@@ -1,0 +1,40 @@
+Release Notes for CLiCC 0.6.2
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+$Revision: 1.1 $
+
+- CLiCC can be compiled by itself now, to get a standalone compiler
+  which can be used without a lisp system. Compile the file
+  clicc.lisp in src/compiler/ by means of (clicc "clicc").
+
+- CLiCC runs with AKCL now.
+
+- Variable *OPTIMIZE* may be used to disable optimizations. Use this
+  in a first (fast !) run of CLiCC to check if your application
+  conforms to CL_0 and if the generated code runs as expected.
+
+- New papers cl0-engl.ps and Migration.ps .
+
+- Tail recursion elimination has been implemented, may be turned off by
+  *no-tail-recursion*
+
+- Method caching for generic functions with more than
+  *METHOD-CACHE-LIMIT* effective methods.
+
+- Commands rt and cl now call gcc by default.
+
+- Arguments of cl must have extension *.c now. 
+
+- Use 'cl file1.c .. filen.c'
+  to compile and link modules or splitted applications.
+
+- New function rt::system
+
+- The function format knows about ~[ and ~;
+
+- Pathnames are printed as #P now.
+
+- Functions logtest und logbit have been implemented
+
+- Command line interface for standalone version of CLiCC has been
+  changed, look at src/compiler/clicc.lisp
+
