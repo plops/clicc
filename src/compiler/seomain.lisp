@@ -3,8 +3,11 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Auf die Seiteneffektanalyse beruhende Optimierungen.
 ;;;
-;;; $Revision: 1.16 $
+;;; $Revision: 1.17 $
 ;;; $Log: seomain.lisp,v $
+;;; Revision 1.17  1994/01/27  18:42:06  kl
+;;; Aufruf von (type-eq bottom-t ..) durch (is-bottom-t ..) ersetzt.
+;;;
 ;;; Revision 1.16  1993/11/15  12:18:39  jh
 ;;; seo-1form fuer progn verbessert.
 ;;;
@@ -89,7 +92,7 @@
 
 (defun eliminate-it-p (form)
   (and (is-side-effect-free form)
-       (not (type-eq bottom-t (?type form)))))
+       (not (is-bottom-t (?type form)))))
 
 ;;------------------------------------------------------------------------------
 ;; An var-refs, named-const etc. kann nichts optimiert werden.

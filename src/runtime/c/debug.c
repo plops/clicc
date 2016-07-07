@@ -5,8 +5,42 @@
  *            ------------------------------------------------------
  * Funktion : Print Funktion fuer CL_FORMs
  *
- * $Revision: 1.15 $
+ * $Revision: 1.24 $
  * $Log: debug.c,v $
+ * Revision 1.24  1994/05/31  15:17:06  sma
+ * UNBOUND wieder als eigenen Tzp eingefuehrt.
+ *
+ * Revision 1.23  1994/05/18  15:18:12  sma
+ * Anpassung für obrep2. Abstraktionen verbessert. (Außerdem Quelltext
+ * teilweise neu formatiert)
+ *
+ * Revision 1.22  1994/05/06  08:26:24  hk
+ * Structure-Printer angepa"st: size enth"alt die Anzahl der Slots, also
+ * size+1
+ *
+ * Revision 1.21  1994/01/21  13:34:49  sma
+ * Erneute Änderung der Symbolrepräsentation. Änderug für neue
+ * Repräsentation von #<unbound>.
+ *
+ * Revision 1.20  1994/01/14  09:18:18  sma
+ * Änderung der Symbol-Repräsentation auch für dc_pure_symbol.
+ *
+ * Revision 1.19  1994/01/13  16:36:51  sma
+ * Änderung der Symbol-Repräsentation.
+ *
+ * Revision 1.18  1993/12/10  15:14:48  sma
+ * in main.c wird stack_cont(stack, 0, 0) aufgerufen, was bis eben als
+ * ungültiges Argument angesehen wurde. Ist korrigiert.
+ *
+ * Revision 1.17  1993/12/10  11:35:39  sma
+ * extern-Declaration in stack_cont vergessen.
+ *
+ * Revision 1.16  1993/12/09  15:00:29  sma
+ * Änderungen für neue array-Repräsentation. Code für jetzt unbenutzte Typen wie
+ * CL_SMAR_FIXNUM entfernt. Source neu eingerückt. Check für stack_cont
+ * eingebaut, der die "beliebten" BUS-Errors beim Debugen unterdrückt,
+ * die entstehen, weil man stack_cont falsch aufruft.
+ *
  * Revision 1.15  1993/10/27  12:23:59  sma
  * Auf die Länge von Strukturen und Instanzen wird jetzt (korrekterweise)
  * mit dem AR_SIZE-Makro zugegriffen.
@@ -63,408 +97,250 @@
 int print_length = 10;
 int print_level = 2;
 
-/*----------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
  * Prozedur    : INSPECT
  * Beschreibung: Zeigt eine LISP-Form an
  *----------------------------------------------------------------------------*/
-void 
-inspect (base, level, length, in_list_p)
-  CL_FORM *base;
-  int level, length;
-  BOOL in_list_p;
+void inspect(base, level, length, in_list_p)
+CL_FORM *base;
+int level, length;
+BOOL in_list_p;
 {
-    CL_FORM *fptr;
-    long i, size;
-
-    switch (TYPE_OF (base))
-    {
-	case CL_UNBOUND:	/*  0 */
-	    printf ("<Unbound value>");
-	    return;
-	case CL_FIXNUM:	/*  1 */
-	    printf ("%d", GET_FIXNUM (base));
-	    return;
-	case CL_FLOAT:		/*  2 */
-	    printf ("%g[F]", GET_FLOAT (base));
-	    return;
-	case CL_CHAR:		/*  3 */
-	    switch (GET_CHAR (base))
-	    {
+   CL_FORM *fptr;
+   long i, size;
+   
+   switch (TYPE_OF(base))
+   {
+	case CL_FIXNUM:              /*  1 */
+      printf("%ld", GET_FIXNUM(base));
+      return;
+	case CL_FLOAT:               /*  2 */
+      printf("%g[F]", GET_FLOAT(base));
+      return;
+	case CL_CHAR:                /*  3 */
+      switch(GET_CHAR(base))
+      {
 		case '\b':
-		    printf ("\\b");
-		    break;
+         printf("\\b");
+         break;
 		case '\f':
-		    printf ("\\f");
-		    break;
+         printf("\\f");
+         break;
 		case '\n':
-		    printf ("\\n");
-		    break;
+         printf("\\n");
+         break;
 		case '\r':
-		    printf ("\\r");
-		    break;
+         printf("\\r");
+         break;
 		case '\t':
-		    printf ("\\t");
-		    break;
+         printf("\\t");
+         break;
 		default:
-		    printf ("\'%c\'", GET_CHAR (base));
-	    }
-	    return;
-	case CL_SYMBOL:	/* 13 */
-	    fptr = GET_FORM (base);
-	    printf ("%.*s", (int)AR_SIZE (fptr), CHAR_AR (fptr));
-	    return;
-	case CL_NIL:		/* 14 */
-	    printf ("NIL");
-	    return;
-	case CL_CLOSURE:	/* 32 */
-	    printf ("<Closure>");
-	    return;
-	case CL_DOWNFUN:	/* 33 */
-	    printf ("<Downfun>");
-	    return;
-	case CL_GLOBFUN:	/* 34 */
-	    printf ("<Global function>");
-	    return;
-	case CL_IND:		/* 38 */
-	    printf ("Indirection: ");
-	    inspect (GET_FORM (base), level, length, FALSE);
-	    return;
-	case CL_CFILE:		/* 41 */
-	    printf ("<C File>");
-	    return;
-	case CL_UNIQUE_TAG:	/* 42 */
-	    printf ("<Tag %d>", GET_FIXNUM (base));
-	    return;
-    }
+         printf("\'%c\'", GET_CHAR(base));
+      }
+      return;
+   case CL_UNBOUND:
+      printf("#<unbound>");
+      return;
+	case CL_SYMBOL:              /* 13 */
+      fptr = SYM_NAME(base);
+      printf("%.*s", (int)AR_SIZE(fptr), CHAR_AR(fptr));
+      return;
+	case CL_NIL:                 /* 14 */
+      printf("NIL");
+      return;
+	case CL_CLOSURE:             /* 32 */
+      printf("#<Closure>");
+      return;
+	case CL_DOWNFUN:             /* 33 */
+      printf("#<Downfun>");
+      return;
+	case CL_GLOBFUN:             /* 34 */
+      printf("#<Global function>");
+      return;
+	case CL_IND:                 /* 38 */
+      printf("Indirection: ");
+      inspect(INDIRECT(base), level, length, FALSE);
+      return;
+	case CL_CFILE:               /* 41 */
+      printf("#<C File>");
+      return;
+	case CL_UNIQUE_TAG:          /* 42 */
+      printf("#<Tag %ld>", AR_SIZE(base));
+      return;
+   }
 
-    if (level > print_level)	/* *PRINT-LEVEL* ueberschritten ? */
-    {
-	printf ("#");
-	return;
-    }
+   if (level > print_level)     /* *PRINT-LEVEL* ueberschritten ? */
+   {
+      printf("#");
+      return;
+   }
 
-    fptr = GET_FORM (base);
-    switch (TYPE_OF (base))
-    {
-/*----------------------------------------------------------------------*/
-	case CL_CONS:		/* 15 */
-	    if (!in_list_p)
-		printf ("(");
-	    inspect (fptr++, level + 1, 0, FALSE);
-	    switch (TYPE_OF (fptr))
-	    {
+   fptr = GET_FORM(base);
+   switch (TYPE_OF(base))
+   {
+      /*----------------------------------------------------------------------*/
+	case CL_CONS:                /* 15 */
+      if (!in_list_p)
+         printf("(");
+      inspect(CAR(fptr), level + 1, 0, FALSE);
+      fptr = CDR(fptr);
+      switch (TYPE_OF(fptr))
+      {
 		case CL_NIL:
-		    printf (")");
-		    break;
+         printf(")");
+         break;
 		case CL_CONS:
-		    printf (" ");
-		    if (length > print_length)
-		    {
-			printf ("... )");
-			return;
-		    }
-		    inspect (fptr, level, length + 1, TRUE);
-		    break;
+         printf(" ");
+         if (length > print_length)
+         {
+            printf("... )");
+            return;
+         }
+         inspect(fptr, level, length + 1, TRUE);
+         break;
 		default:
-		    printf (" . ");
-		    inspect (fptr, level + 1, 0, FALSE);
-		    printf (")");
-		    break;
-	    }
-	    break;
+         printf(" . ");
+         inspect(fptr, level + 1, 0, FALSE);
+         printf(")");
+         break;
+      }
+      break;
 
-/*----------------------------------------------------------------------*/
-	case CL_VEC_T:		/* 16 */
-	    if (HAS_FILL_PTR (fptr))
-		size = AR_SIZE_WHEN_FP (fptr);
-	    else
-		size = AR_SIZE (fptr);
-	    printf ("Vektor T:  Size: %d, FP: ", size);
-	    if (HAS_FILL_PTR (fptr))
-		printf ("%d", AR_SIZE (fptr));
-	    else
-		printf ("NIL");
-	    fptr = FORM_AR (fptr);
-	    printf ("\n   (");
-	    for (i = 0; i < size; i++)
-	    {
-		inspect (fptr + i, level + 1, 0, FALSE);
-		if (i < size - 1)
-		    printf (" ");
-		if (i > print_length)
-		{
-		    printf ("...");
-		    break;
-		}
-	    }
-	    printf (")");
-	    break;
+      /*----------------------------------------------------------------------*/
+	case CL_SMVEC_T:             /* 20 */
+      size = AR_SIZE(fptr);
+      printf("#1A%ld(", size);
+      for (i = 0; i < size; i++)
+      {
+         inspect(OFFSET(FORM_AR(fptr), i), level + 1, 0, FALSE);
+         if (i < size - 1)
+            printf(" ");
+         if (i > print_length)
+         {
+            printf("...");
+            break;
+         }
+      }
+      printf(")");
+      break;
 
-/*----------------------------------------------------------------------*/
-	case CL_VEC_FIXNUM:	/* 17 */
-	    {
-		long *fixnum_ar = FIXNUM_AR (fptr);
+      /*----------------------------------------------------------------------*/
+	case CL_SMVEC_FIXNUM:        /* 21 */
+   {
+      long *fixnum_ar = FIXNUM_AR(fptr);
 
-		if (HAS_FILL_PTR (fptr))
-		    size = AR_SIZE_WHEN_FP (fptr);
-		else
-		    size = AR_SIZE (fptr);
-		printf ("Vektor FIXNUM:  Size: %d, FP: ", size);
-		if (HAS_FILL_PTR (fptr))
-		    printf ("%d", AR_SIZE (fptr));
-		else
-		    printf ("NIL");
-		printf ("\n   (");
-		for (i = 0; i < size; i++)
-		{
-		    printf ("%d", fixnum_ar[i]);
-		    if (i < size - 1)
-			printf (" ");
-		    if (i > print_length)
-		    {
-			printf ("...");
-			break;
-		    }
-		}
-		printf (")");
-		break;
-	    }
+      size = AR_SIZE(fptr);
+      printf("#1AFi%ld(", size);
+      for(i = 0; i < size; i++)
+      {
+         printf("%ld", fixnum_ar[i]);
+         if (i < size - 1)
+            printf(" ");
+         if (i > print_length)
+         {
+            printf("...");
+            break;
+         }
+      }
+      printf(")");
+      break;
+   }
 
-/*----------------------------------------------------------------------*/
-	case CL_VEC_FLOAT:	/* 18 */
-	    {
-		double *fl_ptr = FLOAT_AR (fptr);
+      /*----------------------------------------------------------------------*/
+	case CL_SMVEC_FLOAT:         /* 22 */
+   {
+		double *fl_ptr = FLOAT_AR(fptr);
 
-		if (HAS_FILL_PTR (fptr))
-		    size = AR_SIZE_WHEN_FP (fptr);
-		else
-		    size = AR_SIZE (fptr);
-		printf ("Vektor FLOAT:  Size: %d, FP: ", size);
-		if (HAS_FILL_PTR (fptr))
-		    printf ("%d", AR_SIZE (fptr));
-		else
-		    printf ("NIL");
-		printf ("\n   (");
+		size = AR_SIZE(fptr);
+		printf("#1AFl%ld(", size);
 		for (i = 0; i < size; i++, fl_ptr++)
 		{
-		    printf ("%g", *fl_ptr);
-		    if (i < size - 1)
-			printf (" ");
-		    if (i > print_length)
-		    {
-			printf ("...");
-			break;
-		    }
+         printf("%g", *fl_ptr);
+         if (i < size - 1)
+            printf(" ");
+         if (i > print_length)
+         {
+            printf("...");
+            break;
+         }
 		}
-		printf (")");
+		printf(")");
 		break;
-	    }
-
-/*----------------------------------------------------------------------*/
-	case CL_STRING:	/* 19 */
-	    if (HAS_FILL_PTR (fptr))
-		size = AR_SIZE_WHEN_FP (fptr);
-	    else
-		size = AR_SIZE (fptr);
-	    printf ("String T:  Size: %d, FP: ", size);
-	    if (HAS_FILL_PTR (fptr))
-	    {
-		size = AR_SIZE (fptr);
-		printf ("%d", size);
-	    }
-	    else
-		printf ("NIL");
-	    printf ("   \"%.*s\"", (int)size, CHAR_AR (fptr));
-	    break;
-
-/*----------------------------------------------------------------------*/
-	case CL_SMVEC_T:	/* 20 */
-	    size = AR_SIZE (fptr);
-	    printf ("#1A%d(", size);
-	    for (i = 0; i < size; i++)
-	    {
-		inspect (fptr + 1 + i, level + 1, 0, FALSE);
-		if (i < size - 1)
-		    printf (" ");
-		if (i > print_length)
-		{
-		    printf ("...");
-		    break;
-		}
-	    }
-	    printf (")");
-	    break;
-
-/*----------------------------------------------------------------------*/
-	case CL_SMVEC_FIXNUM:	/* 21 */
-	    {
-		long *fixnum_ar = FIXNUM_AR (fptr);
-
-		size = AR_SIZE (fptr);
-		printf ("#1AFi%d(", size);
+   }
+      /*----------------------------------------------------------------------*/
+	case CL_SMSTR:               /* 23 */
+      printf("\"%.*s\"", (int)AR_SIZE(fptr), AR_STRING(fptr));
+      break;
+      
+      /*----------------------------------------------------------------------*/
+	case CL_STRUCT:              /* 39 */
+   {
+		size = 1 + AR_SIZE(fptr);
+		printf("#S(");
 		for (i = 0; i < size; i++)
 		{
-		    printf ("%d", fixnum_ar[i]);
-		    if (i < size - 1)
-			printf (" ");
-		    if (i > print_length)
-		    {
-			printf ("...");
-			break;
-		    }
+         inspect(fptr + 1 + i, level + 1, 0, FALSE);
+         if (i < size - 1)
+            printf(" ");
+         if (i > print_length)
+         {
+            printf("...");
+            break;
+         }
 		}
-		printf (")");
+		printf(")");
 		break;
-	    }
+   }
 
-/*----------------------------------------------------------------------*/
-	case CL_SMVEC_FLOAT:	/* 22 */
-	    {
-		double *fl_ptr = FLOAT_AR (fptr);
-
-		size = AR_SIZE (fptr);
-		printf ("#1AFl%d(", size);
-		for (i = 0; i < size; i++, fl_ptr++)
-		{
-		    printf ("%g", *fl_ptr);
-		    if (i < size - 1)
-			printf (" ");
-		    if (i > print_length)
-		    {
-			printf ("...");
-			break;
-		    }
-		}
-		printf (")");
-		break;
-	    }
-/*----------------------------------------------------------------------*/
-	case CL_SMSTR:		/* 23 */
-	    printf ("\"%.*s\"", (int)AR_SIZE (fptr), CHAR_AR (fptr));
-	    break;
-
-/*----------------------------------------------------------------------*/
-	case CL_SMAR_T:	/* 24 */
-	    {
-		CL_FORM *array = GET_FORM (base);
-		int rank = AR_RANK (array);
-
-		size = AR_SIZE (array);
-		printf ("Array  Size: %d, Rank: %d ", size, rank);
-		printf ("Dimensions: ");
-		for (i = 0; i < rank; i++)
-		    printf ("%d ", AR_DIM (array, i));
-		printf ("\n   (");
-		for (i = 0; i < size; i++)
-		{
-		    inspect (array + 1 + i, level + 1, 0, FALSE);
-		    if (i < size - 1)
-			printf (" ");
-		    if (i > print_length)
-		    {
-			printf ("...");
-			break;
-		    }
-		}
-		printf (")");
-		break;
-	    }
-
-/*----------------------------------------------------------------------*/
-	case CL_SMAR_FIXNUM:	/* 25 */
-	    {
-		CL_FORM *array = GET_FORM (base);
-		int rank = AR_RANK (array);
-		long *fixnum_ar = FIXNUM_AR (array);
-
-		size = AR_SIZE (array);
-		printf ("Array FIXNUM, Size: %d, Rank: %d ", size, rank);
-		printf ("Dimensions: ");
-		for (i = 0; i < rank; i++)
-		    printf ("%d ", AR_DIM (array, i));
-		printf ("\n   (");
-		for (i = 0; i < size; i++)
-		{
-		    printf ("%d", fixnum_ar[i]);
-		    if (i < size - 1)
-			printf (" ");
-		    if (i > print_length)
-		    {
-			printf ("...");
-			break;
-		    }
-		}
-		printf (")");
-		break;
-	    }
-
-/*----------------------------------------------------------------------*/
-	case CL_STRUCT:	/* 39 */
-	    {
-		size = AR_SIZE (fptr);
-		printf ("#S(");
-		for (i = 0; i < size; i++)
-		{
-		    inspect (fptr + 1 + i, level + 1, 0, FALSE);
-		    if (i < size - 1)
-			printf (" ");
-		    if (i > print_length)
-		    {
-			printf ("...");
-			break;
-		    }
-		}
-		printf (")");
-		break;
-	    }
-
-/*----------------------------------------------------------------------*/
-	case CL_INSTANCE:	/* 50 */
-	    {
-		size = AR_SIZE (fptr);
-		if CL_NILP(AR_BASE (fptr))
-		    printf ("#<CLASS ");
+      /*----------------------------------------------------------------------*/
+	case CL_INSTANCE:            /* 50 */
+   {
+		size = AR_SIZE(fptr);
+		if (CL_NILP(AR_BASE(fptr)))
+         printf("#<CLASS ");
 		else
 		{
-		    printf ("#<INSTANCE-OF-");
-		    inspect (fptr + 1, level + 1, 0, FALSE);
-		    printf (" ");
+         printf("#<INSTANCE-OF-");
+         inspect(AR_BASE(fptr), level + 1, 0, FALSE);
+         printf(" ");
 		}
 		for (i = 1; i < size; i++)
 		{
-		    inspect (fptr + 1 + i, level + 1, 0, FALSE);
-		    if (i < size - 1)
-			printf (" ");
-		    if (i > print_length)
-		    {
-			printf ("...");
-			break;
-		    }
+         inspect(fptr + 1 + i, level + 1, 0, FALSE);
+         if (i < size - 1)
+            printf(" ");
+         if (i > print_length)
+         {
+            printf("...");
+            break;
+         }
 		}
-		printf (">");
+		printf(">");
 		break;
-	    }
+   }
 
-/*----------------------------------------------------------------------*/
-    case RT_CHAR_PTR:
-	    printf ("RT::\"%s\"", GET_CHAR_PTR (base));
-	    break;
-    case RT_FLOAT_PTR:
-       printf ("<float_ptr %lx>", (long)GET_FLOAT_PTR(base));
-       break;
-    case RT_FIXNUM_PTR:
-       printf ("<fixnum_ptr %lx>", (long)GET_FIXNUM_PTR(base));
-       break;
-    case RT_FORM_PTR:
-       printf ("<form_ptr %lx>", (long)GET_FORM(base));
-       break;
-       
+      /*----------------------------------------------------------------------*/
+#ifdef RT_CHAR_PTR
+   case RT_CHAR_PTR:
+      printf("<char_ptr>\"%s\"", GET_CHAR_PTR(base));
+      break;
+   case RT_FLOAT_PTR:
+      printf("<float_ptr %lx>", (long)GET_FLOAT_PTR(base));
+      break;
+   case RT_FIXNUM_PTR:
+      printf("<fixnum_ptr %lx>", (long)GET_FIXNUM_PTR(base));
+      break;
+   case RT_FORM_PTR:
+      printf("<form_ptr %lx>", (long)GET_FORM(base));
+      break;
+#endif
 	default:
-	    printf ("<Unknown object %d>", TYPE_OF (base));
-    }
+      printf("<Unknown object %d>", TYPE_OF(base));
+   }
 }
 
-/*----------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
  * Zeigt aus dem Speicherbereich ab 'base + offset' 'nargs' viele Eintraege an
  *----------------------------------------------------------------------------*/
 void stack_cont (base, offset, nargs)
@@ -472,6 +348,20 @@ CL_FORM *base;
 int offset, nargs;
 {
    int i;
+
+   extern CL_FORM *fo_heap;     /* aus system.c */
+   extern unsigned form_heapsize;
+
+   /* Argumente auf Plausibilität prüfen, um BUS-Errors einzuschränken
+    * Die Zahlen sind so gewählt, daß der häufigste Fall, bei
+    * stack_cont(&Smain[100],0,1) das & zu vergessen, wahrscheinlich 
+    * abgefangen wird. */
+   if (offset < 0 || nargs < 0 || offset > 10000 || nargs > 1000 ||
+       (long)base < 100 || base > fo_heap + 2 * form_heapsize)
+   {
+      printf("\n*** Ungueltige Argumente\n");
+      return;
+   }
 
    for (i = offset; i < offset + nargs; i++)
    {
@@ -481,7 +371,7 @@ int offset, nargs;
    }
 }
 
-/*----------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
  * Zeigt den Namen, die Property-Liste und den Wert des Symbols an einer
  * gegebenen Adresse
  *----------------------------------------------------------------------------*/
@@ -490,8 +380,8 @@ CL_FORM *symbol;
 {
    printf ("Symbol (0x%lx): %.*s\n",
            (long)symbol,
-           (int)AR_SIZE (symbol),
-           CHAR_AR (symbol));
+           (int)AR_SIZE(symbol + OFF_SYM_NAME),
+           AR_STRING(symbol + OFF_SYM_NAME));
    printf ("Plist: ");
    inspect (symbol + OFF_SYM_PLIST, 0, 0, FALSE);
    printf ("\nValue: ");
@@ -506,9 +396,12 @@ void symbol_module_i (sym_base, i)
 CL_FORM *sym_base;
 int i;
 {
-   dc_pure_symbol(sym_base + i * SYM_SIZE);
+   dc_pure_symbol(SYMBOL(sym_base, i));
 }
 
+/*------------------------------------------------------------------------------
+ * Zeigt eine Alist formatiert an.
+ *----------------------------------------------------------------------------*/
 void show_alist (base, i)
 CL_FORM *base;
 int i;

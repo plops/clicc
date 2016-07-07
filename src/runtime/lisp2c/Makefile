@@ -5,7 +5,7 @@
 #            Uses optional parameter OPTIMIZE = <-{O | g}>.
 #            Uses environment variable CLICCROOT.
 #
-#  $Source: /home3/apply/public/clicc-0.6.2a/src/runtime/lisp2c/RCS/Makefile,v $
+#  $Source: /home3/apply/public/clicc-0.6.4/src/runtime/lisp2c/RCS/Makefile,v $
 #  $Author: hk $
 #  $Revision: 1.2 $
 #  $Date: 1993/04/22 10:18:45 $

@@ -6,7 +6,7 @@
 #            Uses Environment variable CLICCROOT and CROSS386.
 #
 # $Revision: 1.6 $
-# $Source: /home3/apply/public/clicc-0.6.2a/src/runtime/c/RCS/GNUmakefile386,v $
+# $Source: /home3/apply/public/clicc-0.6.4/src/runtime/c/RCS/GNUmakefile386,v $
 # $Author: uho $
 # $Date: 1993/06/08 12:59:14 $
 #------------------------------------------------------------------------------

@@ -5,8 +5,29 @@
 ;;;            ------------------------------------------------------
 ;;; Inhalt   : Ein Interpretierer fuer Teile der Zwischensprache.
 ;;;
-;;; $Revision: 1.64 $
+;;; $Revision: 1.70 $
 ;;; $Log: p1eval.lisp,v $
+;;; Revision 1.70  1994/04/28  13:40:44  hk
+;;; Fehler in zw-eval (mv-lambda t) behoben.
+;;;
+;;; Revision 1.69  1994/03/11  14:44:40  hk
+;;; break kann interpretiert werden, damit man Fehler in
+;;; Makro-Expansionsfunktionen eingrenzen kann.
+;;;
+;;; Revision 1.68  1994/03/08  16:26:32  hk
+;;; zw-eval f"ur let* bricht ab, wenn dynamische Variablen gebunden werden
+;;; sollen.
+;;;
+;;; Revision 1.67  1994/03/03  13:48:27  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.66  1994/02/09  15:30:38  hk
+;;; p1-eval kennt nun rt::set-prop und rt::remf-internal, die aus der
+;;; Makroexpansion von (setf getf) und remf entstehen.
+;;;
+;;; Revision 1.65  1994/02/08  14:49:09  hk
+;;; eval f‹R mv-lambda eingebaut.
+;;;
 ;;; Revision 1.64  1993/12/09  10:12:53  hk
 ;;; (method zw-apply imported-fun): (declare (ignore env)) gestrichen.
 ;;;
@@ -360,10 +381,14 @@
 ;;------------------------------------------------------------------------------
 ;; Auswertung einer benannten Konstante
 ;;------------------------------------------------------------------------------
-(defmethod zw-eval ((form named-const) env)
+(defmethod zw-eval ((form defined-named-const) env)
   (if (member (?value form) '(:unknown :forward))
       (unable-to-eval form)
       (zw-eval (?value form) env)))
+
+(defmethod zw-eval ((form imported-named-const) env)
+  (declare (ignore env))
+  (unable-to-eval form))
 
 ;;------------------------------------------------------------------------------
 ;; Zuweisung an eine Variable
@@ -394,13 +419,26 @@
 ;;------------------------------------------------------------------------------
 ;; Hinzufuegen neuer Variablenbindungen
 ;;------------------------------------------------------------------------------
-(defmethod zw-eval ((a-let*-form let*-form) env)
+(defmethod zw-eval ((form let*-form) env)
   (mapc #'(lambda (variable init-form)
-            (zw-bind variable (zw-eval init-form env) env))
-        (?var-list a-let*-form)
-        (?init-list a-let*-form))
-  (zw-eval (?body a-let*-form) env))
+            (if (local-static-p variable)
+                (zw-bind variable (zw-eval init-form env) env)
+                (unable-to-eval form)))
+        (?var-list form)
+        (?init-list form))
+  (zw-eval (?body form) env))
 
+;;------------------------------------------------------------------------------
+;; Multiple Values
+;;------------------------------------------------------------------------------
+(defmethod zw-eval ((form mv-lambda) env)
+  (multiple-value-call
+      (zw-eval (make-defined-fun :symbol 'mv-lambda
+                                 :params (?params form)
+                                 :body (?body form))
+               env)
+    (zw-eval (?arg form) env)))
+  
 ;;------------------------------------------------------------------------------
 ;; Tagbody und Go
 ;;------------------------------------------------------------------------------
@@ -436,18 +474,11 @@
 
 ;;------------------------------------------------------------------------------
 ;; Funktionales Objekt
-;;------------------------------------------------------------------------------
-(defmethod zw-eval ((fun local-fun) env)
-  #'(lambda (&rest arg-list)
-      (zw-apply fun arg-list env)))
-
-;;------------------------------------------------------------------------------
-;; Globale und importierte Funktionen haben leeres Environment
+;; Globale und importierte Funktionen greifen nicht auf env zu
 ;;------------------------------------------------------------------------------
 (defmethod zw-eval ((fun fun) env)
-  (declare (ignore env))
   #'(lambda (&rest arg-list)
-      (zw-apply fun arg-list (zw-empty-env))))
+      (zw-apply fun arg-list env)))
 
 ;;------------------------------------------------------------------------------
 ;; Funktion des Wirts Lispsystems.
@@ -614,6 +645,34 @@
     ;; Symbols
     ;; keine P-Listen von Symbolen bearbeiten !
     (sym-fun L::getf getf)
+    (sym-fun
+     rt::set-prop
+     (lambda (plist indicator value)
+       (labels ((get-prop (list indicator)
+                  (cond
+                    ((atom list) nil) 
+                    ((eq (car list) indicator) list)
+                    (t (get-prop (cddr list) indicator)))))
+         (let ((list (get-prop plist indicator)))
+           (cond
+             (list
+              (rplaca (cdr list) value)
+              plist)
+             (t (cons indicator (cons value plist))))))))
+    
+    (sym-fun
+     rt::remf-internal
+     (lambda (list indicator)
+       (cond
+         ((atom list) (values nil nil))
+         ((eq (car list) indicator) (values (cddr list) t))
+         (t (do ((list1 list (cddr list1))
+                 (list2 (cddr list) (cddr list2)))
+                ((atom list2) (values nil nil)) ;end test
+              (when (eq (car list2) indicator)
+                (rplacd (cdr list1) (cddr list2))
+                (return (values list t))))))))
+
     (sym-fun L::get-properties get-properties)
     (sym-fun L::symbol-name symbol-name)
     (sym-fun L::make-symbol make-symbol)
@@ -986,6 +1045,7 @@
     ;; Errors
     (sym-fun L::error error)
     (sym-fun L::warn warn)
+    (sym-fun L::break break)
     ;; ..
     ))
 

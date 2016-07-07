@@ -7,8 +7,18 @@
  *            - Environment Variablen
  *            - Komandozeilen Argumente
  *
- * $Revision: 1.11 $
+ * $Revision: 1.13 $
  * $Log: environ.c,v $
+ * Revision 1.13  1994/04/28  09:44:34  sma
+ * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ *
+ * Revision 1.12  1993/12/09  15:05:01  sma
+ * Aufgrund der neuen Array- (und String-)Repräsentation müssen c-system
+ * und c-environ in Lisp kodiert werden, die ggf. Strings in
+ * simple-strings konvertieren und dann die neuen Funktionen
+ * c-system-internal bzw c-environ-internal aufgrufen.  STACK(base, xxx)
+ * -> ARG(xxx)
+ *
  * Revision 1.11  1993/11/04  12:56:30  uho
  * Funktion  c_system  zum Aufruf externer Programme definiert.
  *
@@ -57,50 +67,46 @@ extern char **glob_argv;      /* in main.c */
 char ARG_FILE_NOT_FOUND[]= "File ~a not found for argument expansion";
 char ARG_FILE_ERR[]= "in file ~a while expanding argument";
 char ARG_STRING_TOO_LONG[]= "Argument string too long: ~a";
-char ARG_MUST_BE_STRING[]= "String expected but ~a passed";
 
 /*------------------------------------------------------------------------------
- * c-getenv string
+ * c-getenv-internal string
  *----------------------------------------------------------------------------*/
-void c_getenv(base)
+void c_getenv_internal(base)
 CL_FORM *base;
 {
-   char *str = getenv(get_c_string(STACK(base, 0)));
+   char *str = getenv(get_c_string(ARG(0)));
 
    if(str == NULL)
    {
-      LOAD_NIL(STACK(base, 0));
+      LOAD_NIL(ARG(0));
    }
    else
    {
-      make_string (STACK (base, 0), str);
+      make_string(ARG(0), str);
    }
 }
 
 /*------------------------------------------------------------------------------
- * c-system string
+ * c-system_internal string
  *----------------------------------------------------------------------------*/
-void c_system(base)
+void c_system_internal(base)
 CL_FORM *base;
 {	
-   if(CL_SMSTRP(STACK(base, 0)) || CL_STRINGP(STACK(base, 0)))
-	{
-      LOAD_FIXNUM(system(get_c_string(STACK(base, 0))), STACK (base, 0));
-	}
-	else
-	{
-      Lerror(STACK(base, 0), ARG_MUST_BE_STRING);
-	}
+   LOAD_FIXNUM(ARG(0), system(get_c_string(ARG(0))), ARG(0));
 }
 
-/*-------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------
+ * c-argc
+ *----------------------------------------------------------------------------*/
 void c_argc(base)
 CL_FORM *base;
 {
-   LOAD_FIXNUM(glob_argc, STACK(base, 0));
+   LOAD_FIXNUM(ARG(0), glob_argc, ARG(0));
 }
 
-/*-------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------
+ * c-argv
+ *----------------------------------------------------------------------------*/
 void c_argv(base)
 CL_FORM *base;
 {
@@ -120,8 +126,8 @@ CL_FORM *base;
          f = fopen(&glob_argv[arg][1], "r");
          if(!f)
          {
-            make_string(STACK(base, stk), &glob_argv[arg][1]);
-            Lerror(STACK(base, stk), ARG_FILE_NOT_FOUND);
+            make_string(ARG(stk), &glob_argv[arg][1]);
+            Lerror(ARG(stk), ARG_FILE_NOT_FOUND);
          }
          else
          {
@@ -135,13 +141,13 @@ CL_FORM *base;
                {
                   if(ferror (f))
                   {
-                     make_string(STACK(base, stk), &glob_argv[arg][1]);
-                     Lerror(STACK(base, stk), ARG_FILE_ERR);
+                     make_string(ARG(stk), &glob_argv[arg][1]);
+                     Lerror(ARG(stk), ARG_FILE_ERR);
                   }
                   if(j > 0)
                   {
                      tmp_buf[j] = 0;
-                     make_string(STACK(base, stk), tmp_buf);
+                     make_string(ARG(stk), tmp_buf);
                      stk++;
                   }
                   j = 0;
@@ -152,8 +158,8 @@ CL_FORM *base;
                   if(j >= sizeof(tmp_buf))
                   {
                      tmp_buf[--j]='\0';
-                     make_string(STACK(base, stk), tmp_buf);
-                     Lerror(STACK(base, stk), ARG_STRING_TOO_LONG);
+                     make_string(ARG(stk), tmp_buf);
+                     Lerror(ARG(stk), ARG_STRING_TOO_LONG);
                   }
                }                  
             }
@@ -163,11 +169,11 @@ CL_FORM *base;
       }
       else
       {
-         make_string(STACK(base, stk), glob_argv[arg]);
+         make_string(ARG(stk), glob_argv[arg]);
          stk++;
          arg++;
       }
    }
-   Flist(STACK(base, 0), stk);
+   Flist(ARG(0), stk);
    glob_argc = stk;
 }

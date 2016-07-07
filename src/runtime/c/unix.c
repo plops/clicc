@@ -10,8 +10,21 @@
  *            - unix-readlink
  *            - unix-get-unix-error-msg
  *
- * $Revision: 1.7 $
+ * $Revision: 1.11 $
  * $Log: unix.c,v $
+ * Revision 1.11  1994/05/26  10:59:33  uho
+ * In unix_link_mode und unix_file_mode LOAD_SMALLFIXNUM in LOAD_FIXNUM
+ * geaendert, da buf.st_mode kein Byte sein muss.
+ *
+ * Revision 1.10  1994/05/22  15:10:09  sma
+ * LOAD_FIXNUM -> LOAD_SMALLFIXNUM um Compiler-Warnung abzuschaffen.
+ *
+ * Revision 1.9  1994/04/28  09:52:02  sma
+ * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ *
+ * Revision 1.8  1994/01/22  18:33:39  sma
+ * STACK(base, x) --> ARG(x) sowie kosmetische Korrekturen.
+ *
  * Revision 1.7  1993/07/22  15:44:13  uho
  * Wie kam nur diese Klammer weg?
  *
@@ -52,15 +65,14 @@ extern char *getwd();
  * unix-current-directory
  * Returns 2 values
  *----------------------------------------------------------------------------*/
-void unix_current_directory(base)
-CL_FORM *base;
+LISP_FUN(unix_current_directory)
 {
    char pathname[MAXPATHLEN];
    char *result;
    
    result = getwd(pathname);
-   make_string (STACK(base, 0), pathname);
-   COPY(STACK(base, 0), OFFSET(mv_buf, 0));
+   make_string(ARG(0), pathname);
+   COPY(ARG(0), OFFSET(mv_buf, 0));
    mv_count = 2;
    RET_BOOL(result != NULL);
 }
@@ -68,63 +80,67 @@ CL_FORM *base;
 /*------------------------------------------------------------------------------
  * unix-file-mode name
  *----------------------------------------------------------------------------*/
-void unix_file_mode(base)
-CL_FORM *base;
+LISP_FUN(unix_file_mode)
 {
    struct stat buf;
-   int success = stat(get_c_string(STACK(base, 0)), &buf);
+   int success = stat(get_c_string(ARG(0)), &buf);
 
    if(success == 0)
-      LOAD_FIXNUM(buf.st_mode, STACK(base, 0));
+   {
+      LOAD_FIXNUM(ARG(0), buf.st_mode, ARG(0));
+   }
    else
-      LOAD_NIL(STACK(base, 0));
+   {
+      LOAD_NIL(ARG(0));
+   }
 }
 
 /*------------------------------------------------------------------------------
- * unix-link-mode name
+ * UNIX-LINK-MODE name
  *----------------------------------------------------------------------------*/
-void unix_link_mode(base)
-CL_FORM *base;
+LISP_FUN(unix_link_mode)
 {
    struct stat buf;
 #ifdef MSDOS   
-   int success = stat(get_c_string(STACK(base, 0)), &buf);
-   /* No links under DOS */
+   int success = stat(get_c_string(ARG(0)), &buf);  /* No links under DOS */
 #else
-   int success = lstat(get_c_string(STACK(base, 0)), &buf); 
+   int success = lstat(get_c_string(ARG(0)), &buf); 
 #endif
-
-   if(success == 0)
-      LOAD_FIXNUM(buf.st_mode, STACK(base, 0));
+   
+   if (success == 0)
+   {
+      LOAD_FIXNUM(ARG(0), buf.st_mode, ARG(0));
+   }
    else
-      LOAD_NIL(STACK(base, 0));
+   {
+      LOAD_NIL(ARG(0));
+   }
 }
 
 /*------------------------------------------------------------------------------
- * unix-readlink name
+ * UNIX-READLINK name
  * Returns 1 or 2 values
  *----------------------------------------------------------------------------*/
-void unix_readlink(base)
-CL_FORM *base;
+LISP_FUN(unix_readlink)
 {
    char buf[MAXPATHLEN];
 #ifdef MSDOS
-   int success = -1;  /* reading a symbolic link is always an error,
-                         because there are none */
-   errno=EINVAL;      /* The named file is not a symbolic link. */
+   int success = -1;            /* reading a symbolic link is always an error,
+                                   because there are none */
+   errno = EINVAL;              /* The named file is not a symbolic link. */
 #else
-   int success = readlink(get_c_string(STACK(base, 0)), buf, sizeof(buf)-1);
+   int success = readlink(get_c_string(ARG(0)), buf, sizeof(buf)-1);
 #endif
 
    if(success >= 0)
    {
       buf[success] = '\0';
-      make_string (STACK(base, 0), buf);
+      make_string(ARG(0), buf);
    }
    else
    {
-      LOAD_NIL(STACK(base, 0));
-      LOAD_FIXNUM(errno, OFFSET(mv_buf, 0));
+      LOAD_NIL(ARG(0));
+      LOAD_SMALLFIXNUM(errno, OFFSET(mv_buf, 0));
       mv_count = 2;
    }
 }

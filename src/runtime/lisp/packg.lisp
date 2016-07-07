@@ -8,8 +8,23 @@
 ;;;            - alle Package-Funktionen
 ;;;            - Initialisierung der Packages beim Start des Programms
 ;;;
-;;; $Revision: 1.13 $
+;;; $Revision: 1.17 $
 ;;; $Log: packg.lisp,v $
+;;; Revision 1.17  1994/06/02  13:20:18  hk
+;;; Print-Funktion f"ur package-Struktur von write2 nach hier.
+;;;
+;;; Revision 1.16  1994/01/21  13:26:34  sma
+;;; set-symbol-package statt (setf rt::symbol-package).
+;;;
+;;; Revision 1.15  1994/01/13  16:44:57  sma
+;;; rt::set-symbol-package -> setf rt::set-symbol-package. Sourcecode
+;;; verschönert.
+;;;
+;;; Revision 1.14  1993/12/09  17:12:38  sma
+;;; *package-array* und *keyword-package* jetzt statt in startup.lisp hier
+;;; als toplevel-Form definiert. rt::string-hash -> string-hash. Teilweise
+;;; neu eingerückt.
+;;;
 ;;; Revision 1.13  1993/12/08  00:01:00  hk
 ;;; in-package nimmt nur dann den Defaultwert '("LISP") für die Use-List,
 ;;; wenn das Package neu generiert wird und kein anderer Wert angegeben
@@ -72,16 +87,18 @@
    rt::do-all-symbols-iterator rt::setup-symbol) "RT")
 
 ;;------------------------------------------------------------------------------
-(defvar *package*)
 (defconstant package-hashtab-size 101)
-(defvar *package-array*)
-(defvar *keyword-package*)
 
-;;--------------------------------------------------------------------------
+;;------------------------------------------------------------------------------
 (defstruct (package (:copier nil)
                     (:predicate packagep)
                     (:conc-name "%PACKAGE-")
-                    (:constructor raw-make-package))
+                    (:constructor raw-make-package)
+                    (:print-function
+                     (lambda (package stream depth)
+                       (write-string "#<Package \"" stream)
+                       (write-string (package-name package) stream)
+                       (write-string "\">" stream))))
   (name "" :type string)
   (nicknames () :type list)
   (internal
@@ -96,6 +113,11 @@
   (shadowings () :type list)
   (use-list () :type list)
   (used-by-list () :type list))
+
+;;------------------------------------------------------------------------------
+(defvar *package*)
+(defvar *package-array* (make-array 6 :fill-pointer 0 :adjustable t)) 
+(defvar *keyword-package* (make-package "KEYWORD" :nicknames '("") :use ()))
 
 ;;--------------------------------------------------------------------------
 ;; packagep package
@@ -247,19 +269,19 @@
   (setq package (coerce-to-package package))
   
   (multiple-value-bind (symbol where) (find-symbol string package)
-   (if where
-         
-     ;; Symbol ist schon bekannt
-     ;;-------------------------
-     (values symbol where)
-         
-     (progn
-       (setq symbol (make-symbol string))
-       (internal-import symbol package)
-           
-       ;; neues Symbol angelegt
-       ;;----------------------
-       (values symbol nil)))))
+    (if where
+        
+        ;; Symbol ist schon bekannt
+        ;;-------------------------
+        (values symbol where)
+        
+        (progn
+          (setq symbol (make-symbol string))
+          (internal-import symbol package)
+          
+          ;; neues Symbol angelegt
+          ;;----------------------
+          (values symbol nil)))))
 
 ;;--------------------------------------------------------------------------
 ;; find-symbol string &optional package
@@ -267,7 +289,7 @@
 (defun find-symbol (string &optional (package *package*))
   (unless (stringp string)
     (error "~a is not a string" string))
-  (let ((hash-index (rt::string-hash string PACKAGE-HASHTAB-SIZE)))
+  (let ((hash-index (string-hash string PACKAGE-HASHTAB-SIZE)))
     
     (setq package (coerce-to-package package))
     
@@ -307,45 +329,45 @@
         hash-table)
     
     (setq package (coerce-to-package package))
-  
+    
     (multiple-value-setq (found where)
       (find-symbol string package))
     (if (and (eq found symbol)
              (or (eq :internal where) (eq :external where)))
-      (progn
-        (setq hash-table (if (eq :external where)
-                           (%package-external package)
-                           (%package-internal package)))
+        (progn
+          (setq hash-table (if (eq :external where)
+                               (%package-external package)
+                               (%package-internal package)))
+          
+          (when (member symbol (%package-shadowings package))
+            
+            ;; pruefen, ob nach dem Entfernen von SYMBOL ein
+            ;; Names-Konflikt eintreten wuerde.
+            ;;----------------------------------------------
+            (let ((sym1 0))
+              (dolist (used-package (%package-use-list package))
+                (multiple-value-setq (found where)
+                  (find-symbol string used-package))
+                (when (eq where :external)
+                  (if (eql sym1 0)
+                      (setq sym1 found)
+                      (unless (eq found sym1)
+                        (error "~S and ~S will cause a name conflict"
+                               sym1 found))))))
+            (setf (%package-shadowings package)
+                  (delete symbol (%package-shadowings package)
+                          :count 1)))
       
-        (when (member symbol (%package-shadowings package))
+          (del-pack-sym symbol hash-table
+                        (string-hash string PACKAGE-HASHTAB-SIZE))
+          (when (eq (symbol-package symbol) package)
+            (set-symbol-package symbol nil))
         
-          ;; pruefen, ob nach dem Entfernen von SYMBOL ein
-          ;; Names-Konflikt eintreten wuerde.
-          ;;----------------------------------------------
-          (let ((sym1 0))
-            (dolist (used-package (%package-use-list package))
-              (multiple-value-setq (found where)
-                (find-symbol string used-package))
-              (when (eq where :external)
-                (if (eql sym1 0)
-                  (setq sym1 found)
-                  (unless (eq found sym1)
-                    (error "~S and ~S will cause a name conflict"
-                           sym1 found))))))
-          (setf (%package-shadowings package)
-                (delete symbol (%package-shadowings package)
-                        :count 1)))
+          T)
       
-        (del-pack-sym symbol hash-table
-                             (rt::string-hash string PACKAGE-HASHTAB-SIZE))
-        (when (eq (symbol-package symbol) package)
-          (rt::set-symbol-package nil symbol))
-      
-        T)
-    
-      ;; Symbol nicht entfernt
-      ;;----------------------
-      nil)))
+        ;; Symbol nicht entfernt
+        ;;----------------------
+        nil)))
 
 ;;--------------------------------------------------------------------------
 ;; export symbols &optional package
@@ -374,18 +396,18 @@
           (when (and where
                      (not (eq found symbol))
                      (not (member found (%package-shadowings
-                                          using-package))))
+                                         using-package))))
             (error "~S will cause a name conflict in ~S"
                    symbol using-package))))
 
       ;; internal --> external
       ;;----------------------
-      (let ((hash-index (rt::string-hash (symbol-name symbol)
+      (let ((hash-index (string-hash (symbol-name symbol)
                                      PACKAGE-HASHTAB-SIZE)))
         (when (eq :internal where)
           (del-pack-sym symbol
-                               (%package-internal package)
-                               hash-index))
+                        (%package-internal package)
+                        hash-index))
         (push symbol
               (svref (%package-external package) hash-index)))))
   t)
@@ -408,7 +430,7 @@
 
         ;; external --> internal
         ;;----------------------
-        (let ((hash-index (rt::string-hash (symbol-name symbol)
+        (let ((hash-index (string-hash (symbol-name symbol)
                                        PACKAGE-HASHTAB-SIZE)))
           (del-pack-sym symbol
                         (%package-external package)
@@ -438,25 +460,25 @@
 
 ;;--------------------------------------------------------------------------
 (defun internal-import (symbol package)
-  (let ((hash-index (rt::string-hash (symbol-name symbol)
-                                     PACKAGE-HASHTAB-SIZE)))
+  (let ((hash-index (string-hash (symbol-name symbol)
+                                 PACKAGE-HASHTAB-SIZE)))
     (unless (symbol-package symbol)
-      (rt::set-symbol-package package symbol))
+      (set-symbol-package symbol package))
     
     (if (eq package *keyword-package*)
-      ;; Steele (S. 175): whenever a symbol is added to the keyword package
-      ;; the symbol is always made external; the symbol is also automatically
-      ;; declared to be a constant and made to have itself as its value.
-      ;;-------------------------------------------------------------------
-      (progn
+        ;; Steele (S. 175): whenever a symbol is added to the keyword package
+        ;; the symbol is always made external; the symbol is also automatically
+        ;; declared to be a constant and made to have itself as its value.
+        ;;-------------------------------------------------------------------
+        (progn
         
-        ;; Error, wenn eine Konstante in das Keyword-Package importiert
-        ;; wird.
-        ;;-------------------------------------------------------------
-        (set symbol symbol)
-        (rt::set-constant-flag symbol)
-        (push symbol (svref (%package-external package) hash-index)))
-      (push symbol (svref (%package-internal package) hash-index)))))
+          ;; Error, wenn eine Konstante in das Keyword-Package importiert
+          ;; wird.
+          ;;-------------------------------------------------------------
+          (set symbol symbol)
+          (rt::set-constant-flag symbol)
+          (push symbol (svref (%package-external package) hash-index)))
+        (push symbol (svref (%package-internal package) hash-index)))))
 
 ;;--------------------------------------------------------------------------
 ;; shadowing-import symbols &optional package
@@ -471,15 +493,15 @@
 
       ;; evtl. schon vorhandenes Symbol gleichen Namens entfernen
       ;;---------------------------------------------------------
-      (let ((hash-index (rt::string-hash (symbol-name symbol)
+      (let ((hash-index (string-hash (symbol-name symbol)
                                      PACKAGE-HASHTAB-SIZE)))
         (case where
           (:internal (del-pack-sym found
-                                          (%package-internal package)
-                                          hash-index))
+                                   (%package-internal package)
+                                   hash-index))
           (:external (del-pack-sym found
-                                          (%package-external package)
-                                          hash-index)))))
+                                   (%package-external package)
+                                   hash-index)))))
     (internal-import symbol package)
     (push symbol (%package-shadowings package)))
   t)
@@ -540,9 +562,9 @@
   (dolist (unuse to-unuse)
     (setq unuse (coerce-to-package unuse))
     (setf (%package-use-list package)
-      (delete unuse (%package-use-list package) :count 1))
+          (delete unuse (%package-use-list package) :count 1))
     (setf (%package-used-by-list unuse)
-      (delete package (%package-use-list unuse) :count 1)))
+          (delete package (%package-use-list unuse) :count 1)))
   t)
 
 ;;--------------------------------------------------------------------------
@@ -555,13 +577,13 @@
     (map 'nil
          #'(lambda (package)
       
-           ;; hier werden unnoetigerweise auch :inherited Symbole gesucht !
-           ;; (evtl. optimieren)
-           ;;--------------------------------------------------------------
-           (multiple-value-bind (found where)
-               (find-symbol name package)
-             (when (member where '(:internal :external))
-               (pushnew found symbols))))
+             ;; hier werden unnoetigerweise auch :inherited Symbole gesucht !
+             ;; (evtl. optimieren)
+             ;;--------------------------------------------------------------
+             (multiple-value-bind (found where)
+                 (find-symbol name package)
+               (when (member where '(:internal :external))
+                 (pushnew found symbols))))
          *package-array*)
     symbols))
 
@@ -597,47 +619,43 @@
 ;;--------------------------------------------------------------------------
 (defun rt:do-all-symbols-iterator (function)
   (map nil #'(lambda (package)
-             (let ((hash-tab (%package-external package)))
-               (dotimes (i PACKAGE-HASHTAB-SIZE)
-                 (dolist (s (svref hash-tab i))
-                   (funcall function s)))
-               (setq hash-tab (%package-internal package))
-               (dotimes (i PACKAGE-HASHTAB-SIZE)
-                 (dolist (s (svref hash-tab i))
-                   (funcall function s)))))
+               (let ((hash-tab (%package-external package)))
+                 (dotimes (i PACKAGE-HASHTAB-SIZE)
+                   (dolist (s (svref hash-tab i))
+                     (funcall function s)))
+                 (setq hash-tab (%package-internal package))
+                 (dotimes (i PACKAGE-HASHTAB-SIZE)
+                   (dolist (s (svref hash-tab i))
+                     (funcall function s)))))
        *package-array*))
 
 
 ;;------------------------------------------------------------------------------
-;; zur Uebersetzungszeit bekanntes Symbol in Packages eintragen
+;; zur Übersetzungszeit bekanntes Symbol in Packages eintragen
 ;;------------------------------------------------------------------------------
-(defun rt:setup-symbol (sym package-vector &aux n)
-
-  ;; Package-Cell enthaelt:
-  ;; - NIL, wenn uninterned Symbol
-  ;; - 0  , wenn Keyword
-  ;; - -n , wenn external Symbol in Package n
-  ;; - n  , wenn internal Symbol in Package n
+(defun rt:setup-symbol (sym package-vector)
+  
+  ;; Package-Cell enthält:
+  ;;  NIL = uninterned Symbol, nichts zu tun.
+  ;;  0   = Keyword package
+  ;;  -n  = external Symbol in Package n
+  ;;  n   = internal Symbol in Package n
   ;;-----------------------------------------
-  (setq n (rt::symbol-package-index sym))
+  (let ((n (symbol-package-index sym)))
+    (when n
+      (let ((p (svref package-vector (abs n)))
+            (hash-index (string-hash (symbol-name sym) PACKAGE-HASHTAB-SIZE)))
+        
+        (set-symbol-package sym p)
+        
+        ;; Symbol in Hash-Table des Package eintragen
+        ;;-------------------------------------------
+        (if (plusp n)
+            ;; internal Symbol
+            ;;----------------
+            (push sym (svref (%package-internal p) hash-index))
 
-  (if (null n)
-      
-    ;; uninterned Symbol, nichts zu tun
-    ;;---------------------------------
-    nil
-    (let ((p (aref package-vector (abs n)))
-          (hash-index (rt::string-hash (symbol-name sym) PACKAGE-HASHTAB-SIZE)))
-
-      (rt::set-symbol-package p sym)
-
-      ;; Symbol in Hash-Table des Package eintragen
-      ;;-------------------------------------------
-      (cond
-        ;; external Symbol
-        ;;----------------
-        ((<= n 0) (push sym (svref (%package-external p) hash-index)))
-
-        ;; internal Symbol
-        ;;----------------
-        (T (push sym (svref (%package-internal p) hash-index)))))))
+            ;; external Symbol oder Keyword
+            ;;-----------------------------
+            (push sym (svref (%package-external p) hash-index)))))))
+          

@@ -6,8 +6,23 @@
 ;;; Funktion : Das Lisp Modul mit Loads, Definitionen und Toplevel Forms,
 ;;;            die der Initialisierung dienen.
 ;;;
-;;; $Revision: 1.16 $
+;;; $Revision: 1.20 $
 ;;; $Log: lisp.lisp,v $
+;;; Revision 1.20  1994/05/24  14:08:34  sma
+;;; most-positive-fixnum, most-negaitiv-fixnum werden jetzt in fspec.c je
+;;; nach Obrep zur Laufzeit berechnet.
+;;;
+;;; Revision 1.19  1994/01/27  16:22:07  kl
+;;; rt::fixnump eingeführt.
+;;;
+;;; Revision 1.18  1994/01/24  16:22:10  sma
+;;; Symbol T wird jetzt hier definiert.
+;;;
+;;; Revision 1.17  1993/12/09  17:35:28  sma
+;;; Typ-Definitionen von simple-array, simple-vector, simple-string
+;;; korrigiert. Ladereihenfolge der Lisp-Dateien des Laufzeitsystems
+;;; geändert.
+;;;
 ;;; Revision 1.16  1993/11/25  17:19:59  hk
 ;;; error.lisp wird nach print.lisp geladen, damit die special
 ;;; Deklarationen für *print-level* etc. bekannt sind.
@@ -76,7 +91,7 @@
    CONS DOUBLE-FLOAT FIXNUM FLOAT FUNCTION INTEGER KEYWORD LIST LONG-FLOAT MOD
    NULL NUMBER RANDOM-STATE RATIO RATIONAL SEQUENCE SHORT-FLOAT SIGNED-BYTE
    SIMPLE-BIT-VECTOR SIMPLE-STRING SIMPLE-VECTOR SINGLE-FLOAT STANDARD-CHAR
-   STRING SYMBOL UNSIGNED-BYTE VECTOR))
+   STRING SYMBOL UNSIGNED-BYTE VECTOR T))
 
 ;;------------------------------------------------------------------------------
 ;; Das Symbol '* wird vom Laufzeitsystem benutzt, um unspezifizierte Teile von
@@ -87,9 +102,10 @@
 ;;------------------------------------------------------------------------------
 ;; Konstanten
 ;;------------------------------------------------------------------------------
+(defconstant T 'T)
 
-(defconstant MOST-POSITIVE-FIXNUM    2147483647) ; (1- (expt 2 31))
-(defconstant MOST-NEGATIVE-FIXNUM   -2147483648) ; (-  (expt 2 31))
+(defconstant MOST-POSITIVE-FIXNUM (rt::most-positive-fixnum))
+(defconstant MOST-NEGATIVE-FIXNUM (rt::most-negative-fixnum))
 (defconstant SHORT-FLOAT-EPSILON     1.1920929e-7) ; from ALLEGRO
 (defconstant SHORT-FLOAT-NEGATIVE-EPSILON 1.1920929e-7) ; from ALLEGRO
 (defconstant PI                      3.141592653589793)
@@ -131,10 +147,10 @@
   ((&optional element-type size) `(array ,element-type (,size)))
   :superclasses (array))
 (def-built-in BIT-VECTOR
-    :type-expander ((&optional size) `(array bit ,size))
+    :type-expander ((&optional size) `(array bit (,size)))
     :superclasses (vector))
 (def-built-in STRING
-    :type-expander ((&optional size) `(array standard-char ,size))
+    :type-expander ((&optional size) `(array standard-char (,size)))
     :superclasses (vector))
 
 (def-built-in CHARACTER
@@ -199,7 +215,7 @@
 (deftype COMPILED-FUNCTION () '(satisfies compiled-function-p))
 (deftype DOUBLE-FLOAT      () '(satisfies floatp))
 ;(deftype FIXNUM () `(integer most-negative-fixnum most-positive-fixnum))
-(deftype FIXNUM () `(satisfies integerp)) ; zur Zeit keine Bignums implementiert
+(deftype FIXNUM () `(satisfies rt::fixnump)) 
 (deftype KEYWORD           () '(satisfies keywordp))
 (deftype LONG-FLOAT        () '(satisfies floatp))
 (deftype MOD              (n) `(integer 0 (,n)))
@@ -228,9 +244,9 @@
     (t (error "array type: illegal size ~a" size)))
    `(lisp::simple-array-internal ,type ,size))
 
-(deftype SIMPLE-BIT-VECTOR (&optional size) `(simple-array bit ,size))
-(deftype SIMPLE-STRING (&optional size) `(simple-array standard-char ,size))
-(deftype SIMPLE-VECTOR (&optional size) `(simple-array t ,size))
+(deftype SIMPLE-BIT-VECTOR (&optional size) `(simple-array bit (,size)))
+(deftype SIMPLE-STRING (&optional size) `(simple-array standard-char (,size)))
+(deftype SIMPLE-VECTOR (&optional size) `(simple-array t (,size)))
 (deftype SINGLE-FLOAT      () '(satisfies floatp))
 (deftype STANDARD-CHAR     () '(satisfies standard-char-p))
 ;;       T                    --> wird gesondert behandelt
@@ -245,13 +261,6 @@
 ;;------------------------------------------------------------------------------
 (defsetf SYMBOL-VALUE SET)
 
-;;------------------------------------------------------------------------------
-;; NIL und T sind im System Modul definiert aber in kein Package eingetragen,
-;; da Packages erst im Lisp Modul definiert werden.
-;;------------------------------------------------------------------------------
-(defun import-nil-and-t ()
-  (import '(t nil)))
-
 (load "stream")                         ; vor allen anderen fuer IO
 (load "array")
 (load "char")
@@ -263,13 +272,14 @@
 (load "map")
 (load "misc")
 (load "num")
+(load "struct")                         ; vor read fuer struct-reader
+                                        ; und vor packg
 (load "packg")                          ; vor read + sym
 
 (setq *package* (rt:ensure-package "LISP")) ; vor allsyms: (export t)
-(import-nil-and-t)                      ; nach Initialierung von *package*
+(import '(nil))
 
 (load "pred")
-(load "struct")                         ; vor read fuer struct-reader
 (load "hash")                           ; nach struct
 (load "read")
 (load "print")
@@ -283,6 +293,7 @@
 (load "typspc")
 (load "yesno")
 (load "foreign")
+(load "environ")
 
 (load "startup")
 

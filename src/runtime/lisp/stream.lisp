@@ -10,8 +10,11 @@
 ;;;            - FILE-...-STREAM
 ;;;            - CLOSE
 ;;;
-;;; $Revision: 1.12 $
+;;; $Revision: 1.13 $
 ;;; $Log: stream.lisp,v $
+;;; Revision 1.13  1994/06/02  13:43:44  hk
+;;; Print-Funktion f"ur stream-Struktur von write2 nach hier.
+;;;
 ;;; Revision 1.12  1993/12/14  15:38:48  uho
 ;;; lisp::make-stream -> exportiertes rt::make-stream
 ;;;
@@ -33,7 +36,7 @@
 ;;;
 ;;; Revision 1.7  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.12 $ eingefuegt
+;;; $Revision: 1.13 $ eingefuegt
 ;;;
 ;;; Revision 1.6  1993/01/06  16:30:22  hk
 ;;; Spezifikationen von C-fclose, C-fgetc, ... nach hier.
@@ -76,7 +79,8 @@
 ;;------------------------------------------------------------------------------
 (defstruct (stream (:copier nil)
                    (:predicate streamp)
-                   (:constructor rt::make-stream))
+                   (:constructor rt::make-stream)
+                   (:print-function print-stream))
   type
 
   ;; zusaetzliche Informationen:
@@ -95,6 +99,16 @@
   (length #'undef-stream-op)
   close)
 
+;;------------------------------------------------------------------------------
+(defun print-stream (stream to-stream depth)
+  (write-string "#<" to-stream)
+  (princ (stream-type stream) to-stream)
+  (write-string "-STREAM" to-stream)
+  (when (member (stream-type stream) '(FILE-INPUT FILE-OUTPUT FILE-IO))
+    (write-char #\Space to-stream)
+    (write-string (stream-extra stream) to-stream))
+  (write-char #\> to-stream))
+  
 ;;------------------------------------------------------------------------------
 (defun undef-stream-op (&rest x)
   (declare (ignore x))
@@ -373,6 +387,7 @@
         (column 0))
     (rt::make-stream
      :type 'FILE-IO
+     :extra "stdin / stdout"
      :readc #'(lambda () (rt::C-fgetc stdin))
      :unreadc #'(lambda (c) (rt::C-ungetc c stdin))
 ;;;              :listen #'(lambda () (rt::C-listen stdin))

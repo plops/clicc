@@ -5,8 +5,15 @@
  *            ------------------------------------------------------
  * Funktion : Laufzeitsystem: Funktionen des Objektsystems
  *
- * $Revision: 1.14 $
+ * $Revision: 1.16 $
  * $Log: clos.c,v $
+ * Revision 1.16  1994/04/23  16:20:37  sma
+ * Kosmetik.
+ *
+ * Revision 1.15  1994/01/05  12:47:42  sma
+ * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
+ * versehen und den Postfix _internal entfernt. STACK(base,x) -> ARG(x)
+ *
  * Revision 1.14  1993/09/13  11:51:20  sma
  * Fehler in Längenangaben von Arrays, Vectoren und Instanzen beseitigt
  * durch Einführen des SET_AR_SIZE-Makros.
@@ -56,20 +63,22 @@
 #include <c_decl.h>
 #include "sys.h"
 
+/*------------------------------------------------------------------------------
+ * lokale Konstante
+ *----------------------------------------------------------------------------*/
 #define INSTANCE_HEADER 1
 
 
 /*------------------------------------------------------------------------------
- * make-instance-internal  size
+ * RT::MAKE-INSTANCE size
  *----------------------------------------------------------------------------*/
-void make_instance_internal (base)
-CL_FORM *base;
+LISP_FUN(rt_make_instance)
 {
-   long size = GET_FIXNUM(STACK(base, 0));
+   long size = GET_FIXNUM(ARG(0));
    CL_FORM *vector;
 
-   vector = form_alloc(STACK(base, 0), size + INSTANCE_HEADER);
-   SET_AR_SIZE(size, vector);
-   LOAD_CLASS(vector, STACK(base, 0));
+   vector = form_alloc(ARG(0), size + INSTANCE_HEADER);
+   INIT_INSTANCE(vector, size);
+   LOAD_INSTANCE(vector, ARG(0));
 }
 

@@ -5,8 +5,11 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Syntaktischer Export und Import
 ;;;
-;;; $Revision: 1.34 $
+;;; $Revision: 1.35 $
 ;;; $Log: sexport.lisp,v $
+;;; Revision 1.35  1994/01/24  16:15:29  sma
+;;; Fehler in write-syntax-export korrigiert.
+;;;
 ;;; Revision 1.34  1993/12/18  11:08:58  hk
 ;;; Noch einmal korrigiert.
 ;;;
@@ -502,11 +505,11 @@
              "~S~%"
              `(L::IMPORT
                (L::QUOTE ,symbols)
-               ,@(if package
-                     (list (package-name (p1-eval package-form)))
-                     (if (boundp (?package *module*))
-                         (package-name (?package *module*))
-                         "USER")))))))
+               ,(if package
+                    (package-name (p1-eval package-form))
+                    (if (slot-boundp *module* 'package)
+                        (package-name (?package *module*))
+                        "USER")))))))
 
       ;; Die EXPORTs angeben
       ;; -------------------

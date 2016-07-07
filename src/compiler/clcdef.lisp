@@ -5,8 +5,33 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Definitionen fuer Strukturen, Makros, Konstanten, Variablen  
 ;;;
-;;; $Revision: 1.43 $
+;;; $Revision: 1.48 $
 ;;; $Log: clcdef.lisp,v $
+;;; Revision 1.48  1994/06/07  16:09:16  hk
+;;; Erneut: Für CMU17 müssen bei make-instance Symbole statt Klassen
+;;; verwendet werden.
+;;;
+;;; Revision 1.47  1994/06/03  14:18:32  hk
+;;; Versionsnummer auf "0.6.4" erh"oht
+;;;
+;;; Revision 1.46  1994/05/05  15:17:03  hk
+;;; Versionsnummer auf 0.6.3 erh"oht
+;;;
+;;; Revision 1.45  1994/05/05  15:16:18  hk
+;;; Raw-Slots deaktiviert, damit sich CLiCC wieder selbst "ubersetzten
+;;; kann.
+;;;
+;;; Revision 1.44  1994/02/02  09:12:27  hk
+;;; defzws geändert. Nun können Slots mit der Option :raw {t | nil}
+;;; versehen werden. Raw Slots belegen nur dann Speicherplatz, wenn ihnen
+;;; ein Wert ungleich der initform zugewiesen wird. Als initform dürfen
+;;; nur Symbole und Zahlen angegeben werden. Der Defaultwert der initform
+;;; ist nil (nicht unbound). Instanzen mit Raw Slots haben einen
+;;; zusätzlichen Slot, der in einer A-Liste die Werte der Raw Slots
+;;; enthält. Man spart also nur dann Speicherplatz, wenn mindestens 2 Raw
+;;; Slots vorhanden sind.
+;;; (defvar *CURRENT-FORM*) eingefügt.
+;;;
 ;;; Revision 1.43  1993/12/22  09:22:50  hk
 ;;; Für CMU17 müssen bei make-instance Symbole statt Klassen verwendet
 ;;; werden.
@@ -166,7 +191,7 @@
 ;;------------------------------------------------------------------------------
 ;; Global constants
 ;;------------------------------------------------------------------------------
-(defconstant *CLICC-Version* "0.6.2")   ; Versionsnumber of the compiler
+(defconstant *CLICC-Version* "0.6.4")   ; version number of the compiler
 
 ;;------------------------------------------------------------------------------
 ;; Global variables. The default values may be adjusted by the user.
@@ -249,6 +274,7 @@
 (defvar *FUN-NAME*)                     ; Name der momentan uebersetzten
                                         ; Funktion bzw. "toplevel form"
 (defvar *CURRENT-FORM*)                 ; Aktuelle Form fuer Fehlermeldungen
+(defvar *CURRENT-FUN*)                  ; Momentan bearbeitete Funktion 
 (defvar *SDF* NIL)                      ; Handelt es sich um eine vom System
                                         ; generierte Fkt. ?
 (defvar *CLICC-FILENAME*)               ; Name der momentan uebersetzten Datei
@@ -260,6 +286,77 @@
   '(or null (member t)))
 
 ;;------------------------------------------------------------------------------
+;; Hilfsfunktionen fuer defzws
+;;------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+;; Argument: Property-Liste bestehend aus Keyword- / Ausdruck-Paaren
+;;           k1 e1 k2 e2 ... kn en
+;; Resultat: Values
+;;           1. Property-Liste von Keyword- / Variablen-Paaren
+;;              k1 v1 k2 v2 ... kn vn
+;;           2. A-Liste von Variablen- / Ausdruck-Listen
+;;              (v1 e1) (v2 e2) ... (vn en)
+;;------------------------------------------------------------------------------
+(defun args2kv/ve-list (args)
+  (let ((kv (empty-queue))
+        (ve (empty-queue)))
+    (loop
+     (when (endp args) (return))
+     (let ((v (gensym)))
+       (add-q (pop args) kv) (add-q v kv)
+       (add-q (list v (pop args)) ve)))
+    (values (queue2list kv) (queue2list ve))))
+
+;;------------------------------------------------------------------------------
+;; Argumente: 1. Property-Liste von Keyword- / Variablen-Paaren
+;;               k1 v1 k2 v2 ... kn vn
+;;            2. A-Liste von Keyword- / Wert-Paaren
+;;               (l1 . i1) (l2 . i2) ... (lm . im)
+;; Resultate: Values
+;;            1. A-Liste von Keyword- / Variablen- / Wert-Listen
+;;               der Keywords aus dem 1. Argument, die in dem 2. Argument
+;;               vorhanden sind
+;;            2. Teilliste des 1. Arguments, mit den Keywords,
+;;               die nicht in dem 2. Argument gefunden wurden.
+;;------------------------------------------------------------------------------
+(defun split-raw-add-init (kv-list raw-ki-list)
+  (let ((raw-kvi (empty-queue))
+        (not-raw-kv (empty-queue)))
+    (loop
+     (when (endp kv-list) (return))
+     (let* ((k (pop kv-list))
+            (v (pop kv-list))
+            (ki (assoc k raw-ki-list)))
+       (if ki
+           (add-q (list k v (cdr ki)) raw-kvi)
+           (progn (add-q k not-raw-kv) (add-q v not-raw-kv)))))
+    (values (queue2list raw-kvi) (queue2list not-raw-kv))))
+
+;;------------------------------------------------------------------------------
+;; Generiert einen Aufruf der Gestalt
+;; (make-instance '<class> :raw `((:k <value> ...)) :k <value> ...)
+;;------------------------------------------------------------------------------
+(defun gen-raw-constructor-call (class args raw-ki-list)
+  `(make-instance #-CMU17 (find-class ',class) #+CMU17 ',class ,@args)
+#|
+  (let ((raw-v (gensym)))
+    (multiple-value-bind (kv ve)
+        (args2kv/ve-list args)
+      (when raw-ki-list (push (cons raw-v ()) ve))
+      (multiple-value-bind (raw-kvi not-raw-kv)
+          (split-raw-add-init kv raw-ki-list)
+        (when raw-ki-list (push raw-v not-raw-kv) (push :raw not-raw-kv))
+        `(let (,@ve)
+          ,@(mapcar #'(lambda (kvi)
+                        `(unless (eql ,@(cdr kvi))
+                          (push (cons ,(first kvi) ,(second kvi)) ,raw-v)))
+                    raw-kvi)
+          (make-instance #-CMU17 (find-class ',class) #+CMU17 ',class
+           ,@not-raw-kv)))))
+|#)
+
+;;------------------------------------------------------------------------------
 ;; defzws stuetzt sich nicht auf defstruct sondern auf defclass, weil
 ;; - in defclass fuer Slots eine Typspezifikation angegeben werden kann,
 ;;   ohne dass eine Initform angegeben werden muss,
@@ -267,30 +364,69 @@
 ;;   Klassen gleiche Namen haben koennen.
 ;;------------------------------------------------------------------------------
 (defmacro defzws (name supers &rest slots)
-  (let ((accessors ()))
-    (setq slots
-          (mapcar #'(lambda (slot-desc)
-                      (when (atom slot-desc) (setq slot-desc (list slot-desc)))
-                      (let* ((sym (car slot-desc))
-                             (name (symbol-name sym)))
-                        (append slot-desc
-                                (list :accessor
-                                      (let ((acc (intern-prefixed "?" sym)))
-                                        (push acc accessors)
-                                        acc)
-                                      :initarg
-                                      (intern name (find-package "KEYWORD"))))))
-                  slots))
+  (let ((accessors (empty-queue))
+        (real-slots (empty-queue))
+        (raw-key-init-pairs (empty-queue))
+        (raw-slot-accessors (empty-queue))
+        raw-key-init-name)
+    (dolist (slot-desc slots)
+      (when (atom slot-desc) (setq slot-desc (list slot-desc)))
+      (let* ((sym (car slot-desc))
+             (acc-sym (intern-prefixed "?" sym))
+             (initarg (intern (symbol-name sym) "KEYWORD")))
+        (add-q acc-sym accessors)
+        (cond
+#|          ((getf (cdr slot-desc) :raw nil)
+           (let ((init (getf (cdr slot-desc) :initform nil)))
+             (unless (or (null init) (eq t init) (keywordp init) (numberp init)
+                         (and (consp init) (eq 'quote (car init))))
+               (internal-error 'defzws
+                               "~a is not allowed as an initial value" init))
+             (add-q (cons initarg init) raw-key-init-pairs)
+             (add-q `(defmethod ,acc-sym ((i ,name))
+                      (let ((a (assoc ,initarg (?raw i))))
+                        (if a
+                            (cdr a)
+                            ,init)))
+                    raw-slot-accessors)
+             (add-q `(defmethod (setf ,acc-sym) (v (i ,name))
+                      (let ((a (assoc ,initarg (?raw i))))
+                        (if a
+                            (setf (cdr a) v)
+                            (unless (eql v ,init)
+                              (push (cons ,initarg v) (?raw i))))
+                        v))
+                    raw-slot-accessors)))
+|#          (T
+           (remf (cdr slot-desc) :raw)
+           (add-q (list* (car slot-desc)
+                         :accessor acc-sym
+                         :initarg initarg
+                         (cdr slot-desc))
+                  real-slots)))))
+
+    (setq raw-key-init-pairs (queue2list raw-key-init-pairs))
+#|
+    (dolist (class supers)
+      (let ((raw-key-init-name (intern-postfixed class "-RAW-KEY-INIT")))
+        (when (boundp raw-key-init-name)
+          (setq raw-key-init-pairs
+                (append (symbol-value raw-key-init-name) raw-key-init-pairs)))))
+|#
+
+    (when raw-key-init-pairs
+      (add-q `(raw :accessor ?raw :initarg :raw :initform nil) real-slots))
+    
     `(progn
-      (defclass ,name ,supers (,@slots))
-      ,@(mapcar #'(lambda (slot-accessor)
-                    `(proclaim '(inline ,slot-accessor)))
-         accessors)
-      (defun ,(intern-prefixed "MAKE-" name) (&rest options)
-        (apply #'make-instance
-               #-CMU17(find-class ',name)
-               #+CMU17',name
-               options))
+      (defclass ,name ,supers (,@(queue2list real-slots)))
+      ,(when raw-key-init-pairs
+              (setq raw-key-init-name (intern-postfixed name "-RAW-KEY-INIT"))
+              `(defconstant ,raw-key-init-name
+                ',raw-key-init-pairs))
+      (proclaim '(inline ,@(queue2list accessors)))
+      ,@(queue2list raw-slot-accessors)
+      (defmacro ,(intern-prefixed "MAKE-" name) (&rest options)
+        (gen-raw-constructor-call ',name options ,raw-key-init-name))
       (defun ,(intern-postfixed name "-P") (x)
         (typep x ',name)))))
 

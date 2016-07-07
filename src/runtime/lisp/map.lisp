@@ -5,8 +5,13 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Laufzeitsystem: MAPCAR, MAPLIST, MAPC, MAPL, MAPCAN, MAPCON
 ;;;
-;;; $Revision: 1.6 $
+;;; $Revision: 1.7 $
 ;;; $Log: map.lisp,v $
+;;; Revision 1.7  1994/02/02  09:45:16  hk
+;;; mapcar, maplist, mapcan, mapcon mit der Deklaration
+;;; simp-when-no-result versehen. Definition von mapc und mapl nach vorn
+;;; gezogen, da sie in den Deklarationen verwendet werden..
+;;;
 ;;; Revision 1.6  1993/06/16  15:20:38  hk
 ;;;  Copyright Notiz eingefuegt.
 ;;;
@@ -16,7 +21,7 @@
 ;;;
 ;;; Revision 1.4  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.6 $ eingefuegt
+;;; $Revision: 1.7 $ eingefuegt
 ;;;
 ;;; Revision 1.3  1992/07/06  15:16:14  hk
 ;;; Schreibfehler.
@@ -31,59 +36,6 @@
 (in-package "LISP")
 
 (export '(mapcar maplist mapc mapl mapcan mapcon))
-
-;;------------------------------------------------------------------------------
-(defun mapcar (f list &rest lists)
-  (labels
-      ((mapcar-internal ()
-         (labels
-             ((get-rest-args (lists)
-                (cond
-                  ((atom lists) nil)
-                  (T
-                   ;; eine der Rest-Listen ist vollstaendig abgearbeitet
-                   ;;---------------------------------------------------
-                   (when (atom (car lists))
-                     (return-from mapcar-internal nil))
-                   (cons (pop (car lists)) 
-                         (get-rest-args (cdr lists)))))))
-
-           (if (atom list)
-
-               ;; die erste Liste ist vollstaendig abgearbeitet
-               ;;----------------------------------------------
-               nil
-
-               (cons (apply f (pop list) (get-rest-args lists))
-                     (mapcar-internal))))))
-
-    (mapcar-internal)))
-
-;;------------------------------------------------------------------------------
-(defun maplist (f list &rest lists)
-  (labels
-      ((maplist-internal ()
-         (labels
-             ((get-rest-args (lists)
-                (cond
-                  ((atom lists) nil)
-                  (T
-                   ;; eine der Rest-Listen ist vollstaendig abgearbeitet
-                   ;;---------------------------------------------------
-                   (when (atom (car lists))
-                     (return-from maplist-internal nil))
-                   (cons (prog1 list (pop (car lists)))
-                         (get-rest-args (cdr lists)))))))
-
-           (if (atom list)
-               ;; die erste Liste ist vollstaendig abgearbeitet
-               ;;----------------------------------------------
-               nil
-
-               (cons (apply f (prog1 list (pop list)) (get-rest-args lists))
-                     (maplist-internal))))))
-
-    (maplist-internal)))
 
 ;;------------------------------------------------------------------------------
 (defun mapc (f list &rest lists)
@@ -124,7 +76,63 @@
   list)
 
 ;;------------------------------------------------------------------------------
+(defun mapcar (f list &rest lists)
+  (declare (:simp-when-no-result mapc))
+  (labels
+      ((mapcar-internal ()
+         (labels
+             ((get-rest-args (lists)
+                (cond
+                  ((atom lists) nil)
+                  (T
+                   ;; eine der Rest-Listen ist vollstaendig abgearbeitet
+                   ;;---------------------------------------------------
+                   (when (atom (car lists))
+                     (return-from mapcar-internal nil))
+                   (cons (pop (car lists)) 
+                         (get-rest-args (cdr lists)))))))
+
+           (if (atom list)
+
+               ;; die erste Liste ist vollstaendig abgearbeitet
+               ;;----------------------------------------------
+               nil
+
+               (cons (apply f (pop list) (get-rest-args lists))
+                     (mapcar-internal))))))
+
+    (mapcar-internal)))
+
+;;------------------------------------------------------------------------------
+(defun maplist (f list &rest lists)
+  (declare (:simp-when-no-result mapl))
+  (labels
+      ((maplist-internal ()
+         (labels
+             ((get-rest-args (lists)
+                (cond
+                  ((atom lists) nil)
+                  (T
+                   ;; eine der Rest-Listen ist vollstaendig abgearbeitet
+                   ;;---------------------------------------------------
+                   (when (atom (car lists))
+                     (return-from maplist-internal nil))
+                   (cons (prog1 list (pop (car lists)))
+                         (get-rest-args (cdr lists)))))))
+
+           (if (atom list)
+               ;; die erste Liste ist vollstaendig abgearbeitet
+               ;;----------------------------------------------
+               nil
+
+               (cons (apply f (prog1 list (pop list)) (get-rest-args lists))
+                     (maplist-internal))))))
+
+    (maplist-internal)))
+
+;;------------------------------------------------------------------------------
 (defun mapcan (f list &rest lists)
+  (declare (:simp-when-no-result mapc))
   (labels
       ((mapcan-internal ()
          (labels
@@ -152,6 +160,7 @@
 
 ;;------------------------------------------------------------------------------
 (defun mapcon (f list &rest lists)
+  (declare (:simp-when-no-result mapl))
   (labels
       ((mapcon-internal ()
          (labels

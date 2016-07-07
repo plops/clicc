@@ -6,8 +6,18 @@
 ;;; Funktion : Funktionen zur Optimierungen, die auf den Typinformationen
 ;;;            aufbauen.
 ;;;
-;;; $Revision: 1.27 $
+;;; $Revision: 1.29 $
 ;;; $Log: tomain.lisp,v $
+;;; Revision 1.29  1994/04/06  11:46:20  jh
+;;; Einfachen Spezialfall des if-Splittings eingebaut.
+;;;
+;;; Revision 1.28  1994/02/18  14:00:53  hk
+;;; Nur noch If-Ausdr"ucke, deren Pr"adikat den Typ NULL oder not NULL
+;;; haben werden optimiert. Let*, Progn, setq etc., die Teilausdr"ucke des
+;;; Typs bottom haben werden nicht mehr optimiert, da diese als Vorkommen
+;;; von Typfehlern angesehen werden, die in look-for-type-errors gemeldet
+;;; werden.
+;;;
 ;;; Revision 1.27  1993/10/28  07:29:11  kl
 ;;; Verwendung von has-no-side-effect gestrichen. Soll in seo... erledigt werden.
 ;;;
@@ -91,61 +101,18 @@
 (in-package "CLICC")
 
 ;;------------------------------------------------------------------------------
-;; to-1form optimiert einen Zwischensprachausdruck, ohne seine Teilausdruecke
-;; zu optimieren.
+;; to-1form optimiert if-Ausdr"ucke, bei denen der Wahrheitswert des
+;; Pr"adikats bereits bekannt ist.
+;; F"ur Ausdr"ucke, die den Typ bottom haben, wird eine Warnung ausgegeben.
+;; Diese Optimierung wird erst f"ur "au"sere und danach f"ur innere Ausdr"ucke
+;; vorgeommen, so da"s nicht ereichbare Zweige von If-Ausdr"ucken eliminiert
+;; werden, bevor eine Warnung "uber den Bottom Typ ausgegeben werden kann.
 ;;------------------------------------------------------------------------------
 
 ;;------------------------------------------------------------------------------
-;; Ausgabe der Meldung, dass Ausdrucke eliminiert werden
-;;------------------------------------------------------------------------------
-(defmacro eliminating-msg (&rest args)
-  `(when (> *optimize-verbosity* 1)
-    (clicc-message ,@args)))
+(defmethod to-1form ((form form)) form)
 
 ;;------------------------------------------------------------------------------
-;; An var-refs, named-consts etc. kann nichts optimiert werden.
-;;------------------------------------------------------------------------------
-
-(defmethod to-1form ((a-form form))
-  a-form)
-
-;;------------------------------------------------------------------------------
-
-(defun is-bottom-typed (a-form)
-  (is-bottom-t (?type a-form)))
-
-(defmethod to-1form ((a-setq-form setq-form))
-  (if (is-bottom-typed (?form a-setq-form))
-      (progn
-        (eliminating-msg "(in ~A) Eliminating bottom-typed setq." *current-fun*)
-        (inc-stats 'bt-setq)
-        (dec-used-slot (?location a-setq-form) 'write)
-        (?form a-setq-form))
-      a-setq-form))
-
-;;------------------------------------------------------------------------------
-
-(defmethod to-1form ((a-progn-form progn-form))
-  (let* ((form-list (?form-list a-progn-form))
-         (bottom-form-pos (position-if #'is-bottom-typed form-list)))
-    (setf (?form-list a-progn-form)
-          (if (and bottom-form-pos
-                   (< (incf bottom-form-pos) (length form-list)))
-              (progn
-                (eliminating-msg
-                 "(in ~A) Eliminating unreachable code in a progn-form"
-                 *current-fun*)
-                (inc-stats 'bt-progn)
-                (mapc #'dec-used-slot (nthcdr bottom-form-pos form-list))
-                (let ((new-form-list (subseq form-list 0 bottom-form-pos)))
-                  (setf (?type a-progn-form)
-                        (?type (first (last new-form-list))))
-                  new-form-list))
-              form-list)))
-  a-progn-form)
-
-;;------------------------------------------------------------------------------
-
 (defmethod to-1form ((an-if-form if-form))
   (let* ((pred (?pred an-if-form))
          (pred-type (?type pred))
@@ -153,89 +120,63 @@
          (else (?else an-if-form))
          eliminated-case
          (result 
-          (cond ((is-bottom-t pred-type)
-                 (inc-stats 'then-optis)
-                 (dec-used-slot then)
-                 (inc-stats 'else-optis)
-                 (dec-used-slot else)
-                 (setq eliminated-case "then- and else")
-                 pred)
-                ((zs-subtypep pred-type null-t)
-                 (inc-stats 'then-optis)
-                 (dec-used-slot then)
-                 (setq eliminated-case "then")
-                 (optimize-1form
-                  (make-instance 'progn-form 
-                                 :form-list (list pred else)
-                                 :type (?type else))))
-                ((not (zs-subtypep null-t pred-type))
-                 (inc-stats 'else-optis)
-                 (dec-used-slot else)
-                 (setq eliminated-case "else")
-                 (optimize-1form
-                  (make-instance 'progn-form
-                                 :form-list (list pred then)
-                                 :type (?type then))))
-                (T an-if-form))))
-    (when eliminated-case
-      (eliminating-msg "(in ~A) Eliminating unreachable ~A-case."
-                       *current-fun*
-                       eliminated-case))
+          (cond
+            ;; Typfehler gefunden, Warnung erfolgt sp"ater
+            ;;--------------------------------------------
+            ((is-bottom-t pred-type) an-if-form)
+            
+            ((zs-subtypep pred-type null-t)
+             (inc-stats 'then-optis)
+             (dec-used-slot then)
+             (setq eliminated-case "then")
+             (make-instance 'progn-form 
+                            :form-list (list pred else)
+                            :type (?type else)))
+            ((not (zs-subtypep null-t pred-type))
+             (inc-stats 'else-optis)
+             (dec-used-slot else)
+             (setq eliminated-case "else")
+             (make-instance 'progn-form
+                            :form-list (list pred then)
+                            :type (?type then)))
+            ((if-form-p pred) (split an-if-form))
+            (T an-if-form))))
+    (when (and eliminated-case (> *optimize-verbosity* 1))
+      (clicc-message "(in ~A) Eliminating unreachable ~A-case."
+                     *current-fun*
+                     eliminated-case))
     result))
 
-;;------------------------------------------------------------------------------
-
-(defmethod to-1form ((an-app app))
-  (if (or (some #'is-bottom-typed (?arg-list an-app))
-          (is-bottom-typed (?form an-app)))
-      (progn
-        (eliminating-msg "(in ~A) Eliminating unreachable app-form"
-                         *current-fun*)
-        (inc-stats 'bt-app)
-        (let ((form-list (cons (?form an-app) (?arg-list an-app))))
-          (optimize-1form
-           (make-instance 'progn-form
-                          :form-list form-list
-
-                          ;; form-list ist mind. 1 elementig, also kann man
-                          ;; das letzte Element bestimmen.
-                          ;;------------------------------
-                          :type (?type (first (last form-list)))))))
-      an-app))
-
-;;------------------------------------------------------------------------------
-
-(defmethod to-1form ((a-let*-form let*-form))
-  (let* ((init-list (?init-list a-let*-form))
-         (bottom-form-pos (position-if #'is-bottom-typed init-list)))
-    (when bottom-form-pos
-      (eliminating-msg "(in ~A) Eliminating unreachable code in a let*-form"
-                       *current-fun*)
-      (inc-stats 'bt-let*)
-      (mapc #'dec-used-slot (nthcdr (1+ bottom-form-pos)
-                                    (?init-list a-let*-form)))
-      (dolist (var (nthcdr (1+ bottom-form-pos) (?var-list a-let*-form)))
-        (dec-used-slot var 'write))
-      (dec-used-slot (?body a-let*-form))
-      (setf (?init-list a-let*-form) (subseq init-list 0 bottom-form-pos)
-            (?var-list a-let*-form) (subseq (?var-list a-let*-form)
-                                            0 bottom-form-pos)
-            (?body a-let*-form) (nth bottom-form-pos init-list)
-            (?type a-let*-form) (?type (?body a-let*-form)))))
-  a-let*-form)
-
-;;------------------------------------------------------------------------------
-
-(defmethod to-1form ((a-mv-lambda mv-lambda))
-  (if (is-bottom-typed (?arg a-mv-lambda))
-      (progn
-        (eliminating-msg "(in ~A) Eliminating unreachable mv-lambda"
-                         *current-fun*)
-        (inc-stats 'bt-mv-lambda)
-        (dec-used-slot (?params a-mv-lambda))
-        (dec-used-slot (?body a-mv-lambda))
-        (?arg a-mv-lambda))
-      a-mv-lambda))
+(defun split (an-if-form)
+  (let* ((inner-if (?pred an-if-form))
+         (then (?then an-if-form))
+         (else (?else an-if-form))
+         (inner-then (?then inner-if))
+         (inner-else (?else inner-if))
+         (inner-then-type (?type inner-then))
+         (inner-else-type (?type inner-else)))
+    (cond
+      ((and (not (zs-subtypep null-t inner-then-type))
+            (zs-subtypep inner-else-type null-t))
+       (inc-stats 'if-if-split)
+       (setf (?then inner-if)
+             (optimize-1form (make-progn-form :form-list (list inner-then then)
+                                              :type (?type then))))
+       (setf (?else inner-if)
+             (optimize-1form (make-progn-form :form-list (list inner-else else)
+                                              :type (?type else))))
+       (optimize-1form inner-if))
+      ((and (zs-subtypep inner-then-type null-t)
+            (not (zs-subtypep null-t inner-else-type)))
+       (inc-stats 'if-if-split)
+       (setf (?then inner-if)
+             (optimize-1form (make-progn-form :form-list (list inner-then else)
+                                              :type (?type else))))
+       (setf (?else inner-if)
+             (optimize-1form (make-progn-form :form-list (list inner-else then)
+                                         :type (?type then))))
+       (optimize-1form inner-if))
+      (T an-if-form))))
 
 ;;------------------------------------------------------------------------------
 (provide "tomain")

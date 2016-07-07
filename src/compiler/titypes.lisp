@@ -7,8 +7,14 @@
 ;;;            Typverbandsoperatoren und Deklaration der Elemente
 ;;;            des Typverbandes
 ;;;
-;;; $Revision: 1.49 $
+;;; $Revision: 1.51 $
 ;;; $Log: titypes.lisp,v $
+;;; Revision 1.51  1994/01/27  19:22:52  kl
+;;; Typverband erweitert.
+;;;
+;;; Revision 1.50  1994/01/26  19:15:07  kl
+;;; Typbenennungen für non-null-symbol eingeführt.
+;;;
 ;;; Revision 1.49  1993/12/18  06:16:43  hk
 ;;; In dem Makro declare-zs-type: defparameter statt defconstant, um
 ;;; Probleme mit make-load-form zu vermeiden
@@ -254,32 +260,39 @@
 ;; Deklaration der Typen:
 ;;------------------------------------------------------------------------------
 (declare-zs-type bottom-t              (make-ti-type :bt 0))
+
 (declare-zs-type null-t                (make-ti-type :bt (ash 2 -1)))
 (declare-zs-type t-symbol-t            (make-ti-type :bt (ash 2 0)))
 (declare-zs-type other-symbol-t        (make-ti-type :bt (ash 2 1)))
+
 (declare-zs-type list-cons-of-bottom-t (make-ti-type :bt (ash 2 2)))
 (declare-zs-type non-list-cons-t       (make-ti-type :bt (ash 2 3)))
-(declare-zs-type function-t            (make-ti-type :bt (ash 2 4)))
-(declare-zs-type fixnum-t              (make-ti-type :bt (ash 2 5))) 
-(declare-zs-type bignum-t              (make-ti-type :bt (ash 2 6))) 
-(declare-zs-type float-t               (make-ti-type :bt (ash 2 7)))
-(declare-zs-type character-t           (make-ti-type :bt (ash 2 8)))
-(declare-zs-type string-t              (make-ti-type :bt (ash 2 9)))
-(declare-zs-type non-string-vector-t   (make-ti-type :bt (ash 2 10)))
-(declare-zs-type non-vector-array-t    (make-ti-type :bt (ash 2 11)))
-(declare-zs-type structure-t           (make-ti-type :bt (ash 2 12)))
-(declare-zs-type class-t               (make-ti-type :bt (ash 2 13)))
-(declare-zs-type other-t               (make-ti-type :bt (ash 2 14)))
 
-(declare-zs-type hash-table-t          other-t)
-(declare-zs-type readtable-t           other-t)
-(declare-zs-type package-t             other-t)
-(declare-zs-type pathname-t            other-t)
-(declare-zs-type stream-t              other-t)
-(declare-zs-type random-state-t        other-t)
+(declare-zs-type byte-t                (make-ti-type :bt (ash 2 4)))
+(declare-zs-type non-byte-word-t       (make-ti-type :bt (ash 2 5))) 
+(declare-zs-type non-word-fixnum-t     (make-ti-type :bt (ash 2 6))) 
+(declare-zs-type bignum-t              (make-ti-type :bt (ash 2 7))) 
+(declare-zs-type float-t               (make-ti-type :bt (ash 2 8)))
+
+(declare-zs-type character-t           (make-ti-type :bt (ash 2 9)))
+
+(declare-zs-type string-t              (make-ti-type :bt (ash 2 10)))
+(declare-zs-type non-string-vector-t   (make-ti-type :bt (ash 2 11)))
+(declare-zs-type non-vector-array-t    (make-ti-type :bt (ash 2 12)))
+
+(declare-zs-type function-t            (make-ti-type :bt (ash 2 13)))
+(declare-zs-type structure-t           (make-ti-type :bt (ash 2 14)))
+(declare-zs-type class-t               (make-ti-type :bt (ash 2 15)))
+
+(declare-zs-type package-t             (make-ti-type :bt (ash 2 16)))
+(declare-zs-type stream-t              (make-ti-type :bt (ash 2 17)))
+(declare-zs-type hash-table-t          (make-ti-type :bt (ash 2 18)))
+(declare-zs-type readtable-t           (make-ti-type :bt (ash 2 19)))
+(declare-zs-type pathname-t            (make-ti-type :bt (ash 2 20)))
+(declare-zs-type random-state-t        (make-ti-type :bt (ash 2 21)))
 
 ;;------------------------------------------------------------------------------
-(defconstant     bits-used             16)
+(defconstant     bits-used             23)
 (defconstant     top-number            (1- (ash 2 (1- bits-used))))
 
 ;;------------------------------------------------------------------------------
@@ -388,27 +401,40 @@
 ;;------------------------------------------------------------------------------
 ;; Deklaration einiger benannter Vereinigungstypen:
 ;;------------------------------------------------------------------------------
-(declare-joined-type integer-t  fixnum-t     bignum-t)
-(declare-joined-type number-t   integer-t    float-t)
+(declare-joined-type word-t         byte-t       non-byte-word-t)
+(declare-joined-type fixnum-t       word-t       non-word-fixnum-t)
+(declare-joined-type integer-t      fixnum-t     bignum-t)
+(declare-joined-type number-t       integer-t    float-t)
 
-(declare-joined-type bool-t     null-t       t-symbol-t)
-(declare-joined-type symbol-t   bool-t       other-symbol-t)
-(declare-joined-type list-t     null-t       list-cons-t)
-(declare-joined-type cons-t     list-cons-t  non-list-cons-t)
-(declare-joined-type all-list-t list-t       cons-t)
+(declare-joined-type bool-t         null-t       t-symbol-t)
+(declare-joined-type symbol-t       bool-t       other-symbol-t)
+(declare-joined-type non-null-sym-t t-symbol-t   other-symbol-t)
+(declare-joined-type list-t         null-t       list-cons-t)
+(declare-joined-type cons-t         list-cons-t  non-list-cons-t)
+(declare-joined-type all-list-t     list-t       cons-t)
 
-(declare-joined-type vector-t   string-t     non-string-vector-t)
-(declare-joined-type array-t    vector-t     non-vector-array-t)
+(declare-joined-type vector-t       string-t     non-string-vector-t)
+(declare-joined-type array-t        vector-t     non-vector-array-t)
 
-(declare-joined-type sequence-t all-list-t   array-t)
+(declare-joined-type sequence-t     all-list-t   array-t)
 
 
 ;;------------------------------------------------------------------------------
 ;; Das Top-Element des Typverbands ist die Typvereinigung aller Typen.
 ;;------------------------------------------------------------------------------
-(declare-zs-type top-t (multiple-type-join number-t symbol-t sequence-t 
-                                           character-t function-t structure-t 
-                                           class-t other-t))
+(declare-zs-type top-t (multiple-type-join symbol-t
+                                           number-t
+                                           sequence-t 
+                                           character-t
+                                           function-t
+                                           structure-t 
+                                           class-t
+                                           package-t
+                                           stream-t
+                                           hash-table-t
+                                           readtable-t
+                                           pathname-t
+                                           random-state-t))
 
 
 ;;------------------------------------------------------------------------------
@@ -423,16 +449,27 @@
 ;; Deklaration der NOT-Typen:
 ;;------------------------------------------------------------------------------
 (declare-not-types (null-t list-t
-                    fixnum-t bignum-t float-t integer-t number-t
-                    symbol-t character-t string-t vector-t array-t
-                    function-t structure-t class-t))
+                    byte-t word-t fixnum-t bignum-t integer-t float-t number-t
+                    symbol-t non-null-sym-t
+                    character-t string-t vector-t array-t
+                    function-t structure-t class-t
+                    package-t stream-t hash-table-t readtable-t pathname-t
+                    random-state-t))
 
 
 ;;------------------------------------------------------------------------------
 ;; Zusaetzliche Benennungen:
 ;;------------------------------------------------------------------------------
-(declare-zs-type atom-t           (not-type cons-t))
-(declare-zs-type list-of-bottom-t (type-join null-t list-cons-of-bottom-t))
+(declare-zs-type     atom-t               (not-type cons-t))
+(declare-joined-type list-of-bottom-t     null-t list-cons-of-bottom-t)
+(declare-joined-type or-symbol-string-t   symbol-t string-t)
+(declare-joined-type or-sym-str-char-t    symbol-t string-t character-t)
+(declare-joined-type or-null-character-t  null-t   character-t)
+(declare-joined-type package-name-t       or-symbol-string-t)
+(declare-joined-type package-or-name-t    package-t package-name-t)
+(declare-joined-type my-stream-t          null-t symbol-t stream-t)
+(declare-joined-type file-t               string-t pathname-t stream-t)
+
 
 
 ;;------------------------------------------------------------------------------
@@ -472,7 +509,9 @@
 ;; Menge der primitiven Typen.
 ;;------------------------------------------------------------------------------
 (defconstant primitive-types (list bottom-t 
-                                   fixnum-t bignum-t float-t
+                                   byte-t non-byte-word-t non-word-fixnum-t
+                                   fixnum-t bignum-t
+                                   float-t
                                    null-t
                                    t-symbol-t
                                    other-symbol-t 
@@ -485,7 +524,12 @@
                                    function-t
                                    structure-t
                                    class-t
-                                   other-t))
+                                   package-t
+                                   stream-t
+                                   hash-table-t
+                                   readtable-t
+                                   pathname-t
+                                   random-state-t))
 
 
 ;;------------------------------------------------------------------------------
@@ -561,17 +605,19 @@
 ;; der Typkonstruktor explizit dargestellt.
 ;;------------------------------------------------------------------------------
 (defun output-type (type &optional (with-list-decomposition T))
-  (let ((pairs `((,top-t           top)
+  (let ((pairs `((,top-t               top)
                  
                  ;; NOT-Typen:
                  (,not-null-t          not-null)
                  (,atom-t              atom-t)
                  (,not-list-t          not-list)
-                 (,not-number-t        not-number)
+                 (,not-byte-t          not-byte)
+                 (,not-word-t          not-word)
                  (,not-fixnum-t        not-fixnum)
                  (,not-bignum-t        not-bignum)
                  (,not-float-t         not-float)
                  (,not-integer-t       not-integer)
+                 (,not-number-t        not-number)
                  (,not-symbol-t        not-symbol)
                  (,not-character-t     not-character)
                  (,not-array-t         not-array)
@@ -580,6 +626,8 @@
                  (,not-structure-t     not-structure)
                  (,not-string-t        not-string)
                  (,not-class-t         not-class)
+                 (,not-package-t       not-package)
+                 (,not-stream-t        not-stream)
                  
                  ;; Zusammengesetzte Typen:
                  (,sequence-t          sequence)
@@ -592,9 +640,12 @@
                  (,bool-t              bool)
                  (,number-t            number)
                  (,integer-t           integer)
+                 (,fixnum-t            fixnum)
+                 (,word-t              word)
 
                  ;; Primitive Typen:
-                 (,fixnum-t            fixnum)
+                 (,byte-t              byte)
+                 (,non-byte-word-t     non-byte-word)
                  (,bignum-t            bignum)
                  (,float-t             float)
                  (,null-t              null)
@@ -609,7 +660,12 @@
                  (,function-t          function)
                  (,structure-t         structure)
                  (,class-t             class)
-                 (,other-t             other)
+                 (,package-t           package)
+                 (,stream-t            stream)
+                 (,hash-table-t        hash-table)
+                 (,readtable-t         readtable)
+                 (,pathname-t          pathname)
+                 (,random-state-t      random-state)
                  )))
 
     (if (type-eq bottom-t type)
@@ -619,7 +675,7 @@
             ((endp rest-pairs) (if (endp (rest or-type-list))
                                    (first or-type-list)
                                    (cons 'or or-type-list)))
-          (let ((subtype        (first (first rest-pairs)))
+          (let ((subtype        (first  (first rest-pairs)))
                 (subtype-symbol (second (first rest-pairs))))
             
             (case subtype-symbol

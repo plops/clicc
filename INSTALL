@@ -5,8 +5,8 @@
             ------------------------------------------------------
  Funktion : Installation notes for CLiCC
 
- $Revision: 1.11 $
- $Id: INSTALL,v 1.11 1993/12/30 11:43:00 hk Exp $
+ $Revision: 1.14 $
+ $Id: INSTALL,v 1.14 1994/06/23 14:57:59 hk Exp $
  ---------------------------------------------------------------------
  
  This  file describes  the  system requirements  and  the installation
@@ -35,8 +35,8 @@
  
    - Allegro Common Lisp 4.1 (Franz Inc.)
    - Sun (Lucid) Common Lisp 4.0 (Sun Microsystems Inc., Lucid Inc.)
-   - CMU Common Lisp 16f or 17c (Carnegie Mellon University)
-   - CLISP (Bruno Haible & Michael Stoll)
+   - CMU Common Lisp 17c (Carnegie Mellon University)
+   - CLISP "August 1993" (Bruno Haible & Michael Stoll)
    - AKCL 1.615 (Austin Kyoto Common Lisp) with September-16-92-PCL-f
 
  But CLiCC should run on every system which implements Common Lisp as
@@ -50,7 +50,7 @@
  will  need the  GNU Make Utility  "gmake".  GNU  Make is available on 
  ftp.informatik.uni-kiel.de (134.245.15.113) as:
  
-   /pub/systems/gnu/make-3.68.tar.gz
+   /pub/systems/gnu/make-<version>.tar.gz
  
  ---------------------------------------------------------------------
  
@@ -137,8 +137,8 @@
    ...
 
    cl> (compile-clicc)
-   ;;; CLiCC, the Common Lisp to C Compiler --- Version 0.6.2
-   ;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+   ;;; CLiCC, the Common Lisp to C Compiler --- Version 0.6.4
+   ;;; Copyright (C) 1994 Christian-Albrechts-Universitaet zu Kiel
    
    ...
 

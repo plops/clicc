@@ -5,8 +5,21 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Laufzeitsystem, Funktion FORMAT
 ;;;
-;;; $Revision: 1.11 $
+;;; $Revision: 1.15 $
 ;;; $Log: format.lisp,v $
+;;; Revision 1.15  1994/06/02  14:54:38  hk
+;;; ~[@]col,colincT (Tabbing) Directive implemetiert
+;;;
+;;; Revision 1.14  1994/02/17  15:48:30  hk
+;;; in skip: case .. (nil.. --> case .. ((nil)..
+;;;
+;;; Revision 1.13  1994/01/07  14:10:22  hk
+;;; Schreibfehler behoben.
+;;;
+;;; Revision 1.12  1994/01/06  08:59:08  hk
+;;; ~A und ~S für den Fall, daß keine Parameter für die Direktive
+;;; angegeben sind, verbessert
+;;;
 ;;; Revision 1.11  1993/09/17  14:51:33  jh
 ;;; Fehler in der lokalen Funktion padding in format2 beseitigt.
 ;;;
@@ -34,7 +47,7 @@
 ;;;
 ;;; Revision 1.3  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.11 $ eingefuegt
+;;; $Revision: 1.15 $ eingefuegt
 ;;;
 ;;; Revision 1.2  1992/08/27  15:31:14  kl
 ;;; Fehlermeldungen erweitert.
@@ -150,7 +163,7 @@
          (skip (terminator &optional separator-stops)
            (loop
             (case (get-ctrl)
-              (nil (error "~~~A expected in control-string" terminator))
+              ((nil) (error "~~~A expected in control-string" terminator))
               (#\~ (get-params)
                    (get-at-sign-or-colon)
                    (let ((c (get-directive)))
@@ -173,6 +186,36 @@
                  ((>= col param))
                (write-char #\Space stream)
                (incf col))))
+
+         (tabbing (at-sign &optional (column 1) (colinc 1))
+           (cond
+             ((null at-sign)
+              (let ((current (funcall (stream-column stream))))
+                (cond
+                  ;; unknown current: simply output two spaces
+                  ((null current)
+                   (write-char #\Space stream)
+                   (write-char #\Space stream))
+
+                  ;; move to column
+                  ((> column current)
+                   (dotimes (i (- column current))
+                     (write-char #\Space stream)))
+
+                  ;; already at or beyond column
+                  ((> colinc 1)
+                   (let ((beyound (- current column)))
+                     (dotimes (i (- colinc (mod beyound colinc)))
+                       (write-char #\Space stream)))))))
+
+             ;; relative tabulation
+             (T (dotimes (i column)
+                  (write-char #\Space stream))
+                (when (> colinc 1)
+                  (let ((current (funcall (stream-column stream))))
+                    (when current
+                      (dotimes (i (- colinc (mod current colinc)))
+                        (write-char #\Space stream))))))))
          
          (padding (len &optional 
                        (mincol 0)
@@ -186,7 +229,7 @@
                ((>= len mincol))
              (dotimes (i colinc)
                (write-char padchar stream))
-             (incf len colinc))))           
+             (incf len colinc))))
       
       (loop
         (setq c (get-ctrl))
@@ -204,29 +247,37 @@
                
 ;;;-----------------------------------------------------------------------------
                (#\A
-                (let* ((arg (get-arg))
-                       (str (if (and colon (null arg))
-                                "()"
-                                (princ-to-string arg)))
-                       (len (length str)))
-                  (cond
-                    (at-sign (apply #'padding len params)
-                             (princ str stream))
-                    (t (princ str stream)
-                       (apply #'padding len params)))))
+                (if params
+                    (let* ((arg (get-arg))
+                           (str (if (and colon (null arg))
+                                    "()"
+                                    (princ-to-string arg)))
+                           (len (length str)))
+                      (cond
+                        (at-sign (apply #'padding len params)
+                                 (princ str stream))
+                        (t (princ str stream)
+                           (apply #'padding len params))))
+                    (princ (if colon (or (get-arg) "()") (get-arg)) stream)))
 
 ;;;-----------------------------------------------------------------------------
                (#\S
-                (let* ((arg (get-arg))
-                       (str (if (and colon (null arg))
-                                "()"
-                                (prin1-to-string arg)))
-                       (len (length str)))
-                  (cond
-                    (at-sign (apply #'padding len params)
-                             (princ str stream))
-                    (t (princ str stream)
-                       (apply #'padding len params)))))
+                (cond
+                  (params (let* ((arg (get-arg))
+                                 (str (if (and colon (null arg))
+                                          "()"
+                                          (prin1-to-string arg)))
+                                 (len (length str)))
+                            (cond
+                              (at-sign (apply #'padding len params)
+                                       (princ str stream))
+                              (t (princ str stream)
+                                 (apply #'padding len params)))))
+                  (colon (let ((arg (get-arg)))
+                           (if arg
+                               (prin1 arg stream)
+                               (princ "()" stream))))
+                  (t (prin1 (get-arg) stream))))
                
 ;;;-----------------------------------------------------------------------------
                (#\D
@@ -294,6 +345,8 @@
                    (unless (eq c #\Space)
                      (decf ctrl-index)
                      (return)))))
+;;;-----------------------------------------------------------------------------
+               (#\T (apply #'tabbing at-sign params))
 ;;;-----------------------------------------------------------------------------
                (#\*
                 (labels ((goto (n)

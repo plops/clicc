@@ -12,8 +12,18 @@
 ;;;            - Funktionen zum Testen gewisser Eigenschaften von Fixnums und
 ;;;              Arrays.
 ;;;
-;;; $Revision: 1.8 $
+;;; $Revision: 1.10 $
 ;;; $Log: pred.lisp,v $
+;;; Revision 1.10  1994/01/24  16:21:13  sma
+;;; Not und null in LISP implementiert. Beide Funktionen muessen T
+;;; und nicht nur einen Wahrheitswert `true' zurueckliefern. Da das Symbol
+;;; T nicht mehr im Codegenerator bekannt ist, muessen diese Funktionen
+;;; zunaechst hier implementiert werden bis eine neue Optimierungsfunktion
+;;; geschrieben wurde.
+;;;
+;;; Revision 1.9  1993/12/09  17:13:20  sma
+;;; rt::simple-array-p -> simple-array-p.
+;;;
 ;;; Revision 1.8  1993/06/16  15:20:38  hk
 ;;;  Copyright Notiz eingefuegt.
 ;;;
@@ -30,7 +40,7 @@
 ;;;
 ;;; Revision 1.4  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.8 $ eingefuegt
+;;; $Revision: 1.10 $ eingefuegt
 ;;;
 ;;; Revision 1.3  1993/01/19  12:53:54  ft
 ;;; Vorkommen von STRIN-CHAR in TYPEP gestrichen.
@@ -44,7 +54,7 @@
 
 (in-package "LISP")
 
-(export '(typep subtypep))
+(export '(typep subtypep not null))
 (export '(rt::check-array rt::check-simple-array) "RT")
 
 ;;-----------------------------------------------------------------------------
@@ -75,6 +85,15 @@
 ;; Fuer weitere Praedikate siehe inline.lisp
 ;;------------------------------------------------------------------------------
 
+;;------------------------------------------------------------------------------
+;; NOT object / NULL object
+;;------------------------------------------------------------------------------
+(defun not (object)
+  (if object nil t))
+
+(defun null (object)
+  (if object nil t))
+
 ;;-----------------------------------------------------------------------------
 (defun check-integer (object low high)
   (and (integerp object)
@@ -91,7 +110,7 @@
 ;; CHECK-SIMPLE-ARRAY object element-type dimensions
 ;;-----------------------------------------------------------------------------
 (defun rt:check-simple-array (object element-type dimensions)
-  (and (rt::simple-array-p object)
+  (and (simple-array-p object)
        (check-array-internal object element-type dimensions)))
 
 ;;------------------------------------------------------------------------------

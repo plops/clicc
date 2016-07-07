@@ -7,8 +7,19 @@
 ;;;            Tail-rekursive Aufrufe werden in geeigneter Form in 
 ;;;            Spruenge umgewandelt.
 ;;; Autor    : Anouar trigui
-;;; $Revision: 1.13 $
+;;; $Revision: 1.15 $
 ;;; $Log: tail.lisp,v $
+;;; Revision 1.15  1994/01/04  16:14:44  atr
+;;; Die Funktion tail-rec-fun geändert. Nun werden werden die Level-Slots
+;;; bei den lokalen Funktionen während der Tail-rekursion gesetzt, damit
+;;; die Level-Slots der neu erzeugten Tagbody's auch gesetzt werden
+;;; können.
+;;;
+;;; Revision 1.14  1994/01/03  11:58:13  atr
+;;; Tail-rekursive Aufrufe, die innerhalb eines Let-Konstruktes sind, das
+;;; dynamische Variablen bindet werden nicht mehr in Spr"unge umgewandelt,
+;;; denn dies kann zu Fehlern führen.
+;;;
 ;;; Revision 1.13  1993/12/22  11:13:01  atr
 ;;; Die Tail-Rekursion kann jetzt Funktionen mit Multiplen Werte richtig
 ;;; umwandeln.
@@ -75,9 +86,9 @@
     (clicc-message "~s tail recursive calls are eliminated"
                    *app-counter*)))
 ;;;--------------------------------------------------------------------------
-;;; Die Tail-rekursion wird nur auf Funktionen angewendet die 
-;;; Tail-rekursive Aufrufe enthalten , keine Closures bilden und 
-;;; keine Rest-parameter haben.
+;;; Die Tail-rekursion wird nur auf Funktionen angewendet, die 
+;;; Tail-rekursive Aufrufe enthalten, keine Closures bilden und 
+;;; keine Rest-Parameter haben.
 ;;;--------------------------------------------------------------------------
 (defun tail-rec-fun (function)
   (let ((*current-function* function)
@@ -85,13 +96,19 @@
                                 0
                                 (?level function))))
     
-    (when (and (has-tail-rec-calls function)
-               (not (generates-closures function))
+    (when (and (not (generates-closures function))
+               (has-tail-rec-calls function)
                (null (?rest (?params function))))
       (incf *optimized-funs*)
       (clicc-message "optimizing function ~s " (?symbol function))
       (setf (?body function) (transform-tail-rec-calls function)))
     (when (?local-funs *current-function*)
+
+      ;; Die Level-Slots der lokalen Funktionen werden zunächst gesetzt, 
+      ;; dann werden die Funktionen behandelt.
+      ;;----------------------------------------------------------------
+      (dolist (one-local-fun (?local-funs *current-function*))
+        (setf (?level one-local-fun) (1+ *static-level*)))
       (mapc #'tail-rec-fun (?local-funs *current-function*)))))
     
   
@@ -110,13 +127,13 @@
 ;;; Der Rumpf der Funktion wird in ein Let/cc-Konstrukt umgewandelt.
 ;;; Dieses Let/cc-Konstrukt enth"alt einen Tagbody mit nur einem Tag. 
 ;;; In diesem Tag wird die Continuation auf den neuen Rumpf der Funktion,
-;;; in dem Tail-rec-Aufrufe durch Sprünge ersetzt werden, aufgerufen.
+;;; indem Tail-rec-Aufrufe durch Sprünge ersetzt werden, aufgerufen.
 ;;;--------------------------------------------------------------------------
 (defun transform-tail-rec-calls (function)
   (let* ((new-body     (make-instance 'let/cc-form
                                       :cont (make-instance 'cont 
                                                            :read 1)))
-
+         
          (new-tagbody  (make-instance 'tagbody-form
                                       :first-form empty-list
                                       :level (if (global-fun-p function)
@@ -125,21 +142,21 @@
                                       :tagged-form-list
                                       nil))
          (*body-tag*   (make-instance 'tagged-form 
-                                    :form nil
-                                    :tagbody  new-tagbody
-                                    :used 0)))
+                                      :form nil
+                                      :tagbody  new-tagbody
+                                      :used 0)))
     
     (incf *app-counter*)
     
     (setf (?form *body-tag*) (make-instance 'app
                                             :form (?cont new-body)
                                             :arg-list (list (transform-form 
-                                                       (?body function)))))
+                                                             (?body function)))))
     (setf (?tagged-form-list new-tagbody)
           (list *body-tag*))
     (setf (?body new-body) new-tagbody) 
     new-body))
-      
+
 
 ;;;-------------------------------------------------------------------------
 ;;; Diese Funktion erzeugt fuer die Variable "VAR"eine neue lokale Variable, 
@@ -253,8 +270,19 @@
     (make-instance 'setq-form 
                    :location old
                    :form new)))
+
 ;;;------------------------------------------------------------------------
-;;; Transform-Form traversiert den Rumpf der Funktion, und ersetzt 
+;;; dynamic-var-bound überprüft ob eine Liste von Variablen eine dynamische 
+;;; Variable enthält.
+;;;------------------------------------------------------------------------
+(defun dynamic-var-bound (list-of-var)
+  (if (null list-of-var)
+      nil
+      (if (dynamic-p (car list-of-var))
+          T
+          (dynamic-var-bound (cdr list-of-var)))))
+;;;------------------------------------------------------------------------
+;;; transform-Form traversiert den Rumpf der Funktion, und ersetzt 
 ;;; alle Ergebnis-formen durch Sequenzen von 
 ;;; 1 :einer Zuweisung an die  *result-var* (mit der result-form) 
 ;;; 2 :einem Sprung zum *body-tag*
@@ -269,8 +297,11 @@
   a-progn-form)
 
 (defmethod transform-form ((a-let-form let*-form))
-  (setf (?body a-let-form) (transform-form (?body a-let-form)))
-  a-let-form)
+  (if (dynamic-var-bound (?var-list a-let-form))
+      a-let-form
+      (progn 
+        (setf (?body a-let-form) (transform-form (?body a-let-form)))
+        a-let-form)))
 
 ;;;--------------------------------------------------------------------------
 ;;; Bei der (?form a-setq) können keine rekursive Aufrufe durch Sprünge 

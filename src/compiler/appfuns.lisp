@@ -8,8 +8,24 @@
 ;;;            Funktion bestimmt, in welchen Funktionen sie aufgerufen werden
 ;;;            und ob alle Aufrufstellen bekannt sind.
 ;;;
-;;; $Revision: 1.16 $
+;;; $Revision: 1.21 $
 ;;; $Log: appfuns.lisp,v $
+;;; Revision 1.21  1994/03/03  13:45:23  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.20  1994/02/02  09:12:49  hk
+;;; (defvar *current-fun*) nach clcdef
+;;;
+;;; Revision 1.19  1994/01/31  13:44:32  hk
+;;; Nur bei definierten Funktionen wird der Slot unknown-caller gesetzt,
+;;; bei importierten Funktionen ist das nicht notwendig.
+;;;
+;;; Revision 1.18  1994/01/28  07:47:09  ft
+;;; Ausnahmetest in sfc-class auf nil erweitert.
+;;;
+;;; Revision 1.17  1994/01/26  13:52:23  ft
+;;; Änderung der Darstellung von ungebundenen Slots.
+;;;
 ;;; Revision 1.16  1993/11/18  14:49:28  pm
 ;;; Methode fuer sfc-form ueber foreign-funs
 ;;;
@@ -73,14 +89,6 @@
   (mapc #'sfc-class (?class-def-list *module*)))
 
 ;;------------------------------------------------------------------------------
-;; Die Variable enthält die Funktion, in der der zu analysierende Ausdruck
-;; enthalten ist. Der Wert wird benutzt, um bei Funktionsaufrufen den Aufrufer
-;; zu ermitteln.
-;; Sie ist unbound, wenn der Ausdruck die Initform des Slots einer Klasse ist.
-;;------------------------------------------------------------------------------
-(defvar *current-fun*)
-
-;;------------------------------------------------------------------------------
 ;; Die Variable enthält
 ;; - die Applikation, deren Slot form gerade analysiert wird, oder
 ;; - das Symbol 'no-caller, wenn das Resultat des Ausdrucks nicht als
@@ -104,7 +112,9 @@
 ;;------------------------------------------------------------------------------
 (defun sfc-class (a-class-def)
   (dolist (a-slot-desc (?slot-descr-list a-class-def))
-    (sfc-unknown-caller (?initform a-slot-desc))))
+    (unless (or (null (?initform a-slot-desc))
+                (eq (?initform a-slot-desc) :unbound))
+      (sfc-unknown-caller (?initform a-slot-desc)))))
 
 ;;------------------------------------------------------------------------------
 (defun reset-caller-slots (a-fun)
@@ -185,13 +195,10 @@
   (when (app-p *current-app*)
     (setf (?other-funs *current-app*) t)))
 
-
 ;;------------------------------------------------------------------------------
 (defmethod sfc-form ((a-fun fun))
-  (cond ((app-p *current-app*)
-         (pushnew a-fun (?called-funs *current-app*)))
-        ((eq 'unknown-caller *current-app*)
-         (setf (?unknown-caller a-fun) T))))
+  (when (app-p *current-app*)
+    (pushnew a-fun (?called-funs *current-app*))))
 
 ;;------------------------------------------------------------------------------
 (defmethod sfc-form ((a-cont cont))
@@ -270,8 +277,13 @@
   (sfc-form (?body a-mv-lambda)))
 
 ;;------------------------------------------------------------------------------
-(defmethod sfc-form ((a-named-const named-const))
-  (sfc-form (?value a-named-const)))
+(defmethod sfc-form ((a-defined-named-const defined-named-const))
+  (sfc-form (?value a-defined-named-const)))
+
+;;------------------------------------------------------------------------------
+(defmethod sfc-form ((an-imported-named-const imported-named-const))
+  (when (app-p *current-app*)
+    (setf (?other-funs *current-app*) T)))
 
 ;;------------------------------------------------------------------------------
 (defmethod sfc-form ((a-class class-def)))

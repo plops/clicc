@@ -6,8 +6,17 @@
 ;;; Funktion : Funktionen und Makros zum Gewinnen von Typzusicherungen aus
 ;;;            Ausdruecken, die an Praedikatsposition von Konditionalen stehen.
 ;;;
-;;; $Revision: 1.15 $
+;;; $Revision: 1.18 $
 ;;; $Log: tiassert.lisp,v $
+;;; Revision 1.18  1994/06/09  12:07:14  hk
+;;; Typ von rt::struct-typp eingetragen
+;;;
+;;; Revision 1.17  1994/01/27  19:23:55  kl
+;;; Anpassungen an den erweiterten Typverband vorgenommen.
+;;;
+;;; Revision 1.16  1994/01/26  19:16:29  kl
+;;; Typisierung der Typprädikate erweitert.
+;;;
 ;;; Revision 1.15  1993/12/09  10:34:05  hk
 ;;; provide wieder an das Dateiende
 ;;;
@@ -72,7 +81,7 @@
 ;; Makro fuer die Deklaration einer Typzusicherung fuer Ausdrucke an Praedikats-
 ;; position eines Konditionals.
 ;;------------------------------------------------------------------------------
-(defmacro declare-type-assertion (function-name an-optimization-function)
+(defmacro dec-type-assertion (function-name an-optimization-function)
   `(push (cons (get-global-fun ',function-name) ,an-optimization-function) 
          *ti-predicate-assertion-environment*))
 
@@ -80,8 +89,8 @@
 ;;------------------------------------------------------------------------------
 ;; Makro zum Deklarieren einer Typzusicherung durch ein Typpraedikat.
 ;;------------------------------------------------------------------------------
-(defmacro declare-typepred-assertion (function-name then-assert else-assert)
-  `(declare-type-assertion ,function-name
+(defmacro dec-typepred-assertion (function-name then-assert else-assert)
+  `(dec-type-assertion ,function-name
     #'(lambda (&rest args)
         (let ((var-ref (first args)))
           (if (var-ref-p var-ref)
@@ -130,57 +139,74 @@
   ;;----------------------------------------------------------------------------
   ;; Besondere Typdeklarationen fuer die Praedikate.
   ;;----------------------------------------------------------------------------
-  (declare-type-assertion L::eq      #'eq-type-assertion)
-  (declare-type-assertion L::eql     #'eq-type-assertion)
-  (declare-type-assertion L::equal   #'eq-type-assertion)
+  (dec-type-assertion L::eq      #'eq-type-assertion)
+  (dec-type-assertion L::eql     #'eq-type-assertion)
+  (dec-type-assertion L::equal   #'eq-type-assertion)
   
-  (declare-type-assertion L::=       #'eq-type-assertion)
-  (declare-type-assertion L::string= #'eq-type-assertion)
+  (dec-type-assertion L::=       #'eq-type-assertion)
+  (dec-type-assertion L::string= #'eq-type-assertion)
   
   ;;----------------------------------------------------------------------------
-  
-  (declare-typepred-assertion L::endp         null-t       cons-t)
-  (declare-typepred-assertion L::symbolp      symbol-t     not-symbol-t)
-  (declare-typepred-assertion L::atom         atom-t       cons-t)
-  (declare-typepred-assertion L::consp        cons-t       atom-t)
-  (declare-typepred-assertion L::listp        list-t       not-list-t)
-  (declare-typepred-assertion L::numberp      number-t     not-number-t)
-; (declare-typepred-assertion L::fixnump      fixnum-t     not-fixnum-t)
-  (declare-typepred-assertion L::integerp     integer-t    not-integer-t)
-  (declare-typepred-assertion L::floatp       float-t      not-float-t)
-  (declare-typepred-assertion L::characterp   character-t  not-character-t)
-  (declare-typepred-assertion L::stringp      string-t     not-string-t)
-  (declare-typepred-assertion L::vectorp      vector-t     not-vector-t)
-  (declare-typepred-assertion L::arrayp       array-t      not-array-t)
-  (declare-typepred-assertion L::functionp    function-t   not-function-t)
-  (declare-typepred-assertion L::zerop        fixnum-t     number-t)
-  (declare-typepred-assertion rt::structp     structure-t  not-structure-t)
-  (declare-typepred-assertion rt::instancep   class-t      not-class-t)
+  ;; Typdeklaration zu den Typtests
+  ;;----------------------------------------------------------------------------
+  (dec-typepred-assertion L::endp             null-t         cons-t)
+  (dec-typepred-assertion L::symbolp          symbol-t       not-symbol-t)
+  (dec-typepred-assertion rt::symp            non-null-sym-t not-non-null-sym-t)
+  (dec-typepred-assertion L::atom             atom-t         cons-t)
+  (dec-typepred-assertion L::consp            cons-t         atom-t)
+  (dec-typepred-assertion L::listp            list-t         not-list-t)
+
+  (dec-typepred-assertion L::zerop            byte-t         number-t)
+  (dec-typepred-assertion rt::fixnump         fixnum-t       not-fixnum-t)
+  (dec-typepred-assertion L::integerp         integer-t      not-integer-t)
+  (dec-typepred-assertion L::floatp           float-t        not-float-t)
+  (dec-typepred-assertion L::numberp          number-t       not-number-t)
+ 
+  (dec-typepred-assertion L::characterp       character-t    not-character-t)
+
+  (dec-typepred-assertion L::stringp          string-t       not-string-t)
+  (dec-typepred-assertion L::vectorp          vector-t       not-vector-t)
+  (dec-typepred-assertion L::simple-vector-p  vector-t       Top-t)
+  (dec-typepred-assertion L::simple-stringr-p string-t       Top-t)
+  (dec-typepred-assertion L::arrayp           array-t        not-array-t)
+  (dec-typepred-assertion L::simple-array-p   array-t        Top-t)
+  (dec-typepred-assertion L::plain-vector-p   array-t        Top-t)
+
+  (dec-typepred-assertion L::functionp        function-t     not-function-t)
+  (dec-typepred-assertion rt::structp         structure-t    not-structure-t)
+  (dec-typepred-assertion rt::struct-typp     structure-t    Top-t)
+  (dec-typepred-assertion rt::instancep       class-t        not-class-t)
+
+  (dec-typepred-assertion L::packagep         package-t      not-package-t)
+  (dec-typepred-assertion L::streamp          stream-t       not-stream-t)
+  (dec-typepred-assertion L::hash-table-p     hash-table-t   not-hash-table-t)
+  (dec-typepred-assertion L::readtable-p      readtable-t    not-readtable-t)
+  (dec-typepred-assertion L::pathname-p       pathname-t     not-pathname-t)
 
   ;;----------------------------------------------------------------------------
-  ;; Typdeklaration fuer car- und cdr-Zugriffe auf Listen
+  ;; Typdeklaration für car- und cdr-Zugriffe auf Listen
   ;;----------------------------------------------------------------------------
-  (declare-type-assertion L::car    #'car-type-assertion)
-  (declare-type-assertion L::caar   #'car-type-assertion)
-  (declare-type-assertion L::cadr   #'car-type-assertion)
-  (declare-type-assertion L::caaar  #'car-type-assertion)
-  (declare-type-assertion L::caadr  #'car-type-assertion)
-  (declare-type-assertion L::cadar  #'car-type-assertion)
-  (declare-type-assertion L::caddr  #'car-type-assertion)
-  (declare-type-assertion L::first  #'car-type-assertion)
-  (declare-type-assertion L::second #'car-type-assertion)
-  (declare-type-assertion L::third  #'car-type-assertion)
-  (declare-type-assertion L::fourth #'car-type-assertion)
-  (declare-type-assertion L::fifth  #'car-type-assertion)
+  (dec-type-assertion L::car    #'car-type-assertion)
+  (dec-type-assertion L::caar   #'car-type-assertion)
+  (dec-type-assertion L::cadr   #'car-type-assertion)
+  (dec-type-assertion L::caaar  #'car-type-assertion)
+  (dec-type-assertion L::caadr  #'car-type-assertion)
+  (dec-type-assertion L::cadar  #'car-type-assertion)
+  (dec-type-assertion L::caddr  #'car-type-assertion)
+  (dec-type-assertion L::first  #'car-type-assertion)
+  (dec-type-assertion L::second #'car-type-assertion)
+  (dec-type-assertion L::third  #'car-type-assertion)
+  (dec-type-assertion L::fourth #'car-type-assertion)
+  (dec-type-assertion L::fifth  #'car-type-assertion)
 
-  (declare-type-assertion L::cdr    #'cdr-type-assertion)
-  (declare-type-assertion L::cdar   #'cdr-type-assertion)
-  (declare-type-assertion L::cddr   #'cdr-type-assertion)
-  (declare-type-assertion L::cdaar  #'cdr-type-assertion)
-  (declare-type-assertion L::cdadr  #'cdr-type-assertion)
-  (declare-type-assertion L::cddar  #'cdr-type-assertion)
-  (declare-type-assertion L::cdddr  #'cdr-type-assertion)
-  (declare-type-assertion L::rest   #'cdr-type-assertion)
+  (dec-type-assertion L::cdr    #'cdr-type-assertion)
+  (dec-type-assertion L::cdar   #'cdr-type-assertion)
+  (dec-type-assertion L::cddr   #'cdr-type-assertion)
+  (dec-type-assertion L::cdaar  #'cdr-type-assertion)
+  (dec-type-assertion L::cdadr  #'cdr-type-assertion)
+  (dec-type-assertion L::cddar  #'cdr-type-assertion)
+  (dec-type-assertion L::cdddr  #'cdr-type-assertion)
+  (dec-type-assertion L::rest   #'cdr-type-assertion)
 
 
 ) ; initialize-type-assertion-functions

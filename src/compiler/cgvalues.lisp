@@ -7,8 +7,19 @@
 ;;;            - mv-lambda
 ;;;            - VALUES (inline)
 ;;;
-;;; $Revision: 1.17 $
+;;; $Revision: 1.20 $
 ;;; $Log: cgvalues.lisp,v $
+;;; Revision 1.20  1994/05/25  14:07:05  sma
+;;; Aufruf der Restlistenoptimierung aus cg-params herausgezogen.
+;;; Restlistenoptimierung fuer mv-lambda korrigiert, d.h. jetzt gehts
+;;; erst.
+;;;
+;;; Revision 1.19  1994/02/08  15:40:47  sma
+;;; Zusätzlichen Block um cg-params-Aufruf herum eingefügt.
+;;;
+;;; Revision 1.18  1994/01/07  11:56:33  hk
+;;; opt-args wird nun auch in cg-values verwendet.
+;;;
 ;;; Revision 1.17  1993/09/10  10:06:29  hk
 ;;; Fehler beim Aufruf von cg-params behoben.
 ;;;
@@ -130,10 +141,14 @@
          (C-resetMV)))
     (setq *stack-top* old-stack)
 
-    (cg-params params (>= (calc-par-spec params) 0))
-    (cg-form (?body form))
+    (C-blockstart)
+    (let ((*rest-optimization* *rest-optimization*))
+      (cg-params params (>= (calc-par-spec params) 0)
+                 (rest-optimization-p (?params form) (?body form) nil))
+      (cg-form (?body form)))
+    (C-blockend)
     (setq *stack-top* old-stack)
-    
+
     (unless (>= par-spec 0)
       (C-Blockend))))
     
@@ -141,40 +156,45 @@
 ;;------------------------------------------------------------------------------
 ;; Erzeugt Inline-code fuer die System-Fkt. VALUES.
 ;;------------------------------------------------------------------------------
-(defun cg-values (arg-list app &aux (mv-count (length arg-list)))
-  (if (or (not (?mv-used app)) (eql mv-count 1))
+(defun cg-values (arg-list app)
+  (let ((mv-count (length arg-list))
+        (*stack-top* *stack-top*))
     
-      ;; keine Multiple Values erzeugen
-      ;;-------------------------------
-      (case mv-count
-        (0 (cg-form empty-list))
-        (1 (cg-form (first arg-list)))
-        (T (cg-args arg-list -1)
-           (stacktop-to-result-loc)))
+    (if (or (not (?mv-used app)) (eql mv-count 1))
     
-      ;; Multiple Values erzeugen
-      ;;-------------------------
-      (case mv-count
-        (0 (cg-form empty-list)
-           (C-SetMV 0))
+        ;; keine Multiple Values erzeugen
+        ;;-------------------------------
+        (case mv-count
+          (0 (cg-form empty-list))
+          (1 (cg-form (first arg-list)))
+          (T (opt-args arg-list)        ; veraendert *stack-top* !
+             (cg-args arg-list -1)
+             (stacktop-to-result-loc)))
+    
+        ;; Multiple Values erzeugen
+        ;;-------------------------
+        (case mv-count
+          (0 (cg-form empty-list)
+             (C-SetMV 0))
       
-        ;; Alle MV zunaechst auf dem Stack erzeugen, weil beim Evaluieren der
-        ;; Argumente evtl. mv_buf uebertschrieben wird.
-        ;;-Beachte:
-        ;; Resultat nicht auf fun-result Position erzeugen, weil dadurch
-        ;; evtl.  eine lokale Variable ueberschrieben wird, die fuer MV noch
-        ;; benoetigt wird.
-        ;;--------------------------------------------------------------------
-        (t (when (> mv-count MV-LIMIT)
-             (cg-error "VALUES is called with ~a arguments, ~
+          ;; Alle MV zunaechst auf dem Stack erzeugen, weil beim Evaluieren der
+          ;; Argumente evtl. mv_buf uebertschrieben wird.
+          ;;-Beachte:
+          ;; Resultat nicht auf fun-result Position erzeugen, weil dadurch
+          ;; evtl.  eine lokale Variable ueberschrieben wird, die fuer MV noch
+          ;; benoetigt wird.
+          ;;--------------------------------------------------------------------
+          (t (when (> mv-count MV-LIMIT)
+               (cg-error "VALUES is called with ~a arguments, ~
                         but only ~a are allowed"
-                       mv-count MV-LIMIT)
-             (setq mv-count MV-LIMIT))
-           (cg-args arg-list -1)
-           (stacktop-to-result-loc)
-           (dotimes (i (1- mv-count))
-             (C-copy (CC-Stack (+ *stack-top* i 1)) (CC-mv_buf i)))
-           (C-SetMV mv-count)))))
+                         mv-count MV-LIMIT)
+               (setq mv-count MV-LIMIT))
+             (opt-args arg-list)        ; veraendert *stack-top* !
+             (cg-args arg-list -1)
+             (stacktop-to-result-loc)
+             (dotimes (i (1- mv-count))
+               (C-copy (CC-Stack (+ *stack-top* i 1)) (CC-mv_buf i)))
+             (C-SetMV mv-count))))))
 
 ;;------------------------------------------------------------------------------
 (provide "cgvalues")

@@ -5,8 +5,39 @@
  *            ------------------------------------------------------
  * Funktion : obrep1.c - datenrepräsentationsspezifisch
  *
- * $Revision: 1.2 $
+ * $Revision: 1.10 $
  * $Log: obrep1.c,v $
+ * Revision 1.10  1994/06/17  15:25:48  sma
+ * forwaertsreferenz auf save_form eingefuegt.
+ *
+ * Revision 1.9  1994/05/18  15:20:18  sma
+ * Anpassung für obrep2.
+ *
+ * Revision 1.8  1994/05/05  14:40:34  uho
+ * In 'goto begin; break;'-Folgen das break geloescht, da es Warnungen
+ * mit BC++ V4 erzeugt.
+ *
+ * Revision 1.7  1994/02/18  12:10:30  uho
+ * Das Ermitteln konstanter Datenobjekte und der Heapkonsistenz wird
+ * durch Makroaufrufe vorgenommen.
+ *
+ * Revision 1.6  1994/01/24  16:28:32  sma
+ * Die AR_SIZE-Komponente von Strukturen enthaelt jetzt nur noch die
+ * Anzahl der Slots, nicht #Slots + 1. Spart einige +/-1 Berechnungen bei
+ * new-struct und struct-size.
+ *
+ * Revision 1.5  1994/01/21  13:31:45  sma
+ * Erneute Änderung der Symbolrepräsentation und somit auch des
+ * entsprechenden Codes zur Garbage-Collection. Änderug für neue
+ * Repräsentation von #<unbound>.
+ *
+ * Revision 1.4  1994/01/13  16:41:33  sma
+ * Änderung der Symbol-Repräsentation.
+ *
+ * Revision 1.3  1993/12/09  15:12:25  sma
+ * Neuer Garbage-collector für neue Repräsentation der arrays. Ist besser
+ * kommentiert, optimiert und vermeidet konsequent tail-end-Rekursionen.
+ *
  * Revision 1.2  1993/10/29  15:19:41  sma
  * Änderung wegen neuer Verwaltung von Array-Dimensionen.
  *
@@ -30,7 +61,6 @@
 #define LOAD_FORWARD(fw_ptr, loc) \
    (SET_TAG (loc, GC_FORWARD), GET_FORM (loc) = (fw_ptr))
 
-
 /*------------------------------------------------------------------------------
  * globale Heap-Variablen
  *----------------------------------------------------------------------------*/
@@ -47,17 +77,46 @@ extern double *fl_eoh;
 extern double *old_fl_heap;
 extern unsigned fl_heapsize;
 
+void gc_main();
+void save_form();
 
 /*------------------------------------------------------------------------------
- * Rettet eine LISP-Form, falls noetig, in den neuen Heap.
+ * Speicherbereinigung durchfuehren
+ *----------------------------------------------------------------------------*/
+void do_gc(top)
+CL_FORM *top;
+{
+   CL_FORM *lptr;
+
+   /* Traversieren der Wurzelbereiche im Hauptmodul und den importierten
+    * Modulen
+    *--------------------------------------------------------------------*/
+   gc_main();
+
+   /* Traversieren des LISP-Laufzeitstacks */
+   /* ------------------------------------ */
+   for (lptr = stack; lptr < top; lptr++)
+      save_form(lptr);
+   
+   /* Traversieren des Binding-Stacks */
+   /* ------------------------------- */
+   /* 'bind_top' zeigt auf den naechsten freien Eintrag. */
+   for (lptr = bind_stack; lptr < bind_top; lptr++)
+      save_form(lptr);
+}
+
+/*------------------------------------------------------------------------------
+ * Kernroutine des Gabage-Collectors
+ * Kopiert alle von "form" erreichbaren Objekte in den neuen Heap.
  *----------------------------------------------------------------------------*/
 void save_form (form)
 CL_FORM *form;
 {
  begin:
-   switch (TYPE_OF (form))
+   switch (TYPE_OF(form))
    {
-   case CL_UNBOUND:
+      /* keine Garbage-Collection nötig */
+      /*--------------------------------*/
    case CL_FIXNUM:
    case CL_CHAR:
    case CL_NIL:
@@ -68,283 +127,187 @@ CL_FORM *form;
    case CL_UNIQUE_TAG:
       break;
       
-   /*------------------------------------------------------------------------   
-    * Garbage-Collection eines LISP-Datums,                                  
-    * welches durch einen Zeiger referenziert wird.                          
-    * Annahme: Konstanten des Typs 'double' und 'CL_FORM', die schon zur     
-    * Uebersetzungszeit in 'floats' bzw 'const_forms' angelegt wurden,       
-    * haben Adressen, die kleiner sind als die Adresse von Daten, die        
-    * erst zur Laufzeit angelegt wurden                                      
-    *----------------------------------------------------------------------*/
+      /* Garbage-Collection von Floats */
+      /*------------------------------ */
    case CL_FLOAT:
    {
-      double *lptr = GET_FLOAT_PTR(form);
-
-      if(lptr < fl_heap1)       /* Konstantes Datum */
-         return;
-      if (lptr >= fl_heap1 + 2 * fl_heapsize)
-         Labort ("Unexpected pointer out of heap.");
-      if (!(old_fl_heap <= lptr && lptr < old_fl_heap + fl_heapsize))
-         Labort ("Unexpected pointer in wrong heap.");
-
-      /* ACHTUNG: wenn mehrere Referenzen auf eine Fließkommazahl existieren, */
-      /* dann wird die Zahl mehrmals kopiert! --> evtl. Überlauf während */
-      /* der GC */
+      double *fptr = GET_FLOAT_PTR(form);
       
-      *fl_toh = *lptr;
+      if (FL_CONSTANTq(fptr))      /* Konstantes Datum */
+         return;
+      
+      /* Test auf Inkonsistenz im GC */
+      
+      if (FL_OUT_OF_HEAPq(fptr))
+         Labort ("Unexpected pointer out of heap."); 
+      if (FL_WRONG_HEAPq(fptr)) 
+         Labort ("Unexpected pointer in wrong heap.");
+      
+      *fl_toh = *fptr;          /* In neuen Heap kopieren */
       GET_FLOAT_PTR(form) = fl_toh++;
-      if(fl_toh >= fl_eoh)
+
+      if (fl_toh >= fl_eoh) 
          Labort("Float-Heap Overflow.");
       break;
    }
    default:
    {
-      CL_FORM *lptr = GET_FORM (form);
+      CL_FORM *fptr = GET_FORM(form);
+      long size;
       
-      /*------------------------------------------------------------------------
-       * Annahme:
-       * - Der initialisierte Konstantenbereich wird bereits zur
+      /* Annahmen:
+       * o Der initialisierte Konstantenbereich wird bereits zur
        *   Übersetzungszeit alloziert.
-       * - Nicht initialisierte Arrays werden erst zur Laufzeit alloziert.
-       * - Zur Laufzeit allozierte Speicherbereiche liegen adressenmaessig
+       * o Nicht initialisierte Arrays werden erst zur Laufzeit alloziert.
+       * o Zur Laufzeit allozierte Speicherbereiche liegen adressenmaessig
        *   oberhalb des Programms.
-       * 
-       * => Zur Ueberpruefung, ob der Zeiger nicht in den Heap zeigt,
-       * reicht die Abfrage:
-       *----------------------------------------------------------------------*/
-      if (lptr < fo_heap)       /* Konstantes Datum */
-         return;
-      if (lptr >= fo_heap + 2 * form_heapsize)
-         Labort ("Unexpected pointer out of heap.");
-      if (!(old_form_heap <= lptr && lptr < old_form_heap + form_heapsize))
+       *--------------------------*/
+
+      if (FO_CONSTANTq(fptr))       /* Konstantes Datum */
+         return;                    /* oder #<unbound> Objekt */
+
+      /* Test auf Inkonsistenz im GC */
+      if (FO_OUT_OF_HEAPq(fptr)) 
+         Labort ("Unexpected pointer out of heap."); 
+      if (FO_WRONG_HEAPq(fptr))
          Labort ("Unexpected pointer in wrong heap.");
 
-      /* Wenn Vorwärtsreferenz, dann Datum bereits kopiert.
-       * Neue Adresse eintragen und fertig. */
-      if (TYPE_OF(lptr) == GC_FORWARD)
+      /* Wenn Vorwärtsreferenz, dann Datum schon kopiert. */
+      if (TYPE_OF(fptr) == GC_FORWARD)
       {
-         GET_FORM(form) = GET_FORM(lptr);
+         GET_FORM(form) = GET_FORM(fptr); /* Neue Adresse eintragen */
          return;
       }
       
-      switch (TYPE_OF (form)) {
-
-      /* Garbage-Collection von Symbolen */
-      /*---------------------------------*/
-      case CL_SYMBOL:
-         GET_FORM(form) = form_swap(lptr, SYM_SIZE);
-         LOAD_FORWARD(GET_FORM(form), lptr);
-
-         lptr = GET_FORM(form); /* Zeiger auf das neue Symbol */
-         
-         /* SYMBOL Printnamen retten, falls String im Character-Heap liegt.
-          * MAKE-SYMBOL kopiert bei einem SIMPLE-STRING nicht den
-          * eigentlichen String! Deshalb kann ein SYMBOL im Heap als
-          * Printnamen auch einen C-String haben. */
-         if (CHAR_AR(lptr) >= (char *)fx_heap1)
-            CHAR_AR(lptr) = ch_swap(CHAR_AR(lptr), AR_SIZE(lptr));
-         
-         save_form(lptr + OFF_SYM_PLIST);
-         save_form(lptr + OFF_SYM_VALUE);
-         save_form(lptr + OFF_SYM_PACKAGE);
-         break;
-
-      /* Garbage-Collection von Listen */
-      /*------------------------------ */
+      switch (TYPE_OF(form))
+      {
+         /* Garbage-Collection von Listen */
+         /*------------------------------ */
       case CL_CONS:
-         COPY(lptr, form_toh);
-         COPY(lptr + 1, form_toh + 1);
+         /* CONS-Knoten kopieren. */
+         COPY(fptr,     form_toh);
+         COPY(fptr + 1, form_toh + 1);
          
-         /* Zeiger auf kopierten CONS-Knoten setzen */
+         /* Zeiger auf kopierten CONS-Knoten setzen. */
          GET_FORM(form) = form_toh;
-         LOAD_FORWARD(form_toh, lptr);
+         LOAD_FORWARD(form_toh, fptr);
+         fptr = form_toh;
          form_toh += 2;
-
-         /* Depth-First Strategie: Zuerst den CAR weiterverfolgen */
-         save_form (GET_FORM (form));
+         
+         /* Depth-First Strategie: Zuerst den CAR weiterverfolgen. */
+         save_form(CAR(fptr));
 
          /* Dann den CDR weiterverfolgen.
-          * Hier wird 'form' neu gesetzt und durch einen Sprung an den
-          * Anfang der Funktion unnoetige Rekursion vermieden. */
-         form = GET_FORM (form) + 1;
+          * Durch das goto wird eine unnötige Rekursion vermieden. */
+         form = CDR(fptr);
          goto begin;
-         break;
 
-      /* Bei einem VECTOR wird
-       * 1. Der Header kopiert, der Zeiger auf den neuen Header gesetzt und
-       *    im alten Header eine Vorwärtsreferenz auf den neuen Header
-       *    eingetragen. (Der Header beginnt 2 Einträge vor 'lptr' und
-       *    ist 4 Eintraege lang.)
-       * 2. Falls es sich um einen DISPLACED-TO Vektor handelt, wird der
-       *    Vektor, auf welchen referenziert wird, gerettet.
-       * 3. Sonst wird die Länge des Vektors bestimmt,
-       *    (FILL-POINTER wird ignoriert)
-       *    und die Elemente werden kopiert. */
-      /*-------------------------------------*/
-      case CL_VEC_T:
-      case CL_VEC_FIXNUM:
-      case CL_VEC_FLOAT:
-      case CL_STRING:
-         GET_FORM(form) = form_swap(lptr - 2, 4L) + 2;
-         LOAD_FORWARD(GET_FORM(form), lptr);
+         /* Garbage-Collection von Symbolen */
+         /*---------------------------------*/
+      case CL_SYMBOL:
+         /* SYMBOL-Daten kopieren. */
+         COPY(fptr,     form_toh);
+         COPY(fptr + 1, form_toh + 1);
+         COPY(fptr + 2, form_toh + 2);
+         COPY(fptr + 3, form_toh + 3);
+         COPY(fptr + 4, form_toh + 4);
+         COPY(fptr + 5, form_toh + 5);
 
-         lptr = GET_FORM (form); /* Zeiger auf den neuen Header */
-         if (DISPLACED_P (lptr))
-         {
-            save_form (DISPLACED_TO (lptr));
-         }
-         else
-         {
-            long i, size;
+         /* Zeiger auf das neue Symbol */
+         GET_FORM(form) = form_toh;
+         LOAD_FORWARD(form_toh, fptr);
+         fptr = form_toh;
+         form_toh += SYM_SIZE;
+         
+         /* String kopieren, wenn nicht konstant. */
+         if (!AR_CONSTANTq(fptr,OFF_SYM_NAME))
+            AR_STRING(fptr + OFF_SYM_NAME) = 
+               ch_swap(AR_STRING(fptr + OFF_SYM_NAME), 
+                       AR_SIZE(fptr + OFF_SYM_NAME));
 
-            size = HAS_FILL_PTR (lptr) ? AR_SIZE_WHEN_FP(lptr) : AR_SIZE(lptr);
-            switch (TYPE_OF (form)) {
-            case CL_VEC_T:
-               FORM_AR(lptr) = form_swap(FORM_AR(lptr), size);
-               for (lptr = FORM_AR(lptr), i = 0; i < size; i++)
-                  save_form(lptr + i);
-               break;
-            case CL_VEC_FIXNUM:
-               FIXNUM_AR(lptr) = fx_swap(FIXNUM_AR(lptr), size);
-               break;
-            case CL_VEC_FLOAT:
-               FLOAT_AR(lptr) = fl_swap(FLOAT_AR(lptr), size);
-               break;
-            case CL_STRING:
-               CHAR_AR(lptr) = ch_swap(CHAR_AR(lptr), size);
-            }
-         }
-         break;
+         save_form(fptr + OFF_SYM_PLIST);
+         save_form(fptr + OFF_SYM_PACKAGE);
 
-      /* Bei einem SIMPLE-VECTOR wird:
-       * 1. Der Header kopiert.
-       * 2. Der eigentliche Vektor kopiert.
-       * 3. Im alten Header eine Vorwaertsreferenz auf den neuen Header
-       *     eingetragen.
-       * 4. Falls die Elemente des Vektors wieder CL_FORM's sind,
-       *    das GC auf die Elemente ausgedehnt. */
-      /*----------------------------------------*/
-      case CL_SMVEC_T:
-      case CL_CLOSURE:
+         /* Vermeidet Tail-End-Recursion */
+         form = fptr + OFF_SYM_VALUE;
+         goto begin;
+
+         /* Garbage-Collection von Simple-Vector und ähnlichem */
+         /*----------------------------------------------------*/
       case CL_STRUCT:
+         size = AR_SIZE(fptr) + 1;
+         goto copy;
+      case CL_SMVEC_T:
       case CL_INSTANCE:
-      {
-         long i, size = AR_SIZE (lptr);
+      case CL_CLOSURE:
+         /* Anzahl der zu kopierenden Objekte */
+         size = AR_SIZE(fptr);
+      copy:
+         GET_FORM(form) = form_swap(fptr, size + 1);
+         LOAD_FORWARD(GET_FORM(form), fptr);
+         fptr = GET_FORM(fptr) + 1L;
+         while (--size > 0)
+            save_form(fptr++);
+         form = fptr;
+         goto begin;
 
-         GET_FORM(form) = form_swap(lptr, 1 + size);
-         LOAD_FORWARD(GET_FORM(form), lptr);
-         for (lptr = GET_FORM(lptr) + 1, i = 0; i < size; i++)
-            save_form (lptr + i);
-         break;
-      }
       case CL_SMVEC_FIXNUM:
-         GET_FORM (form) = form_swap (lptr, 2L);
-         LOAD_FORWARD (GET_FORM (form), lptr);
-         lptr = GET_FORM (form); /* Zeiger auf den neuen Header */
-         FIXNUM_AR (lptr) = fx_swap (FIXNUM_AR (lptr), AR_SIZE (lptr));
+         /* Deskriptor kopieren. */
+         COPY(fptr, form_toh);
+         COPY(fptr + 1, form_toh + 1);
+         GET_FORM(form) = form_toh;
+         LOAD_FORWARD(form_toh, fptr);
+         fptr = form_toh;       /* Zeiger auf neuen Header */
+         form_toh += 2;
+         /* Vektor mit FIXNUM-Repräsentation kopieren. */
+         FIXNUM_AR(fptr) = fx_swap(FIXNUM_AR(fptr), AR_SIZE(fptr));
          break;
-      case CL_SMVEC_FLOAT: 
-         GET_FORM (form) = form_swap (lptr, 2L);
-         LOAD_FORWARD (GET_FORM (form), lptr);
-         lptr = GET_FORM (form); /* Zeiger auf den neuen Header */
-         FLOAT_AR (lptr) = fl_swap (FLOAT_AR (lptr), AR_SIZE (lptr));
+      case CL_SMVEC_FLOAT:
+         /* Deskriptor kopieren. */
+         COPY(fptr, form_toh);
+         COPY(fptr + 1, form_toh + 1);
+         GET_FORM(form) = form_toh;
+         LOAD_FORWARD(form_toh, fptr);
+         fptr = form_toh;       /* Zeiger auf neuen Header */
+         form_toh += 2;
+         /* Vektor mit FLOATs kopieren. */
+         FLOAT_AR(fptr) = fl_swap(FLOAT_AR(fptr), AR_SIZE(fptr));
          break;
-      case CL_SMSTR:    
-         GET_FORM (form) = form_swap (lptr, 2L);
-         LOAD_FORWARD (GET_FORM (form), lptr);
-         lptr = GET_FORM (form); /* Zeiger auf den neuen Header */
-         CHAR_AR (lptr)  = ch_swap (CHAR_AR (lptr), AR_SIZE (lptr));
+      case CL_SMVEC_CHARACTER:
+         /* Deskriptor kopieren. */
+         COPY(fptr, form_toh);
+         COPY(fptr + 1, form_toh + 1);
+         GET_FORM(form) = form_toh;
+         LOAD_FORWARD(form_toh, fptr);
+         fptr = form_toh;       /* Zeiger auf neuen Header */
+         form_toh += 2;
+         /* String kopieren, wenn nicht konstant. */
+         if (!AR_CONSTANTq(fptr,0))
+            AR_STRING(fptr) = ch_swap(AR_STRING(fptr), AR_SIZE(fptr));
          break;
-
-      /* Simple Arrays */
-      /*---------------*/
-      case CL_SMAR_T:  
-      {
-         long i, size = AR_SIZE(lptr);
-
-         GET_FORM(form) = form_swap(lptr - 1, 2L + size) + 1;
-         LOAD_FORWARD(GET_FORM (form), lptr);
-
-         lptr = GET_FORM (form); /* Zeiger auf den neuen Header */
-         AR_DIMS (lptr) = fx_swap (AR_DIMS (lptr), AR_RANK (lptr) + 1);
-
-         lptr++;                /* Zeiger auf das eigentliche Array */
-         for (i = 0; i < size; i++)
-            save_form (lptr + i);
-         break;
-      }
-      
-      case CL_SMAR_FIXNUM:
-      case CL_SMAR_FLOAT:
-      case CL_SMAR_CHAR:
-         GET_FORM (form) = form_swap (lptr - 1, 3L) + 1;
-         LOAD_FORWARD (GET_FORM (form), lptr);
-
-         lptr = GET_FORM (form); /* Zeiger auf den neuen Header */
-         AR_DIMS (lptr) = fx_swap (AR_DIMS (lptr), AR_RANK (lptr) + 1);
-         switch (TYPE_OF (form)) {
-         case CL_SMAR_FIXNUM:
-            FIXNUM_AR (lptr) = fx_swap (FIXNUM_AR (lptr), AR_SIZE (lptr));
-            break;
-         case CL_SMAR_FLOAT: 
-            FLOAT_AR (lptr) = fl_swap (FLOAT_AR (lptr), AR_SIZE (lptr));
-            break;
-         case CL_SMAR_CHAR:  
-            CHAR_AR (lptr)  = ch_swap (CHAR_AR (lptr), AR_SIZE (lptr));
-         }
-         break;
-
-      /* Arrays */
-      /*--------*/
-      case CL_AR_T:
-      case CL_AR_FIXNUM:
-      case CL_AR_FLOAT:
-      case CL_AR_CHAR:
-         GET_FORM (form) = form_swap (lptr - 2, 4L) + 2;
-         LOAD_FORWARD (GET_FORM (form), lptr);
-
-         lptr = GET_FORM (form); /* Zeiger auf den neuen Header */
-         AR_DIMS (lptr) = fx_swap (AR_DIMS (lptr), AR_RANK (lptr) + 1);
-         if (DISPLACED_P (lptr))
-         {
-            save_form (DISPLACED_TO (lptr));
-         }
-         else
-         {
-            switch (TYPE_OF (form))
-            {
-            case CL_AR_T:
-            {
-               long i, size = AR_SIZE (lptr);
-               
-               FORM_AR (lptr) = form_swap (FORM_AR (lptr), size);
-               
-               /* Zeiger auf das eigentliche Array */
-               for (lptr = FORM_AR (lptr), i = 0; i < size; i++)
-                  save_form (lptr + i);
-               break;
-            }
-            case CL_AR_FIXNUM:
-               FIXNUM_AR (lptr) = fx_swap (FIXNUM_AR (lptr), AR_SIZE (lptr));
-               break;
-            case CL_AR_FLOAT:
-               FLOAT_AR (lptr) = fl_swap (FLOAT_AR (lptr), AR_SIZE (lptr));
-               break;
-            case CL_AR_CHAR:
-               CHAR_AR (lptr) = ch_swap (CHAR_AR (lptr), AR_SIZE (lptr));
-            }
-         }
+      case CL_SMVEC_BIT:
+         /* Deskriptor kopieren. */
+         COPY(fptr, form_toh);
+         COPY(fptr + 1, form_toh + 1);
+         GET_FORM(form) = form_toh;
+         LOAD_FORWARD(form_toh, fptr);
+         fptr = form_toh;       /* Zeiger auf neuen Header */
+         form_toh += 2;
+         /* Vektor mit Bitvektor-Repräsentation kopieren. */
+         BIT_AR(fptr) = bits_swap(BIT_AR(fptr), AR_SIZE(fptr));
          break;
          
-      /*--------------------------------------------------*/
+         /* Indirection */
+         /*-------------*/
       case CL_IND:
-         GET_FORM (form) = form_swap (lptr, 1L);
-         LOAD_FORWARD (GET_FORM (form), lptr);
-         form = GET_FORM (form);
+         COPY(fptr, form_toh);
+         GET_FORM(form) = form_toh;
+         LOAD_FORWARD(form_toh, fptr);
+         form = form_toh++;
          goto begin;
 
-      /* Foreign-Datentypen */
-      /*--------------------*/
+         /* Foreign-Datentypen */
+         /*--------------------*/
       case CL_C_CHAR:
       case CL_C_UNSIGNED_CHAR:
       case CL_C_SHORT:
@@ -354,12 +317,13 @@ CL_FORM *form;
       case CL_C_UNSIGNED_INT:
       case CL_C_UNSIGNED_LONG:
          break;
-
+         
       default:
-         fprintf (stderr, ";;; Unkonwn data type %d by GC\n", TYPE_OF (form));
-         exit (1);
+         fprintf(stderr, ";;; Unkonwn data type %d by GC\n", TYPE_OF(form));
+         exit(1);
       }
    }
    } /*switch*/
 }
+
 #endif

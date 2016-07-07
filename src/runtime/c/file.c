@@ -15,8 +15,15 @@
  *            - c_fputc
  *            - c_ungetc
  *
- * $Revision: 1.9 $
+ * $Revision: 1.11 $
  * $Log: file.c,v $
+ * Revision 1.11  1994/04/28  09:45:38  sma
+ * LOAD_CFILE, LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ *
+ * Revision 1.10  1994/01/13  16:41:13  sma
+ * STACK(base, x) -> ARG(x). Eine Typcasts eingefügt, damit chars mit
+ * code > 128 korrekt verarbeit werden. Quelltext verschönert.
+ *
  * Revision 1.9  1993/10/13  16:54:29  sma
  * Da LOAD_CFILE zu einem Block expandieren kann, muß es bei if/then/else
  * in { } stehen.
@@ -53,61 +60,51 @@
 
 char NOT_UNREAD[] = "Could not unread character ~s";
 
-/*-------------------------------------------------------------------------
- * C-open name mode
- *-------------------------------------------------------------------------*/
-void 
-c_fopen(base)
-CL_FORM *base;
+/*------------------------------------------------------------------------------
+ * C-OPEN name mode
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_fopen)
 {
-   FILE *f = fopen(get_c_string(STACK(base, 0)), get_c_string(STACK(base, 1)));
+   FILE *f = fopen(get_c_string(ARG(0)), get_c_string(ARG(1)));
 
    if (f != NULL)
    {
-      LOAD_CFILE(f, STACK(base, 0));
+      LOAD_CFILE(ARG(0), f, ARG(0));
    }
    else
-      LOAD_NIL(STACK(base, 0));
+      LOAD_NIL(ARG(0));
 }
 
-/*-------------------------------------------------------------------------
- * C-fclose cfile
- *-------------------------------------------------------------------------*/
-void 
-c_fclose(base)
-CL_FORM *base;
+/*------------------------------------------------------------------------------
+ * C-FCLOSE cfile
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_fclose)
 {
-   fclose(GET_CFILE(STACK(base, 0)));
+   fclose(GET_CFILE(ARG(0)));
 }
 
-/*-------------------------------------------------------------------------
- * C-ftell cfile
- *-------------------------------------------------------------------------*/
-void 
-c_ftell(base)
-CL_FORM *base;
+/*------------------------------------------------------------------------------
+ * C-FTELL cfile
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_ftell)
 {
-   LOAD_FIXNUM(ftell(GET_CFILE(STACK(base, 0))), STACK(base, 0));
+   LOAD_FIXNUM(ARG(1), ftell(GET_CFILE(ARG(0))), ARG(0));
 }
 
-/*-------------------------------------------------------------------------
- * C-fseek cfile offset
- *-------------------------------------------------------------------------*/
-void 
-c_fseek(base)
-CL_FORM *base;
+/*------------------------------------------------------------------------------
+ * C-FSEEK cfile offset
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_fseek)
 {
-   fseek(GET_CFILE(STACK(base, 0)), GET_FIXNUM(STACK(base, 1)), 0);
+   fseek(GET_CFILE(ARG(0)), (long)GET_FIXNUM(ARG(1)), 0);
 }
 
-/*-------------------------------------------------------------------------
- * C-file-length cfile
- *-------------------------------------------------------------------------*/
-void 
-c_file_length(base)
-CL_FORM *base;
+/*------------------------------------------------------------------------------
+ * C-FILE-LENGTH cfile
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_file_length)
 {
-   FILE *f = GET_CFILE(STACK(base, 0));
+   FILE *f = GET_CFILE(ARG(0));
    long pos = ftell(f);
    long len;
 
@@ -115,93 +112,77 @@ CL_FORM *base;
    fseek(f, 0L, 2);
    len = ftell(f);
    fseek(f, pos, 0);
-   LOAD_FIXNUM(len, STACK(base, 0));
+   LOAD_FIXNUM(ARG(0), len, ARG(0));
 }
 
-/*-------------------------------------------------------------------------
- * get stdin handle
- *-------------------------------------------------------------------------*/
-void 
-c_stdin(base)
-CL_FORM *base;
+/*------------------------------------------------------------------------------
+ * C-STDIN
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_stdin)
 {
-   LOAD_CFILE(stdin, STACK(base, 0));
+   LOAD_CFILE(ARG(0), stdin, ARG(0));
 }
 
-/*-------------------------------------------------------------------------
- * get stdout handle
- *-------------------------------------------------------------------------*/
-void 
-c_stdout(base)
-CL_FORM *base;
+/*------------------------------------------------------------------------------
+ * C-STDOUT
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_stdout)
 {
-   LOAD_CFILE(stdout, STACK(base, 0));
+   LOAD_CFILE(ARG(0), stdout, ARG(0));
 }
 
-/*-------------------------------------------------------------------------
- * c-fgetc cfile
- *-------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------
+ * C-FGETC cfile
+ *----------------------------------------------------------------------------*/
 #if 1
-void 
-c_fgetc(base)
-CL_FORM *base;
+LISP_FUN(c_fgetc)
 {
-   int c = fgetc(GET_CFILE(STACK(base, 0)));
+   int c = fgetc(GET_CFILE(ARG(0)));
 
    if (c == EOF)
-      LOAD_NIL(STACK(base, 0));
+      LOAD_NIL(ARG(0));
    else
    {
-      LOAD_CHAR(c, STACK(base, 0));
+      LOAD_CHAR(ARG(0), c, ARG(0));
    }
 }
 #else
-void 
-c_fgetc(base)
-CL_FORM *base;
+LISP_FUN(c_fgetc)
 {
    static char buf[256];
    static char *ptr = buf;
 
    if (*ptr == '\0')
    {
-      if (!fgets(buf, sizeof(buf), GET_CFILE(STACK(base, 0))))
+      if (!fgets(buf, sizeof(buf), GET_CFILE(ARG(0))))
       {
-	 LOAD_NIL(STACK(base, 0));
-	 buf[0] = '\0';
-	 ptr = buf;
-	 return;
+         LOAD_NIL(ARG(0));
+         buf[0] = '\0';
+         ptr = buf;
+         return;
       }
       else
       {
-	 ptr = buf;
+         ptr = buf;
       }
    }
-   LOAD_CHAR(*ptr++, STACK(base, 0));
+   LOAD_CHAR(ARG(0), *ptr++, ARG(0));
 }
 #endif
 
-/*-------------------------------------------------------------------------
- * C-fputc char cfile
- *-------------------------------------------------------------------------*/
-void 
-c_fputc(base)
-CL_FORM *base;
+/*------------------------------------------------------------------------------
+ * C-FPUTC char cfile
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_fputc)
 {
-   /* Aufruf erfolgt nur mit Char als erstem Argument
-    * ----------------------------------------------- */
-   fputc(GET_CHAR(STACK(base, 0)), GET_CFILE(STACK(base, 1)));
+   fputc((int)GET_CHAR(ARG(0)), GET_CFILE(ARG(1)));
 }
 
 /*-------------------------------------------------------------------------
- * C-ungetc char cfile
+ * C-UNGETC char cfile
  *-------------------------------------------------------------------------*/
-void 
-c_ungetc(base)
-CL_FORM *base;
+LISP_FUN(c_ungetc)
 {
-   /* Aufruf erfolgt nur Char als erstem Argument
-    * ------------------------------------------- */
-   if (ungetc(GET_CHAR(STACK(base, 0)), GET_CFILE(STACK(base, 1))) == EOF)
-      Lerror(STACK(base, 0), NOT_UNREAD);
+   if (ungetc((int)GET_CHAR(ARG(0)), GET_CFILE(ARG(1))) == EOF)
+      Lerror(ARG(0), NOT_UNREAD);
 }

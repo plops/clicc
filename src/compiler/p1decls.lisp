@@ -5,8 +5,26 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : 9. Declarations
 ;;;
-;;; $Revision: 1.13 $
+;;; $Revision: 1.17 $
 ;;; $Log: p1decls.lisp,v $
+;;; Revision 1.17  1994/02/21  10:02:19  ft
+;;; Proklamation von Klassen als INSTANCEABLE, SUBCLASSABLE und
+;;; SPECIALIZABLE ermöglicht.
+;;;
+;;; Revision 1.16  1994/02/08  13:28:35  hk
+;;; name2fun nach p1env
+;;;
+;;; Revision 1.15  1994/02/08  13:16:40  sma
+;;; Annotation my-last-arg-may-be-rest-var bei funs, die angibt, daß das
+;;; letzte Argument der hiermit annotierten Funktion auch ein rest-listen
+;;; Parameter sein kann. Die Annotation enthält in diesem Falle den Namen
+;;; (als Keyword) ihrer Funktion.
+;;;
+;;; Revision 1.14  1994/02/02  09:22:05  hk
+;;; Bearbeitung von CLiCC-spezifischen Deklarationen eingefügt, mit denen
+;;; angegeben werden kann, wie Funktionen des Laufzeitsystems optimiert
+;;; werden sollen.
+;;;
 ;;; Revision 1.13  1993/08/19  16:49:22  hk
 ;;; Verwendung von lex-var-name-p.
 ;;;
@@ -105,6 +123,26 @@
         (push variable (?ignore-decls *GLOBAL-ENVIRONMENT*)))))
 
 ;;------------------------------------------------------------------------------
+(defun p1-proclaim-export-goal (symbols goal)
+  (dolist (symbol symbols)
+    (let ((class
+           (cdr (or (get-class-entry symbol) (bind-forward-class symbol)))))
+      (cond
+        ((built-in-class-def-p class)
+         (clc-error "it is illegal to export the built-in-class ~A." symbol))
+        ((imported-class-p class)
+         (clc-error "it is illegal to export the imported-class ~A." symbol))
+         ((defined-class-p class)
+          (unless (member goal (?export-goals class))
+            (case goal
+              (:instanceable
+               (push :full-instanceable (?export-goals class)))
+              (:subclassable
+               (push :full-subclassable (?export-goals class)))
+              (:specializable
+               (push :full-specializable (?export-goals class))))))))))
+
+;;------------------------------------------------------------------------------
 (defun p1-declare-ignore (variables)
   (dolist (variable variables)
     (if (not (symbolp variable))
@@ -147,13 +185,44 @@
 ;;------------------------------------------------------------------------------
 (defun p1-declare (declaration)
   (dolist (decl-spec (rest declaration))
-    (case (first decl-spec)
-      (L::SPECIAL
-       (p1-declare-special (rest decl-spec)))
-      (L::IGNORE
-       (p1-declare-ignore (rest decl-spec)))
-      (otherwise
-       (p1-check-if-valid-declaration (first decl-spec))))))
+    (let ((decl-value (rest decl-spec)))
+      (case (first decl-spec)
+        (L::SPECIAL
+         (p1-declare-special decl-value))
+        (L::IGNORE
+         (p1-declare-ignore decl-value))
+        (:simp-when-n-args
+         (setf (?simp-when-n-args *current-fun*)
+               (list (first decl-value) (name2fun (second decl-value)))))
+        (:simp-when-no-result
+         (setf (?simp-when-no-result *current-fun*)
+               (name2fun (first decl-value))))
+        (:simp-when-arg-n=cons
+         (setf (?simp-when-arg-n=cons *current-fun*)
+               (list (first decl-value) (name2fun (second decl-value)))))
+        (:simp-when-some-arg-not-cons/pathn/string/bitv
+         (setf (?simp-when-some-arg-not-cons/pathn/string/bitv *current-fun*)
+               (name2fun (first decl-value))))
+        (:simp-when-some-arg-not-num/char
+         (setf (?simp-when-some-arg-not-num/char *current-fun*)
+               (name2fun (first decl-value))))
+        (:simp-test-fun-when-not-testnot
+         (setf (?simp-test-fun-when-not-testnot *current-fun*)
+               (list (pop decl-value)
+                     (pop decl-value)
+                     (p1-make-symbol (pop decl-value))
+                     (name2fun (pop decl-value))
+                     (p1-make-symbol (pop decl-value)))))
+        (:simp-when-only-test=value
+         (setf (?simp-when-only-test=value *current-fun*)
+               (list (pop decl-value)
+                     (p1-make-symbol (pop decl-value))
+                     (name2fun (pop decl-value))
+                     (name2fun (pop decl-value)))))
+        (:my-last-arg-may-be-rest-var
+         (setf (?my-last-arg-may-be-rest-var *current-fun*) (first decl-value)))
+        (otherwise
+         (p1-check-if-valid-declaration (first decl-spec)))))))
 
 ;;------------------------------------------------------------------------------
 ;; PROCLAIM decl-spec
@@ -179,6 +248,8 @@
        (p1-proclaim-special (rest decl-spec)))
       (L::IGNORE
        (p1-proclaim-ignore (rest decl-spec)))
+      ((:INSTANCEABLE :SUBCLASSABLE :SPECIALIZABLE)
+       (p1-proclaim-export-goal (rest decl-spec) (first decl-spec)))
       (otherwise
        (p1-check-if-valid-declaration (first decl-spec))))))
 

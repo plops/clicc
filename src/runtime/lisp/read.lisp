@@ -15,8 +15,24 @@
 ;;;            - READ-FROM-STRING
 ;;;            - PARSE-INTEGER
 ;;;
-;;; $Revision: 1.9 $
+;;; $Revision: 1.14 $
 ;;; $Log: read.lisp,v $
+;;; Revision 1.14  1994/06/03  09:51:05  hk
+;;; Schreibfehler behoben
+;;;
+;;; Revision 1.13  1994/06/02  14:10:19  hk
+;;; Print-Funktion f"ur readtable-Struktur von write2 nach hier.
+;;;
+;;; Revision 1.12  1994/05/31  12:05:06  hk
+;;; Bessere warning beim Lesen von Ratios als Floats
+;;;
+;;; Revision 1.11  1994/02/17  16:16:35  hk
+;;; "Uberfl"ussigen Test in struct-reader gestrichen, aufger"aumt,
+;;; Fehlermeldung verbessert.
+;;;
+;;; Revision 1.10  1994/01/11  16:11:47  hk
+;;; Fehler in bq-attach-append bei `( ..... . const) behoben.
+;;;
 ;;; Revision 1.9  1993/11/29  12:26:40  uho
 ;;; In 'read-token' wird beim Lesen des look-ahead-Zeichens das Ende
 ;;; explizit als NIL gemeldet.
@@ -42,7 +58,7 @@
 ;;;
 ;;; Revision 1.3  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.9 $ eingefuegt
+;;; $Revision: 1.14 $ eingefuegt
 ;;;
 ;;; Revision 1.2  1993/01/11  15:04:27  hk
 ;;; structure -> struct
@@ -255,10 +271,10 @@
 
 ;;------------------------------------------------------------------------------
 (defun bq-attach-append (op item result)
-  (cond ((and (null-or-quoted item) (null-or-quoted result))
-         (list *bq-quote* (append (cadr item) (cadr result))))
-        ((or (null result) (equal result *bq-quote-nil*))
+  (cond ((or (null result) (equal result *bq-quote-nil*))
          (if (bq-splicing-frob item) (list op item) item))
+        ((and (null-or-quoted item) (null-or-quoted result))
+         (list *bq-quote* (append (cadr item) (cadr result))))
         ((and (consp result) (eq (car result) op))
          (list* (car result) item (cdr result)))
         (t (list op item result))))
@@ -295,7 +311,12 @@
     (T (maptree #'bq-remove-tokens x))))
 
 ;;------------------------------------------------------------------------------
-(defstruct (readtable (:copier nil) (:predicate readtablep))
+(defstruct (readtable (:copier nil)
+                      (:predicate readtablep)
+                      (:print-function
+                       (lambda (readtable stream depth)
+                         (declare (ignore readtable depth))
+                         (write-string "#<readtable>" stream))))
 
     ;; fuer jedes Standard-Character ein Eintrag:
     ;; NIL (= ILLEGAL), WHITESPACE, CONSTITUENT, SINGLE-ESCAPE, MULTI-ESCAPE,
@@ -652,8 +673,9 @@
 
            (setq num2 (read-digits))
            (when (or (null num2) (< i len)) (go SYMBOL))
-           (warn "ratios are not supported")
-           (return-from read-token (/ num1 num2))
+           (let ((result (/ num1 num2)))
+             (warn "ratio ~a/~a has been read as ~s" num1 num2 result)
+             (return-from read-token result))
 
          SYMBOL
 
@@ -896,17 +918,18 @@
     (cond
       (*read-suppress* nil)
       ((atom list) (error "illegal value (~s) followed #S" list))
-      (T (let ((constructor (rt:struct-constructor (car list))))
+      (T (let ((constructor (rt:struct-constructor (car list)))
+               (key-value-list (cdr list)))
            (unless constructor (error "~a is not a structure" (car list)))
-           (setq list (cdr list))
-           (do ((result nil))
-               ((endp list) (apply constructor (nreverse result)))
-             (when (atom list) (error "~s should be a list" list))
-             (push (intern (string (car list)) *keyword-package*) result)
-             (setq list (cdr list))
-             (when (atom list) (error "~s should be a list" list))
-             (push (car list) result)
-             (setq list (cdr list))))))))
+           (do ((result ()))
+               ((endp key-value-list) (apply constructor (nreverse result)))
+             (push (intern (string (car key-value-list)) *keyword-package*)
+                   result)
+             (pop key-value-list)
+             (when (endp key-value-list)
+               (error "unexpected end in #S~s" key-value-list))
+             (push (car key-value-list) result)
+             (pop key-value-list)))))))
 
 ;;------------------------------------------------------------------------------
 (defun feature-plus-reader (stream char i)

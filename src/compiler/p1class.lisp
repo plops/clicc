@@ -5,8 +5,26 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Pass 1 der Klassenverarbeitung, sowie der Instantierung
 ;;;
-;;; $Revision: 1.58 $
+;;; $Revision: 1.63 $
 ;;; $Log: p1class.lisp,v $
+;;; Revision 1.63  1994/02/21  10:04:42  ft
+;;; Parameterprüfung in p1-defclass erweitert; Neue Funktion
+;;; export-classes zur Vorbereitung von Klassen auf das Exportieren hin
+;;; zugefügt.
+;;;
+;;; Revision 1.62  1994/01/26  13:36:53  ft
+;;; Änderung der Darstellung von ungebundenen Slots.
+;;;
+;;; Revision 1.61  1994/01/21  16:51:15  ft
+;;; Zweite Behelfskorrektur an *SECRET-UNBOUND-SLOT-VALUE*.
+;;;
+;;; Revision 1.60  1994/01/21  16:48:51  ft
+;;; Behelfskorrektur an *SECRET-UNBOUND-SLOT-VALUE*.
+;;;
+;;; Revision 1.59  1994/01/21  08:25:00  ft
+;;; Änderung der Zwischensprachrepr. des Werts unbound für Slots von einem
+;;; String zu einem Symbol (unintern).
+;;;
 ;;; Revision 1.58  1993/12/14  12:27:25  hk
 ;;; In parse-slot-specifier: 'setf -> 'L::setf
 ;;;
@@ -242,10 +260,11 @@
   
     ;; erste Parameterpruefung
     ;;------------------------
-    (when (< (length all-args) 3)
-    (clicc-error
-     ILLEGAL_CALL "DEFCLASS"
-     "CLASS-NAME ({SUPERCLASS-NAME}*) ({SLOT-SPECIFIER}*) [CLASS-OPTION]"))
+    (unless (and (listp all-args) (> (length all-args) 2)
+                 (listp (second all-args)) (listp (third all-args)))
+      (clicc-error
+       ILLEGAL_CALL "DEFCLASS"
+       "CLASS-NAME ({SUPERCLASS-NAME}*) ({SLOT-SPECIFIER}*) [CLASS-OPTION]"))
 
     (multiple-value-bind
         (class-name 
@@ -260,6 +279,10 @@
             slot-descriptions           ; Liste von slot-desc Instanzen
             (*CURRENT-FORM* class-name))
       
+        ;; gebe Meldung aus
+        ;;-----------------
+        (clicc-message "Analyse DEFCLASS     ~A" class-name)
+
         ;; Pruefen ob die Klasse schon definiert/referenziert  wurde
         ;; sonst neue Instanz von defined-class erzeugen
         ;;----------------------------------------------
@@ -277,10 +300,6 @@
            (setf class (make-instance 'defined-class :symbol class-name))
            (set-unfinalized-class-entry class-name class nil nil)
            (setf class-entry (get-class-entry class-name))))
-
-        ;; gebe Meldung aus
-        ;;-----------------
-        (clicc-message "Analyse DEFCLASS     ~A" class-name)
 
         ;; Parameteranalyse z.B Ermittlung der Metaklasse
         ;;-----------------------------------------------
@@ -354,12 +373,6 @@
 ;;------------------------------------------------------------------------------
 
 (defun parse-defclass-args (all-args)
-  (when (or (< (length all-args) 3) 
-            (not (listp (second all-args)))
-            (not (listp (third all-args))))
-    (clc-error 
-     "The argument list of DEFCLASS does not match ~
-      CLASS-NAME ({SUPERCLASS-NAME}*) ({SLOT-SPECIFIER}*) [[CLASS-OPTION]]"))
   (let ((class-name                     ; Name der Klasse als Symbol
          (first all-args))
         (defined-superclasses           ; Liste definierter Superklassen
@@ -407,18 +420,26 @@
                                   (list slot-specifier)))
       (multiple-value-bind
             (evaluated-initform evaluated)
-          (if (s-fun-p initform) (values initform nil) (p1-eval initform))
+          (cond
+            ((eq initform :unbound) (values initform T))
+            ((s-fun-p initform)                        (values initform nil))
+            (T                                         (p1-eval initform)))
         (let* ((*SDF* T)
                (initfunction-name (intern (concatenate 'string 
                                                        (string symbol)
                                                        "-initfunction" 
                                                        (string (gensym)))))
-               (processed-initform (if evaluated 
-                                       (p1-form `(L::QUOTE ,evaluated-initform))
-                                       (progn 
-                                         (p1-defun `(,initfunction-name ()
-                                                     ,initform))
-                                         (p1-form  `#',initfunction-name))))
+               (processed-initform
+                (cond
+                  ((eq evaluated-initform :unbound)
+                   evaluated-initform)
+                  (evaluated 
+                   (p1-form
+                    `(L::QUOTE ,evaluated-initform)))
+                  (T
+                   (progn 
+                     (p1-defun `(,initfunction-name () ,initform))
+                     (p1-form  `#',initfunction-name)))))
                (slot-description (make-instance 'slot-desc
                                                 :symbol symbol
                                                 :initform processed-initform
@@ -435,7 +456,7 @@
 (defun parse-slot-specifier (slot-specifier)
   (let ((symbol (car slot-specifier))
         (type T)
-        (initform "SECRET-UNBOUND-SLOT-VALUE")
+        (initform :unbound)
         (allocation ':instance)
         ;; fuer ^^^ koennte man noch einen Fehler bei mehrfacher Angabe ausgeben
         (reader (empty-queue))
@@ -709,10 +730,15 @@
 
          ;;---------------------------------------------------------------------
          ;; generate-accessor-methods: Erzeuge die Slot-Zugriffs-Methoden
+         ;;                            Diese müssen auch Typtests enthalten
+         ;;                            (mittels THE) damit die primitiven
+         ;;                            Zugriffsf. darauf verzichten können.
          ;;---------------------------------------------------------------------
          (generate-accessor-methods ()
-           (clicc-message "Generating slot accessors ...")
+           (when (queue2list (?class-def-list *module*))
+             (clicc-message "Generating slot accessors ..."))
            (dolist (class (queue2list (?class-def-list *module*)))
+
              ;; erzeuge die Slot-Zugriffsmethoden
              ;;----------------------------------
              (let* ((*SDF* T)           ; System-Defined-Function
@@ -872,7 +898,37 @@
       (setf (?symbol a-slot) (p1-constant (?symbol a-slot))))))
 
 ;;------------------------------------------------------------------------------
-;; class-precedence-sort
+;; export-classes: Setzt das exported-flag der Klassen und veranlasst ggf. das
+;;                 schattierte exportieren von Oberklassen
+;;------------------------------------------------------------------------------
+(defun export-classes ()
+  (dolist (class (?class-def-list *module*))
+    (unless (?exported class)
+      (let ((symbol (?symbol (?symbol class))))
+        (when (consp symbol) (setq symbol (second symbol)))
+        (when (symbol-package symbol)
+          (multiple-value-bind (s status)
+              (find-symbol (symbol-name symbol) (symbol-package symbol))
+            (declare (ignore s))
+            (when (eq :external status)
+              (dolist (superclass
+                        (rest (?value (?class-precedence-list class))))
+                (unless (?exported superclass)
+                  (setf (?exported superclass) t)
+                  (unless (member :full-specializable
+                                  (?export-goals superclass))
+                    (push :shadow-specializable
+                          (?export-goals superclass)))))
+              (setf (?exported class) t)
+              (unless (?export-goals class)
+                (setf (?export-goals class)
+                      (list :full-subclassable
+                            :full-instanceable
+                            :full-specializable))))))))))
+
+;;------------------------------------------------------------------------------
+;; class-precedence-sort: sortiert eine Liste von Klassen gemaess der durch
+;;                        die c-p-l's vorgegeben Reihenfolgen
 ;;------------------------------------------------------------------------------
 (defun class-precedence-sort (class-list)
   (let ((todo class-list)

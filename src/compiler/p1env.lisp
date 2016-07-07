@@ -5,8 +5,30 @@
 ;;;            ------------------------------------------------------
 ;;; Inhalt   : Environments
 ;;;
-;;; $Revision: 1.50 $
+;;; $Revision: 1.55 $
 ;;; $Log: p1env.lisp,v $
+;;; Revision 1.55  1994/06/10  20:40:14  hk
+;;; name2fun: liefert nil, wenn Funktion nicht gefunden.
+;;;
+;;; Revision 1.54  1994/05/26  10:10:06  hk
+;;; dynamische Variablen in Ausdr"ucken, die zur Compile-Zeit evaluiert
+;;; werden, werden nicht in global-env eingetragen, da dies f"ur Symbole
+;;; auch nicht geschieht. Vorher konnte ein sym f"alschlich in den
+;;; Zwischencode gelangen.
+;;;
+;;; Revision 1.53  1994/04/18  15:40:39  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - UNEXPANDED-FOREIGN-FUN als moeglicher Operator ins Globale
+;;;   Environment eingetragen.
+;;;
+;;; Revision 1.52  1994/03/12  18:34:02  jh
+;;; Macro get-global-setf-fun eingefuegt.
+;;;
+;;; Revision 1.51  1994/02/08  13:28:14  hk
+;;; Neue Funktion name2fun: Das Argument ist ein 'extended function
+;;; designator' also eine Symbol oder eine Liste der Gestalt (setf
+;;; <symbol>).
+;;;
 ;;; Revision 1.50  1993/12/07  15:04:12  ft
 ;;; find im Rumpf von get-symbol-bind durch dolist ersetzt.
 ;;;
@@ -208,6 +230,7 @@
   ;; (:FORWARD . defined-named-const)
   ;; (:GENERIC-FUN . generic-fun)
   ;; (:FOREIGN-FUN . foreign-fun)
+  ;; (:UNEXPANDED-FOREIGN-FUN . foreign-fun)
   ;; oder
   ;; (:COMPILER-MACRO . (expander . X))
   ;;-----------------------------
@@ -365,6 +388,9 @@
 (defmacro set-foreign-fun (name fun)
   `(set-global-op ,name :FOREIGN-FUN ,fun))
 
+(defmacro set-unexpanded-foreign-fun (name fun)
+  `(set-global-op ,name :UNEXPANDED-FOREIGN-FUN ,fun))
+
 (defmacro set-compiler-macro (name fun)
   `(let ((entry (assoc ,name (?operators *GLOBAL-ENVIRONMENT*))))
     (if entry
@@ -422,6 +448,9 @@
   `(cdr (assoc (second ,name) (?setf-functions *GLOBAL-ENVIRONMENT*)
          :test #'eq)))
 
+(defmacro get-global-setf-fun (name)
+  `(cdr (get-global-setf-fun-def ,name)))
+
 ;;------------------------------------------------------------------------------
 ;; Names of previous lexical variables
 ;;------------------------------------------------------------------------------
@@ -456,8 +485,9 @@
         (cdr bind)
         (let ((var (make-instance 'dynamic
                                   :sym (p1-make-symbol name))))
-          (push (cons name var)
-                (?dyn-vars *GLOBAL-ENVIRONMENT*))
+          (unless *compiler-eval*
+            (push (cons name var)
+                  (?dyn-vars *GLOBAL-ENVIRONMENT*)))
           var))))
                 
 ;;------------------------------------------------------------------------------
@@ -583,6 +613,20 @@
     (if setf-fun-def
         setf-fun-def
       (get-global-setf-fun-def name))))
+
+;;------------------------------------------------------------------------------
+;; Find the function which is denoted by a extended function designator
+;;------------------------------------------------------------------------------
+(defun name2fun (name)
+  (let* ((operator-def (if (consp name)
+                           (get-setf-fun-def name)
+                           (get-operator-def name))))
+
+    (when (eq :COMPILER-MACRO (car operator-def))
+      (setq operator-def (cddr operator-def)))
+    (case (car operator-def)
+      ((:IMPORTED-FUN :GLOBAL-FUN :LOCAL-FUN) (cdr operator-def))
+      (t nil))))
 
 ;;------------------------------------------------------------------------------
 ;; Funktionsbindungen fuer LABELS/FLET

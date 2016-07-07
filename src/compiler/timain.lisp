@@ -9,8 +9,11 @@
 ;;;            Auf Wunsch werden in einem zweiten Schritt Statistiken 
 ;;;            erstellt und ausgegeben.
 ;;;
-;;; $Revision: 1.42 $
+;;; $Revision: 1.43 $
 ;;; $Log: timain.lisp,v $
+;;; Revision 1.43  1994/01/05  10:12:28  kl
+;;; Funktionen types-on und types-off nach printzs verlegt.
+;;;
 ;;; Revision 1.42  1993/12/09  10:30:40  hk
 ;;; provide wieder an das Dateiende
 ;;;
@@ -243,23 +246,6 @@
 ;;------------------------------------------------------------------------------
 (defun list-all-function-types ()
   (list-function-types (?all-funs *module*)))
-
-
-;;------------------------------------------------------------------------------
-;; Funktionen zum Ein- und Ausschalten der Anzeige des Typslots der ZS-Elemente.
-;;------------------------------------------------------------------------------
-(defmacro find-po-slot-list-element (a-zs-class-name)
-  `(rest (assoc ',a-zs-class-name *po-slot-list*)))
-
-(defun types-off ()
-  (setf (find-po-slot-list-element form) 
-        (remove 'type (find-po-slot-list-element form)))
-  (setf (find-po-slot-list-element var) 
-        (remove 'type (find-po-slot-list-element var))))
-
-(defun types-on ()
-  (push 'type (find-po-slot-list-element form))
-  (push 'type (find-po-slot-list-element var)))
 
 
 ;;------------------------------------------------------------------------------

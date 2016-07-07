@@ -6,8 +6,18 @@
 ;;; Funktion : Behandlung definierender Vorkommen generischer Funktionen und
 ;;;            Methoden, Finalisierung generischer Funktionen.
 ;;;
-;;; $Revision: 1.88 $
+;;; $Revision: 1.91 $
 ;;; $Log: p1generic.lisp,v $
+;;; Revision 1.91  1994/01/14  08:53:47  sma
+;;; extract-specializer hoffentlich endgültig korrigiert. (then und else
+;;; Fall im if vertauscht)
+;;;
+;;; Revision 1.90  1994/01/13  07:49:05  ft
+;;; extract-specializer korrigiert.
+;;;
+;;; Revision 1.89  1994/01/12  11:13:39  ft
+;;; extract-specializers verschoenert.
+;;;
 ;;; Revision 1.88  1993/12/07  14:39:32  ft
 ;;; Der Methodencache enthaelt jetzt als Vergleichsobjekt die Klasse des
 ;;; spezialisierten Parameters, statt der Klasse des typecase-Falls.
@@ -642,34 +652,51 @@
 ;; extract-specializers: spez.-lambda-list -> specializer
 ;;------------------------------------------------------------------------------
 (defun extract-specializers (specialized-lambda-list)
-  (let ((parameter (first specialized-lambda-list)))
-    (cond 
-      ((null parameter)
-       NIL)
-      ((consp parameter)
-       (unless (consp (cdr parameter))
-         (clicc-error "~S is not a valid specialized-lambda-list."
-                      specialized-lambda-list))
-       (let ((class-entry (get-class-entry (cadr parameter)))
-             class)
-         (case (car class-entry)
-           ((:TYPE :STRUCT)
-            (clicc-warning 
-             "~S is not a legal specializer, using T instead" (cadr parameter))
-            (setf class (?class-def (cdr (get-class-entry 'L::T)))))
-           (:CLASS
-            (setf class (?class-def (cdr class-entry))))
-           (:BUILT-IN
-            (setf class (cdr class-entry)))
-           (otherwise
-            (setf class (make-instance 'defined-class :symbol (cadr parameter)))
-            (set-forward-class-entry (cadr parameter) class)))
-         `(,class ,@(extract-specializers (rest specialized-lambda-list)))))
-      ((lambda-list-keyword-p parameter)
-       NIL)
-      (T
-       `(,(?class-def (cdr (get-class-entry 'L::T)))
-         ,@(extract-specializers (rest specialized-lambda-list)))))))
+  (if (or (null specialized-lambda-list)
+          (lambda-list-keyword-p (first specialized-lambda-list)))
+
+      ;; alle required-parameter betrachtet
+      ;;-----------------------------------
+      NIL
+
+      ;; betrachte required-parameter
+      ;;-----------------------------
+      (let ((parameter (first specialized-lambda-list))
+            class-entry
+            class)
+        (if (consp parameter)
+            
+            ;; spezialisierter Parameter
+            ;;--------------------------
+            (if (consp (cdr parameter))
+                (progn
+                  (setf class-entry (get-class-entry (cadr parameter)))
+                  (case (car class-entry)
+                    ((:TYPE :STRUCT)
+                     (clicc-warning 
+                      "~S is not a legal specializer, using T instead"
+                      (cadr parameter))
+                     (setf class (?class-def (cdr (get-class-entry 'L::T)))))
+                    (:CLASS
+                     (setf class (?class-def (cdr class-entry))))
+                    (:BUILT-IN
+                     (setf class (cdr class-entry)))
+                    (otherwise
+                     (setf class (make-instance 'defined-class
+                                                :symbol (cadr parameter)))
+                     (set-forward-class-entry (cadr parameter) class)))
+                  (cons class
+                        (extract-specializers (rest specialized-lambda-list))))
+
+                ;; doted-pairs sind keine gültigen Spezialisierer
+                ;;-----------------------------------------------
+                (clicc-error "~S is not a valid specialized-lambda-list."
+                             specialized-lambda-list))
+            
+            ;; unspezialisierter Parameter
+            ;;----------------------------
+            (cons (?class-def (cdr (get-class-entry 'L::T)))
+                  (extract-specializers (rest specialized-lambda-list)))))))
 
 ;;------------------------------------------------------------------------------
 ;; add-required: Erweiterung einer lambda-list um einen required Parameter

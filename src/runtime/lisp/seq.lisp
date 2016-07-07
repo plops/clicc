@@ -5,8 +5,23 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion  : Laufzeitsystem (14. Sequences)                             
 ;;;
-;;; $Revision: 1.32 $
+;;; $Revision: 1.36 $
 ;;; $Log: seq.lisp,v $
+;;; Revision 1.36  1994/02/09  14:16:27  hk
+;;; Keyword Parameter in {remove|delete}-if-[not] gestrichen, da die
+;;; Rest-Liste an eine Funktion weitergereicht wird, die die Keyword
+;;; Parameter Zuordnung und Prüfung vornimmt.
+;;;
+;;; Revision 1.35  1994/02/08  13:19:25  sma
+;;; :my-last-arg-may-be-rest-var bei length.
+;;;
+;;; Revision 1.34  1993/12/14  12:40:42  sma
+;;; Aufruf von rt::%vector-length aus length entfernt. Alle (besser)
+;;; internen Funktionen nach vector-length aus array.lisp verlagert.
+;;;
+;;; Revision 1.33  1993/12/09  16:53:41  sma
+;;; length verändert, C-funktion raw-list-length wird nicht mehr benutzt.
+;;;
 ;;; Revision 1.32  1993/12/07  15:36:53  ft
 ;;; fehlende lokale Variable result in list-find hinzugefuegt
 ;;;
@@ -91,7 +106,7 @@
 ;;;
 ;;; Revision 1.7  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.32 $ eingefuegt
+;;; $Revision: 1.36 $ eingefuegt
 ;;;
 ;;; Revision 1.6  1993/01/15  08:45:46  ft
 ;;; Erweiterung um MISMATCH und SEARCH.
@@ -286,11 +301,14 @@
 ;; length sequence
 ;;------------------------------------------------------------------------------
 (defun length (sequence)
+  (declare (:my-last-arg-may-be-rest-var :length))
   (typecase sequence
     (null 0)
-    (cons (rt::raw-list-length sequence))
-    (vector (rt::%vector-length sequence))
-    (t (error "~a is not a sequence" sequence))))
+    (cons (let ((n 0)) 
+            (dolist (s sequence) (incf n))
+            n))
+    ;;Statt doppeltem vectorp-Test erzeugt vector-length ggf Laufzeitfehler
+    (T (vector-length sequence))))
 
 ;;-----------------------------------------------------------------------------
 ;; REVERSE sequence
@@ -682,9 +700,7 @@
 ;;-----------------------------------------------------------------------------
 ;; REMOVE-IF predicate sequence &KEY :from-end :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun remove-if (predicate sequence &rest rest-args
-                            &key  from-end start end count key)
-  (declare (ignore from-end start end count key))
+(defun remove-if (predicate sequence &rest rest-args)
   (apply #'remove nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
@@ -694,9 +710,7 @@
 ;;-----------------------------------------------------------------------------
 ;; REMOVE-IF-NOT predicate sequence &KEY :from-end :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun remove-if-not (predicate sequence &rest rest-args
-                                &key  from-end start end count key)
-  (declare (ignore from-end start end count key))
+(defun remove-if-not (predicate sequence &rest rest-args)
   (apply #'remove nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
@@ -706,25 +720,14 @@
 ;;-----------------------------------------------------------------------------
 ;; DELETE item sequence &KEY :from-end :test :test-not :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun delete (item sequence
-                    &key from-end test test-not (start 0) end count
-                    (key #'identity))
-  (remove item sequence
-          :from-end from-end
-          :test     test
-          :test-not test-not
-          :start    start
-          :end      end
-          :count    count
-          :key      key))
+(defun delete (item sequence &rest rest-args)
+  (apply #'remove item sequence rest-args))
 
 ;;-----------------------------------------------------------------------------
 ;; DELETE-IF predicate sequence &KEY :from-end :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun delete-if (predicate sequence &rest rest-args
-                            &key  from-end start end count key)
-  (declare (ignore from-end start end count key))
-  (apply #'remove nil sequence
+(defun delete-if (predicate sequence &rest rest-args)
+  (apply #'delete nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
                    (funcall predicate seq-elem))
@@ -733,10 +736,8 @@
 ;;-----------------------------------------------------------------------------
 ;; DELETE-IF-NOT predicate sequence &KEY :from-end :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun delete-if-not (predicate sequence &rest rest-args
-                                &key  from-end start end count key)
-  (declare (ignore from-end start end count key))
-  (apply #'remove nil sequence
+(defun delete-if-not (predicate sequence &rest rest-args)
+  (apply #'delete nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
                    (not (funcall predicate seq-elem)))
@@ -798,9 +799,7 @@
 ;;-----------------------------------------------------------------------------
 ;; DELETE-DUPLICATES sequence &KEY :from-end :test :test-not :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun delete-duplicates (sequence &rest rest-args 
-                                   &key from-end test test-not start end key)
-  (declare (ignore from-end test test-not start end key))
+(defun delete-duplicates (sequence &rest rest-args)
   (apply #'remove-duplicates sequence rest-args))
 
 ;;-----------------------------------------------------------------------------
@@ -828,9 +827,9 @@
         (let ((elem (elt vector i)))
           (when (funcall test item (funcall key elem)) (return elem))))))
 
-(defun list-find (item list
-                       &key from-end test test-not (start 0) end
-                       (key #'identity))
+(defun list-find (item
+                  list
+                  &key from-end test test-not (start 0) end (key #'identity))
   (let ((i start)
         (result nil)
         (length (length list)))
@@ -847,9 +846,7 @@
 ;;-----------------------------------------------------------------------------
 ;; FIND-IF predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun find-if (predicate sequence &rest rest-args
-                          &key  from-end start end key)
-  (declare (ignore from-end start end key))
+(defun find-if (predicate sequence &rest rest-args)
   (apply #'find nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
@@ -859,9 +856,7 @@
 ;;-----------------------------------------------------------------------------
 ;; FIND-IF-NOT predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun find-if-not (predicate sequence &rest rest-args
-                              &key  from-end start end key)
-  (declare (ignore from-end start end key))
+(defun find-if-not (predicate sequence &rest rest-args)
   (apply #'find nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
@@ -913,9 +908,7 @@
 ;;-----------------------------------------------------------------------------
 ;; POSITION-IF predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun position-if (predicate sequence &rest rest-args
-                              &key  from-end start end key)
-  (declare (ignore from-end start end key))
+(defun position-if (predicate sequence &rest rest-args)
   (apply #'position nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
@@ -925,9 +918,7 @@
 ;;-----------------------------------------------------------------------------
 ;; POSITION-IF-NOT predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun position-if-not (predicate sequence &rest rest-args
-                                  &key  from-end start end key)
-  (declare (ignore from-end start end key))
+(defun position-if-not (predicate sequence &rest rest-args)
   (apply #'position nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
@@ -953,10 +944,7 @@
 ;;-----------------------------------------------------------------------------
 ;; COUNT-IF predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun count-if (predicate sequence
-                           &rest rest-args
-                           &key  from-end start end key)
-  (declare (ignore from-end start end key))
+(defun count-if (predicate sequence &rest rest-args)
   (apply #'count nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
@@ -966,9 +954,7 @@
 ;;-----------------------------------------------------------------------------
 ;; COUNT-IF-NOT predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun count-if-not (predicate sequence &rest rest-args
-                               &key  from-end start end key)
-  (declare (ignore from-end start end key))
+(defun count-if-not (predicate sequence &rest rest-args)
   (apply #'count nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))

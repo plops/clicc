@@ -5,8 +5,23 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Hilsfunktionen, Hilfsmakros, Fehlermeldungen, Par-spec
 ;;;
-;;; $Revision: 1.30 $
+;;; $Revision: 1.35 $
 ;;; $Log: clcmisc.lisp,v $
+;;; Revision 1.35  1994/06/10  23:31:11  hk
+;;; Neue Funktion intern-postnum, die an ein Symbol eine Zahl anh"angt
+;;;
+;;; Revision 1.34  1994/06/03  15:25:41  uho
+;;; Underscores werden in C Namen zu Us.
+;;;
+;;; Revision 1.33  1994/02/22  14:46:25  hk
+;;; check-nparams gestrichen, Fehler in clc-check-nparams behoben.
+;;;
+;;; Revision 1.32  1994/02/21  10:26:14  kl
+;;; clc-check-nparams erweitert und neue Unterfunktionen dazu geschrieben.
+;;;
+;;; Revision 1.31  1994/02/08  11:06:00  sma
+;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
+;;;
 ;;; Revision 1.30  1993/11/17  23:00:31  hk
 ;;; In clc-probe-file wurde (open .. :probe) durch (probe-file ..)
 ;;; ersetzt, weil akcl sonst das limit für 'open files' überschritten
@@ -175,6 +190,9 @@
 (defun intern-postfixed (symbol-or-string postfix)
   (intern (concatenate 'string (string symbol-or-string) postfix)))
 
+(defun intern-postnum (symbol i)
+  (intern (format nil "~A~A" symbol i)))
+
 ;;------------------------------------------------------------------------------
 (defun mapappend (fun &rest args) 
   (if (some #'null args)
@@ -269,14 +287,38 @@
   `(1- (ABS ,par-spec)))
 
 ;;------------------------------------------------------------------------------
+;; 
+;;------------------------------------------------------------------------------
+(defun positive-par-spec (par-spec)
+  (if (exact-par-spec-p par-spec)
+      par-spec
+      (at-least-params par-spec)))
+
+;;------------------------------------------------------------------------------
+;; Prüft, ob die Anzahl der aktuellen Parameter passend ist. Rückgabewerte sind:
+;;  'not-enough-argsX, wenn zu wenig aktuelle Parameter vorliegen,
+;;  'too-much-args, wenn zu viele Parameter vorliegen,
+;;  nil sonst.
+;;------------------------------------------------------------------------------
+(defun number-of-args-is-not-ok (par-spec number-of-args)
+  (if (exact-par-spec-p par-spec)
+      (cond ((< number-of-args par-spec) 'not-enough-args)
+            ((> number-of-args par-spec) 'too-much-args)
+            (T nil))
+      (cond ((< number-of-args (at-least-params par-spec)) 'not-enough-args)
+            (T nil))))
+
+
+;;------------------------------------------------------------------------------
 ;; Ueberprueft, ob die Anzahl der aktuellen Parameter korrekt ist
 ;;------------------------------------------------------------------------------
-(defun clc-check-nparams (par-spec nargs symbol)
-  (if (exact-par-spec-p par-spec)
-    (when (/= nargs par-spec)
-      (clc-error NARGS_NC symbol nargs))
-    (when (< nargs (at-least-params par-spec))
-      (clc-error NOT_ENOUGH_ARGS symbol (at-least-params par-spec)))))
+(defun clc-check-nparams (par-spec number-of-arguments symbol)
+  (case (number-of-args-is-not-ok par-spec number-of-arguments)
+    (not-enough-args 
+     (clc-error NOT_ENOUGH_ARGS symbol (positive-par-spec par-spec)))
+    (too-much-args
+     (clc-error TOO_MUCH_ARGS symbol par-spec))
+    (otherwise)))
 
 ;;------------------------------------------------------------------------------
 ;; Ausgabe von Meldungen, Error oder Warning
@@ -337,6 +379,10 @@
     (format t ";;; ")
     (apply #'format t mess-string args-for-mess-string)
     (terpri)))
+
+;;------------------------------------------------------------------------------
+(defun clicc-message-line (&optional (length 75))
+  (clicc-message (make-string length :initial-element #\-)))
 
 ;;------------------------------------------------------------------------------
 ;; Funktion zur Behandlung interner Fehler:
@@ -405,6 +451,7 @@
                      ((eql #\* char) #\X)
                      ((eql #\% char) #\P)
                      ((eql #\? char) #\Q)
+                     ((eql #\_ char) #\U) 
                      (t (setq illegal t)
                         (cond
                           ((and upper-case-normal (lower-case-p char))

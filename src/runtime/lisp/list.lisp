@@ -5,8 +5,28 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : System-Funktionen (15. Lists)                                  
 ;;;
-;;; $Revision: 1.19 $
+;;; $Revision: 1.24 $
 ;;; $Log: list.lisp,v $
+;;; Revision 1.24  1994/02/08  13:18:55  sma
+;;; :my-last-arg-may-be-rest-var bei car, cdr, endp, list-length, first
+;;; und rest.
+;;;
+;;; Revision 1.23  1994/02/02  09:43:08  hk
+;;; car, cdr, rplaca, replacd und assoc mit Deklarationen versehen, die
+;;; Optimierungen erlauben. Definition von simple-assoc vor assoc gezogen,
+;;; da es in der Deklaration verwendet wird.
+;;;
+;;; Revision 1.22  1994/01/13  13:04:40  ft
+;;; Die Faelle CONS und NULL im TYPECASE von CAR und CDR vertauscht.
+;;;
+;;; Revision 1.21  1994/01/05  12:40:37  sma
+;;; rt::simple-assoc jetzt (endgültig) in Lisp implementiert. assoc auf
+;;; allgemeinen Fall reduziert. assoc wird von clicc zur compile-Zeit durch
+;;; rt::simple-assoc ersetzt wenn möglich.
+;;;
+;;; Revision 1.20  1993/12/13  13:15:55  sma
+;;; Auskommentierte Funktion raw-list-length gelöscht
+;;;
 ;;; Revision 1.19  1993/09/20  08:07:36  sma
 ;;; unnötigen Test in assoc entfernt.
 ;;;
@@ -51,7 +71,7 @@
 ;;;
 ;;; Revision 1.8  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.19 $ eingefuegt
+;;; $Revision: 1.24 $ eingefuegt
 ;;;
 ;;; Revision 1.7  1993/02/16  10:25:01  ft
 ;;; Erweiterung um eine 'dumme' Version von nunion.
@@ -89,6 +109,9 @@
    intersection set-difference subsetp acons pairlis assoc assoc-if assoc-if-not
    rassoc rassoc-if rassoc-if-not))
 
+(export 
+ '(rt::simple-assoc) "RT")
+
 ;;-----------------------------------------------------------------------------
 ;; 15.1. Conses                                                               
 ;;-----------------------------------------------------------------------------
@@ -96,18 +119,22 @@
 ;; CAR x
 ;;------------------------------------------------------------------------------
 (defun car (x)
+  (declare (:simp-when-arg-n=cons 0 rt::%car)
+           (:my-last-arg-may-be-rest-var :car))
   (typecase x
-    (null x)
     (cons (rt::%car x))
+    (null x)
     (t (error "~a is not a list" x))))
 
 ;;------------------------------------------------------------------------------
 ;; CDR x
 ;;------------------------------------------------------------------------------
 (defun cdr (x)
+  (declare (:simp-when-arg-n=cons 0 rt::%cdr)
+           (:my-last-arg-may-be-rest-var :cdr))
   (typecase x
-    (null x)
     (cons (rt::%cdr x))
+    (null x)
     (t (error "~a is not a list" x))))
 
 ;;------------------------------------------------------------------------------
@@ -187,11 +214,11 @@
 (defun (setf cddddr) (new list) (setf (cdr (cdr (cdr (cdr list)))) new))
 
 ;;------------------------------------------------------------------------------
-;; cons x y:  siehe inline.lisp
+;; CONS x y:  siehe inline.lisp
 ;;------------------------------------------------------------------------------
 
 ;;-----------------------------------------------------------------------------
-;; tree-equal x y &key :test :test-not
+;; TREE-EQUAL x y &key :test :test-not
 ;;-----------------------------------------------------------------------------
 (defun tree-equal (x y &key test test-not)
   (setq test (check-seq-test test test-not))
@@ -211,19 +238,21 @@
 ;;-----------------------------------------------------------------------------
 
 ;;------------------------------------------------------------------------------
-;; endp object
+;; ENDP object
 ;;------------------------------------------------------------------------------
 (defun endp (x)
+  (declare (:my-last-arg-may-be-rest-var :atom))
   (typecase x
     (null t)
     (cons nil)
     (t (error "~a is not a list" x))))
 
 ;;-----------------------------------------------------------------------------
-;; list-length list
+;; LIST-LENGTH list
 ;; source-code from [CLtL2] p. 414
 ;;-----------------------------------------------------------------------------
 (defun list-length (list)
+  (declare (:my-last-arg-may-be-rest-var :length))
   (do ((n 0 (+ n 2))
        (fast list (cdr fast))
        (slow list (cdr slow)))
@@ -232,15 +261,6 @@
     (pop fast)
     (when (endp fast) (return (1+ n)))
     (when (eq fast slow) (return nil))))
-
-;;------------------------------------------------------------------------------
-;; raw-list-length list
-;;------------------------------------------------------------------------------
-;(defun raw-list-length (list)
-;  (let ((len 0))
-;    (dolist (l list)
-;      (incf len))
-;    len))
 
 ;;-----------------------------------------------------------------------------
 ;; NTH n list
@@ -259,8 +279,8 @@
 ;; (setf (fdefinition 'first) #'car)
 ;; (setf (fdefinition '(setf first)) #'(setf car)) ...
 ;;------------------------------------------------------------------------------
-(defun first   (list) (car    list))
-(defun rest    (list) (cdr    list))
+(defun first (list) (declare (:my-last-arg-may-be-rest-var :car)) (car list))
+(defun rest  (list) (declare (:my-last-arg-may-be-rest-var :cdr)) (cdr list))
 (defun second  (list) (cadr   list))
 (defun third   (list) (caddr  list))
 (defun fourth  (list) (cadddr list))
@@ -308,7 +328,7 @@
       (t (nthcdr i list)))))
 
 ;;-----------------------------------------------------------------------------
-;; make-list size &key :initial-element
+;; MAKE-LIST size &key :initial-element
 ;;-----------------------------------------------------------------------------
 (defun make-list (size &key initial-element)
   (when (not (typep size '(integer 0 *)))
@@ -320,7 +340,7 @@
     (f size initial-element)))
 
 ;;------------------------------------------------------------------------------
-;; copy-list list
+;; COPY-LIST list
 ;;------------------------------------------------------------------------------
 (defun copy-list (list)
   (typecase list
@@ -333,7 +353,7 @@
          (f list)))))
 
 ;;-----------------------------------------------------------------------------
-;; copy-alist list
+;; COPY-ALIST list
 ;;-----------------------------------------------------------------------------
 (defun copy-alist (alist)
   (etypecase alist
@@ -349,7 +369,7 @@
        (f alist)))))
 
 ;;-----------------------------------------------------------------------------
-;; copy-tree object
+;; COPY-TREE object
 ;;-----------------------------------------------------------------------------
 (defun copy-tree (object)
   (if (atom object)
@@ -357,7 +377,7 @@
       (cons (copy-tree (car object)) (copy-tree (cdr object)))))
 
 ;;-----------------------------------------------------------------------------
-;; revappend x y
+;; REVAPPEND x y
 ;;-----------------------------------------------------------------------------
 (defun revappend (x y)
   (do ((top x (cdr top))
@@ -365,7 +385,7 @@
       ((endp top) result)))
 
 ;;-----------------------------------------------------------------------------
-;; nconc &rest lists
+;; NCONC &rest lists
 ;;-----------------------------------------------------------------------------
 (defun nconc (&rest lists)
   (if (null lists)
@@ -382,13 +402,13 @@
             (setq last-list next-list)))))))
 
 ;;-----------------------------------------------------------------------------
-;; nreconc x y
+;; NRECONC x y
 ;;-----------------------------------------------------------------------------
 (defun nreconc (x y)
   (nconc (reverse x) y))
 
 ;;-----------------------------------------------------------------------------
-;; butlast list &optional n
+;; BUTLAST list &optional n
 ;;-----------------------------------------------------------------------------
 (defun butlast (list &optional (n 1))
   (let ((size (- (length list) n)))
@@ -397,7 +417,7 @@
       (subseq list 0 size))))
 
 ;;-----------------------------------------------------------------------------
-;; nbutlast list &optional n
+;; NBUTLAST list &optional n
 ;;-----------------------------------------------------------------------------
 (defun nbutlast (list &optional (n 1))
   (let ((size (- (length list) n))
@@ -409,7 +429,7 @@
          list))))
 
 ;;-----------------------------------------------------------------------------
-;; ldiff list sublist
+;; LDIFF list sublist
 ;;-----------------------------------------------------------------------------
 (defun ldiff (l subl)
   (cond
@@ -422,17 +442,19 @@
 
 
 ;;------------------------------------------------------------------------------
-;; rplaca x y
+;; RPLACA x y
 ;;------------------------------------------------------------------------------
 (defun rplaca (x y)
+  (declare (:simp-when-arg-n=cons 0 rt::%rplaca))
   (typecase x
     (cons (rt::%rplaca x y))
     (t (error "~a is not a cons" x))))
 
 ;;------------------------------------------------------------------------------
-;; rplacd x y
+;; RPLACD x y
 ;;------------------------------------------------------------------------------
 (defun rplacd (x y)
+  (declare (:simp-when-arg-n=cons 0 rt::%rplacd))
   (typecase x
     (cons (rt::%rplacd x y))
     (t (error "~a is not a cons" x))))
@@ -450,7 +472,7 @@
        ,element))
 
 ;;-----------------------------------------------------------------------------
-;; subst new old tree &key :test :test-not :key
+;; SUBST new old tree &key :test :test-not :key
 ;;-----------------------------------------------------------------------------
 (defun subst (new old tree &key test test-not key)
   (setq test (check-seq-test test test-not))
@@ -470,7 +492,7 @@
     (subst-internal tree)))
 
 ;;-----------------------------------------------------------------------------
-;; subst-if new test tree &key :key
+;; SUBST-IF new test tree &key :key
 ;;-----------------------------------------------------------------------------
 (defun subst-if (new test tree &key key)
   (labels ((subst-if-internal (tree)
@@ -489,13 +511,13 @@
     (subst-if-internal tree)))
 
 ;;-----------------------------------------------------------------------------
-;; subst-if-not new test tree &key :key
+;; SUBST-IF-NOT new test tree &key :key
 ;;-----------------------------------------------------------------------------
 (defun subst-if-not (new test tree &key key)
   (subst-if new (complement test) tree :key key))
 
 ;;-----------------------------------------------------------------------------
-;; nsubst new old tree &key :test :test-not :key
+;; NSUBST new old tree &key :test :test-not :key
 ;;-----------------------------------------------------------------------------
 (defun nsubst (new old tree &key test test-not key)
   (setq test (check-seq-test test test-not))
@@ -708,10 +730,21 @@
    ERROR
      (error "The lists of keys and data are of unequal length.")))
 
+;;------------------------------------------------------------------------------
+;; RT::SIMPLE-ASSOC item a-list
+;;------------------------------------------------------------------------------
+(defun rt:simple-assoc (item a-list)
+  (dolist (pair a-list nil)
+    (when (eq item (car pair))
+      (return pair))))
+
 ;;-----------------------------------------------------------------------------
 ;; ASSOC item a-list &KEY :test :test-not :key
 ;;-----------------------------------------------------------------------------
 (defun assoc (item a-list &key test test-not key)
+  (declare
+   (:simp-test-fun-when-not-testnot 0 2 :test eql :test-not)
+   (:simp-when-only-test=value 2 :test eq rt::simple-assoc))
   (setq test (check-seq-test test test-not))
   (cond
     ((and (eq test #'eq) (not key))
@@ -763,7 +796,7 @@
       (return-from rassoc-if pair))))
 
 ;;-----------------------------------------------------------------------------
-;; rassoc-if-not predicate a-list &KEY :key
+;; RASSOC-IF-NOT predicate a-list &KEY :key
 ;;-----------------------------------------------------------------------------
 (defun rassoc-if-not (predicate a-list &key key)
   (dolist (pair a-list nil)

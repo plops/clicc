@@ -5,8 +5,45 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Optimierungen der Let*-Ausdruecke.
 ;;;
-;;; $Revision: 1.43 $
+;;; $Revision: 1.52 $
 ;;; $Log: optimize.lisp,v $
+;;; Revision 1.52  1994/05/27  09:15:14  hk
+;;; optimize-let soll Initforms von Slot-Descriptions nur bearbeiten, wenn
+;;; der Wert nicht UNBOUND ist. Methode f"ur slot-desr in optimize-let war
+;;; "uberfl"ussig, ebenso in subst-var.
+;;;
+;;; Revision 1.51  1994/03/14  09:24:20  hk
+;;; (clicc-message "Zuweisung OK") gestrichen
+;;;
+;;; Revision 1.50  1994/03/11  14:32:20  hk
+;;; Meldung "~s wird nicht eliminiert" in delete-unref-var eliminiert.
+;;;
+;;; Revision 1.49  1994/03/02  15:22:27  atr
+;;; Die Funktion optimize-1 geändert. Die Sonderbehandlung für simple-app
+;;; weggestrichen. Anstatt dessen gib es jetzt eine allegmeine Behandlung.
+;;; Die Optimierung der is-a-single-assignment korrigiert.
+;;;
+;;; Revision 1.48  1994/02/08  11:10:06  sma
+;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
+;;;
+;;; Revision 1.47  1994/01/26  14:41:13  ft
+;;; Änderung der Darstellung von ungebundenen Slots.
+;;;
+;;; Revision 1.46  1994/01/24  15:23:28  atr
+;;; Die methode (effect-of-form let*form) geaendert. Bei dieser Methode
+;;; soll die neue Reihenfolge (VAR-LIST, INIT-LIST und dann RUMPF) nicht
+;;; geaendert werden, da der Aufruf von EFFECT-OF-FORM evtl durch ein
+;;; THROW verlassen wird. Damit es bei der richtigen Stelle verlassen wird
+;;; muss diese Reihenfolge beibehalten werden.
+;;;
+;;; Revision 1.45  1994/01/12  18:30:29  atr
+;;; destruktive --> destructive
+;;;
+;;; Revision 1.44  1994/01/12  18:21:19  atr
+;;; Die Funktion is-side-effect-free so geändert, daß destruktive
+;;; Operation auf konstante Strukturen nicht side-effect-free sind, und
+;;; infolgedessen nicht eliminiert werden dürfen.
+;;;
 ;;; Revision 1.43  1993/11/25  17:10:42  atr
 ;;; Bei delete-unref-vars werden dynamische Variablen nicht eliminiert.
 ;;; (let ((loc init-form)) (setq var loc)) --> (setq var init-form).
@@ -176,6 +213,8 @@
 ;;(defvar *let-effect* )
 ;;(defvar *local-effect*)
 ;;(defvar *vars-bound-but-not-used* 0)
+(defvar *let-effect-until-var*)
+(defvar *local-effect-until-var*)
 
 
 (defun let-optimizing ()
@@ -184,7 +223,7 @@
         (*vars-bound-but-not-used* 0)
         (*subst-number*  0  ))
     (clicc-message "Optimizing the let-forms ...")
-    (clicc-message "----------------------------")
+    (clicc-message-line 28)
     (setf (?fun-list *module*) 
           (mapcar #'optimize-a-fun (?fun-list *module*)))
     (setf (?toplevel-forms *module*) 
@@ -195,7 +234,7 @@
     (clicc-message "~s let-variables are eliminated " *eliminated-vars*)
     (clicc-message "~s substitutions are done " *subst-number*)))
 
-  
+
 (defun optimize-a-fun (fun)
   (let* ((*current-function* fun)
          (*static-level* (if (global-fun-p fun)
@@ -245,14 +284,11 @@
 
 (defmethod optimize-let ((a-class-def class-def))
   (dolist (one-slot-desc (?slot-descr-list a-class-def))
-    (setf (?initform one-slot-desc)
-          (optimize-let (?initform one-slot-desc))))
+    (unless (or (null (?initform one-slot-desc))
+                (eq (?initform one-slot-desc) :unbound))
+      (setf (?initform one-slot-desc)
+            (optimize-let (?initform one-slot-desc)))))
   a-class-def)
-
-
-(defmethod optimize-let ((a-slot-descr slot-desc))
-  (setf (?initform a-slot-descr) (optimize-let (?initform a-slot-descr)))
-  a-slot-descr)
 
 (defmethod optimize-let ((a-app app))
   (setf (?arg-list a-app) 
@@ -281,14 +317,8 @@
   (setf (?body     a-labels) (optimize-let (?body     a-labels)))
   a-labels)
 
-(defmethod optimize-let ((a-defined-fun defined-fun))
-  
-  a-defined-fun)
-
 (defmethod optimize-let ((a-let-form let*-form))
-  (let ((init-list      (?init-list a-let-form))
-        (var-list       (?var-list  a-let-form))
-        (*let-effect*   (empty-effect))
+  (let ((*let-effect*   (empty-effect))
         (*local-effect* (make-instance 'local-effect)))
     
     ;; Jetzt werden zunaechst die Init-formen untersucht,
@@ -297,24 +327,24 @@
     (setf (?init-list a-let-form) 
           (mapcar #'optimize-let (?init-list a-let-form)))
     
-    ;;Nun werden die Let-formen in dem  Rumpf der Let-form optimiert.
+    ;; Nun werden die Let-formen in dem  Rumpf der Let-form optimiert.
     ;;---------------------------------------------------------------
     (setf (?body a-let-form) (optimize-let (?body a-let-form)))
     
     ;; Hier passiert die Optimierung dieses Let-konstrukts.
     ;;-----------------------------------------------------
-    (effect-of-form a-let-form *let-effect* *local-effect*)
-    (if (and (null var-list)
-             (null init-list))
+    (if (and (null (?var-list a-let-form))
+             (null (?init-list a-let-form)))
         
         ;; (Let*  ()() (form1 ... formN)) --> (progn form1... formN)
         ;;----------------------------------------------------------
         (progn (setq *eliminated-lets* (1+ *eliminated-lets*))
-               (setq a-let-form (optimize-0 a-let-form)))
+               (optimize-0 a-let-form))
         
         ;; Eventuell wird VAR durch INIT-FORM substituiert.
         ;;-------------------------------------------------
         (let (var init-form)
+          (effect-of-form a-let-form *let-effect* *local-effect*)
           (dotimes (i  (length (?var-list a-let-form)))
             (setq var        (nth  i (?var-list a-let-form)))
             (setq init-form  (nth  i (?init-list a-let-form)))
@@ -324,7 +354,7 @@
           
           ;; Wenn eine Variable nicht mehr referenziert ist,
           ;; wird sie und die dazugehoerige Init-form aus 
-          ;; var-list bzw aus init-form-list entfernt.
+          ;; var-list bzw init-form-list entfernt.
           ;;------------------------------------------------
           (setq a-let-form (delete-unref-var a-let-form))
           (if  (and (null (?var-list  a-let-form))
@@ -334,16 +364,16 @@
                ;;----------------------------------------------------------
                (progn 
                  (setq *eliminated-lets* (1+ *eliminated-lets*))
-                 (setq a-let-form (optimize-0 a-let-form)))
-               a-let-form)))
-    a-let-form))
-(defmethod optimize-let ((a-cont cont))
-  a-cont)
+                 (optimize-0 a-let-form))
+               a-let-form)))))
+
 
 (defmethod optimize-let ((any-thing-else form))
   any-thing-else)
 
-
+;;;-----------------------------------------------------------------------
+;;; (let () . body) --> body.
+;;;----------------------------------------------------------------------- 
 (defun optimize-0 (let-form)
   (?body let-form))
 
@@ -357,117 +387,167 @@
 ;;;-----------------------------------------------------------------------
 
 (defun optimize-1 (var init-form let-form)
-  
   (when (and (eql 0 (?read var))
              (eql 1 (?write var)))
     (incf *vars-bound-but-not-used*))
-  (let ((init-form-effect (empty-effect))
-        (init-form-local-effect (make-instance 'local-effect)))
-    (cond 
-      ;; Simple-contant-p "uberpr"uft ob der Ausdruck dupliziert werden darf
-      ;; ohne die EQ-Semantik zu beeiflussen. Ausdr"ucke solcher Art
-      ;; k"onnen substituiert werden, auch mehr als einmal, wenn die entspr
-      ;; lokale Variable nicht ver"andert wird.
-      ;;--------------------------------------------------------------------
-      ((simple-constant-p init-form) 
-       (if (eql 1 (?write (?var var)))
-           (update-let var init-form let-form)
-           let-form))
-      
-      ((var-ref-p init-form)
+  
+  (cond 
+    ((is-a-single-assignment let-form) 
+     
+     ;; Hier wird versucht folgende Substitution durchzuf"uhren:  
+     ;; (let ((loc init-form)) (setq var loc)) --> (setq var init-form)
+     ;;----------------------------------------------------------------
+     (if (let-to-assign-possible let-form)
+         (update-let var init-form let-form)
+         let-form))
+
+    ((and (var-ref-p init-form)
+          (>  (?read var) 1))
+     
+     ;; Subs-with-var-is-possible "uberpr"uft die Bedingungen, 
+     ;; um die Substitution einer Variablen durch eine andere Variable 
+     ;; durchf"uhren zu k"onnen.
+     ;;---------------------------------------------------------
+     (if (subst-with-var-is-possible var init-form let-form)
+         (update-let var init-form let-form)
+         let-form))
+    
+    ((and (eql 1  (?write var))
+          (eql 1  (?read var)))
+     
+     ;; Die lokale Variable ist nur einmal im Rumpf referenziert
+     ;; In diesem fall interessieren wir uns nur mit dem Seiteneffekt bis
+     ;; zu dieser Referenz, was danach kommt ist uninteressant.
+     ;;------------------------------------------------------------------
+     (let ((*let-effect-until-var*   (empty-effect))
+           (*local-effect-until-var* (make-instance 'local-effect)))
+       (catch 'var-reached
+         (effect-of-form let-form *let-effect-until-var* 
+                         *local-effect-until-var* nil var))
        
-       ;; Subs-with-var-is-permissible "uberpr"uft die Bedingungen, 
-       ;; um eine Substitution durchf"uhren zu k"onnen.
-       ;;---------------------------------------------------------
-       (if (subst-with-var-is-pemissilble var init-form let-form)
-           (update-let var init-form let-form)
-           let-form))
-      ((is-a-single-assignment let-form) 
-
-       ;; Hier wird versucht folgende Substitution durchzuf"uhren:  
-       ;; (let ((loc init-form)) (setq var loc)) --> (setq var init-form)
-       ;;----------------------------------------------------------------
-       
-       (update-let var init-form let-form))
-
-      ((and (eql 1  (?write var))
-            (eql 1 (?read var)))
-
-       ;; Die lokale Variable ist nur einmal im Rumpf referenziert
-       ;;---------------------------------------------------------
-       (effect-of-form init-form init-form-effect init-form-local-effect)
-       (if (simple-app init-form)
-           (if (and (subst-with-app-permissible var init-form let-form)
-                    (does-not-jump *let-effect*))
-               
-               ;; Wenn die Init-form eine Applikation ist, deren Argumente 
-               ;; variablen, oder Konstanten sind, dann wird die Substitution
-               ;; nur gemacht wenn subst-with-app-permissible wahr ist.
-               ;; Die Bedingung (does-not-jump *let-effect*) verhindert eine 
-               ;; Substitution in einer LOOP, denn mit einer solchen  
-               ;; Substitution wird eine Applikation mehrmals ausgewertet.
-               ;;------------------------------------------------------------
-               (update-let var init-form let-form)
-               let-form)
+       ;; Wenn die Init-form eine Variable ist:
+       ;;--------------------------------------
+       (if (var-ref-p init-form)
+           (let ((glo-w-vars (?write-list *let-effect-until-var*))
+                 (loc-w-vars (?write-list *local-effect-until-var*)))
+             (if (or 
+                  (member-of-region var glo-w-vars loc-w-vars)
+                  (member-of-region (?var init-form) glo-w-vars loc-w-vars)
+                  (member (?var init-form) (?var-list let-form) :test #'eq))
+                  let-form
+                  (update-let var init-form let-form)))
            
-           ;; Nun wenn die Init-form bekannte Seiteneffekte hat,
-           ;; dann wird untersucht ob die Substitution machbar ist.
-           ;;------------------------------------------------------
-           (if (and (not-destructive init-form-effect)
-                    (not (fun-p init-form))
-                    (does-not-jump init-form-effect)
-                    (static-p var)
-                    (listp (?read-list init-form-local-effect))
-                    (listp (?write-list init-form-local-effect))
-                    (listp (?read-list  init-form-effect))
-                    (listp (?write-list init-form-effect))
-                    (not-destructive *let-effect*)
-                    (does-not-jump *let-effect*))
-               
-               ;; Hier auch wird mit der Bedingung (does-not-jump *let-effect*)
-               ;; verhindert, dass ein komplizieter Ausdruck in einer 
-               ;; Schleife substituiert wird.
-               ;;-------------------------------------------------------------
-               (let ((write-region (append 
-                                    (?write-list init-form-effect)
-                                    (?write-list init-form-local-effect)))
-                     (read-region  (append 
-                                    (?read-list  init-form-effect)
-                                    (?read-list init-form-local-effect))))
-                 (if (and 
-                      (not (member var write-region :test #'eq))
-                      (r/w-interference-free read-region 
-                                             (?write-list *let-effect*))
-                      (r/w-interference-free read-region
-                                             (?write-list *local-effect*))
-                      (r/w-interference-free write-region 
-                                             (?read-list *let-effect*))
-                      (r/w-interference-free write-region 
-                                             (?read-list *local-effect*))
-                      (not (member-of-region var 
-                                             (?write-list *let-effect*)
-                                             (?write-list *local-effect*))))
-                     
-                     
-                     (update-let var init-form let-form)
-                     let-form))
-               let-form)))
-      (t  let-form))))
+           ;; Sonst wird der Seiteneffekt der Init-form berechnet, und dann
+           ;; werden viele Bedingungen überprüft um die Substitution 
+           ;; vornehmen zu können.
+           ;;--------------------------------------------------------------
+           (let ((init-form-effect (empty-effect))
+                 (init-form-local-effect (make-instance 'local-effect)))
+             (effect-of-form init-form init-form-effect 
+                             init-form-local-effect)
+             (if (and
+                  ;; Die Seiteneffekte der Init-form sind bekannt.
+                  ;;----------------------------------------------
+                  (known-side-effect init-form-effect 
+                                     init-form-local-effect)
+                  
+                  ;; Weder die Init-form noch der Rumpf der Let-Konstruktes
+                  ;; verursachen Sprünge oder destruktive Seiteneffekte.
+                  ;;-------------------------------------------------------
+                  (member (?data-effects init-form-effect) '(nil :alloc))
+                  (member (?data-effects *let-effect-until-var*) 
+                          '(nil :alloc))
+                  
+                  ;; Die Seiteneffekte der Init-form und die des Rumpfes 
+                  ;; haben keine Read-Write-Konflikte, also die Read-
+                  ;; bzw die Write-Regionen haben keinen Schnitt.
+                  ;;----------------------------------------------------
+                  (no-interference init-form-effect init-form-local-effect
+                                   *let-effect-until-var*
+                                   *local-effect-until-var*)
+                  
+                  ;; Die lokale Variable wird im Rumpf 
+                  ;; nicht mehr verändert.  
+                  ;;----------------------------------
+                  (not (member-of-region var 
+                                         (?write-list 
+                                          *let-effect-until-var*)
+                                         (?write-list 
+                                          *local-effect-until-var*))))
+                 
+                 (update-let var init-form let-form)
+                 let-form)))))
+    (t let-form)))
 
+(defun known-side-effect (effect local-effect)
+  (and (listp (?read-list effect))
+       (listp (?write-list effect))
+       (listp (?read-list local-effect))
+       (listp (?write-list local-effect))))
+
+;;;----------------------------------------------------------------------------
+;;; Diese Funktion überprüft ob der Seiteneffekt einer Init-form 
+;;; (effect local-effect) Read-Write Konflikte mit dem Seieneffekt des 
+;;; Let-Konstrktes (*let-effect-until-var* *local-effect-until-var*) hat. 
+;;; Also ob die Read-region und die Write-region einen Schnitt haben. 
+;;;---------------------------------------------------------------------------
+(defun no-interference (effect1 local-effect1 effect2 local-effect2)
+  (let ((write-region (append  (?write-list effect1)
+                               (?write-list local-effect1)))
+        (read-region  (append  (?read-list  effect1)
+                               (?read-list local-effect1))))
+    (and (r/w-interference-free read-region 
+                                (?write-list  effect2))
+         (r/w-interference-free read-region   
+                                (?write-list  local-effect2))
+         (r/w-interference-free write-region 
+                                (?read-list   effect2))
+         (r/w-interference-free write-region 
+                                (?read-list   local-effect2)))))
+
+;;;-------------------------------------------------------------------------
+;;; Der Rumpf einer Let-Form besteht nur aus einer Zuweisung. Außerdem
+;;; wird nur eine loale Variable gebunden. Solche Let-Froms können in eine 
+;;; Zuweisung umgewandelt werden, wenn einige Bedingungen gelten.
+;;;-------------------------------------------------------------------------
 (defun is-a-single-assignment (let-form)
   (and (eql 1 (length (?var-list let-form)))
        (eql 1 (length (?init-list let-form)))
        (setq-form-p (?body let-form))))
 
+;;;-----------------------------------------------------------------------
+;;; Let-to-assign-possible überprüft ob eine a-single-assignment zu einer 
+;;; Zuweisung umgewandelt werden kann.
+;;;-----------------------------------------------------------------------
+(defun let-to-assign-possible (let-form)
+  (let ((body-form (?form (?body let-form)))
+        (init-form (car (?init-list let-form)))
+        (body-effect (empty-effect))
+        (init-effect (empty-effect))
+        (body-local-effect (make-instance 'local-effect))
+        (init-local-effect (make-instance 'local-effect)))
+    (effect-of-form body-form body-effect body-local-effect)
+    (effect-of-form init-form init-effect init-local-effect)
+    (and (known-side-effect init-effect init-local-effect)
+         (member (?data-effects init-effect)  '(nil :alloc))
+         (no-interference init-effect init-local-effect 
+                          body-effect body-local-effect)
+         (not (member-of-region  (car (?var-list let-form)) 
+                                 (?write-list body-effect)
+                                 (?write-list body-local-effect))))))
+         
+    
+    
+
 ;;;------------------------------------------------------------------------
 ;;; Eine Substitution der Variablen VAR durch die Variable INIT-VAR
 ;;; ist nur erlaubt wenn :
-;;; 1 : VAR wird nicht im Rumpf oder in den init-formen veraedert.
-;;; 2 : INIT-VAR wird nichtim Rumpf oder in den init-formen  veraendert.
-;;; 3 : init-var wird nicht (im Falle einer dynamischen Variable 
+;;; 1 : VAR wird nicht im Rumpf oder in den init-formen veraendert.
+;;; 2 : INIT-VAR wird nicht im Rumpf oder in den init-formen  veraendert.
+;;; 3 : INIT-VAR wird nicht (im Falle einer dynamischen Variablen) 
 ;;;     nochmal gebunden nach dem Sie referenziert ist.
 ;;;------------------------------------------------------------------------
-(defun subst-with-var-is-pemissilble (var init-var let-form)
+(defun subst-with-var-is-possible (var init-var let-form)
   (let ((global-written-vars (?write-list *let-effect*))
         (local-written-vars (?write-list *local-effect*)))
     (and 
@@ -480,9 +560,9 @@
 
 ;;;--------------------------------------------------------------------------
 ;;; Die READ und WRITE-LISTS sind entweder Listen von Variablen oder
-;;; integerzahlen ,die Mengen von Varaiblen kodieren.
+;;; integerzahlen, die Mengen von Varaiblen kodieren.
 ;;; member-of-region fragt ab of eine Variable direkt in der Liste 
-;;; ist, oder , im Falle einer integerzahl, ob die Variable in der 
+;;; ist, oder, im Falle einer integerzahl, ob die Variable in der 
 ;;; durch diese integerzahl kodierte Menge ist.
 ;;;--------------------------------------------------------------------------
 (defun member-of-region (var global-region local-region)
@@ -495,35 +575,12 @@
            (static-p var)
            (>= global-region (?level var)))))
 
-;;;------------------------------------------------------------------------
-;;; Eine Substitution einer Variablen VAR durch eine Applikation APP
-;;; ist erlaubt, wenn die Menge der in APP gelesenen Variablen keinen
-;;; Schnitt hat mit der Menge der im Let-konstrukt veraenderten Variablen,
-;;; und wenn VAR im Let-konstrukt nicht veraendert wird.
-;;;------------------------------------------------------------------------
-(defun subst-with-app-permissible (var init-app let-form)
-  (let* ((functional (?form    init-app))
-         (arg-list   (?arg-list init-app))
-         (fun-effect (get-effect functional))
-         (read-vars  (mapcar #'?var (remove-if-not #'var-ref-p arg-list))))
-    (and (not (member-of-region var (?write-list *let-effect*)
-                                (?write-list *local-effect*)))
-         (fun-p (?form init-app))
-         (only-alloc fun-effect)
-         (not-destructive *let-effect*)
-         (null (intersection read-vars (?var-list let-form)))
-         (let ((global-write-vars (?write-list *let-effect*))
-               (local-write-vars  (?write-list *local-effect*)))
-           (r/w-interference-free read-vars global-write-vars)
-           (r/w-interference-free read-vars local-write-vars)))))
-
-
 ;;;-------------------------------------------------------------------------
 ;;; r/w-interference-free ist true , wenn keine Variable von region1
 ;;; enthalten ist in region2, wenn region2 eine Liste ist,
 ;;; und wenn region2 eine Integer ist dann soll sie echt kleiner
 ;;; sein als das statische Niveau jeder Variablen in region1 und 
-;;; ungekehrt.Wenn beide integerzahlen sind dann sind sie nicht disjunkt.
+;;; ungekehrt. Wenn beide integerzahlen sind, sind sie nicht disjunkt.
 ;;;-------------------------------------------------------------------------
 
 (defun r/w-interference-free (region1 region2)
@@ -543,9 +600,7 @@
                   (< region1 (apply #'max
                                     (mapcar #'code-level-of-var region2))))))))
 
-;;;----------------------------------------------------------------------------
-;;; HILFSFUNKTIONEN ...
-;;;----------------------------------------------------------------------------
+
 (defun code-level-of-var (var)
   (if (dynamic-p var)
       -1 
@@ -561,62 +616,32 @@
                             var-ref-list)))
     (apply #'max level-list)))
 
-
-
-(defun simple-app (form)
-  (if (app-p form)
-      (and 
-       (all-are-side-effect-free (?arg-list form))
-       (if (fun-p (?form form))
-           (and (not (eq *error-function* (?form form)))
-                (only-alloc (get-effect (?form form))))
-           nil))))
-
-
-
-(defun all-are-side-effect-free (liste)
-  (if (endp liste)
-      T
-      (if (not (may-be-copied (car liste)))
-          nil
-          (all-are-side-effect-free (cdr liste)))))
-
-
 (defun only-alloc (effect)
   (and (null (?read-list  effect))
        (null (?write-list effect))
-       (not-destructive   effect)
-       (does-not-jump       effect)))
+       (member (?data-effects effect) '(nil :alloc))))
   
 (defun does-not-jump (effect)
   (not (member (?data-effects effect) '(:jump :alloc-jump :dest-jump 
-                                        :alloc-dest-jump))))
+                                        :alloc-dest-jump) :test #'eq)))
 
 ;;;-------------------------------------------------------------------------
 ;;; entscheidet ob eine Form keine Seiteneffekte hat, also auch entfernt
-;;; werden kann, wenn sie z.B in einer Progn-form, nicht auf Ergebnisposition
-;;; vorkommt.
+;;; werden kann, wenn ihr Resultat nicht mehr benötigt wird. 
 ;;;-------------------------------------------------------------------------
 (defun is-side-effect-free (form)
   (let ((global-effect (empty-effect))
         (local-effect  (make-instance 'local-effect)))
     (effect-of-form form global-effect local-effect)
 
-    ;; Eine Form kann entfernt werden wenn sie entweder 
-    ;; 1: keine Variablen und keine Daten destruktive veraendert 
-    ;;    (lesen von Variablen ist erlaubt)
-    ;; 2: Wenn sie Variablen weder liest noch veraedert.
-    ;;    (destruktive Effekte sind erlaubt, denn keine Variablen
-    ;;     werden gelesen.)
+    ;; Eine Form kann entfernt werden wenn sie nur den Alloc-effect hat.
+    ;; Also wenn sie keine Variablen liest, keine Variablen verändert, und 
+    ;; weder einen Sprung noch einen destruktiven Seiteneffekt verursacht.
     ;;-----------------------------------------------------------------
-    (or (and (only-alloc global-effect)
-             (null (?write-list local-effect)))
-        (and
-         (does-not-jump     global-effect)
-         (null (?read-list  global-effect))
-         (null (?write-list global-effect))
-         (null (?read-list  local-effect))
-         (null (?write-list local-effect))))))
+    (and (only-alloc global-effect)
+         (null (?write-list local-effect))
+         (null (?read-list local-effect)))))
+
 
 ;;;-------------------------------------------------------------------------
 ;;; Diese  Funktion fragen ab, ob eine Form auf dem Heap etwas alloziiert,
@@ -629,8 +654,8 @@
 ;;;
 ;;;------------------------------------------------------------------------
 ;;;-------------------------------------------------------------------------
-;;; Diese Funktion fragt ab, ob eine Form dessen Seiteneffekt 'Effect' ist
-;;; destruktiv Daten veraendert.
+;;; Diese Funktion fragt ab, ob eine Form dessen Seiteneffekt 'Effect' ist,
+;;;  Daten destruktiv veraendert.
 ;;;-------------------------------------------------------------------------
 (defun not-destructive (effect)
   (not (member (?data-effects effect) '(:dest :alloc-dest :alloc-dest-jump
@@ -642,10 +667,10 @@
 ;;;------------------------------------------------------------------------
 (defun update-let (var init-form let-form)
   
-  ;; Update der read-slots bei  Variablen .
-  ;; Wenn die Init-form eine Variablenreferenz  ist , dann wird 
+  ;; Update der read-slots bei  Variablen.
+  ;; Wenn die Init-form eine Variablenreferenz ist, dann wird 
   ;; der Slot READ bei der entsprechenden Variablen um die Anzahl 
-  ;; der Referenzen von VAR erhoeht.
+  ;; der Referenzen von VAR erhoeht,
   ;; ansonsten ist die init-form entweder eine Seiteneffektfreie Form
   ;; wo es keine Variablen referenziert sind, oder eine Form die nur 
   ;; einmal referenziert ist.
@@ -653,15 +678,16 @@
   (when (var-ref-p init-form)
     (setf (?read (?var init-form))
           (+ (?read (?var init-form)) (?read var))))
-      
+  (setf (?read var) 0)
+  
   
   ;; Die Substitution wird zunaechst bei den 
   ;; Initformen der restlichen Bindungen der
   ;; let-form vorgenommen.
   ;;-------------------------------------------
-  (dotimes (i    (length (?init-list let-form)))
+  (dotimes (i (length (?init-list let-form)))
     (setf (nth i (?init-list let-form))
-          (subst-var var  init-form (nth i (?init-list let-form)))))
+          (subst-var var init-form (nth i (?init-list let-form)))))
   
   ;; Nun wird in dem Rumf substituiert.
   ;;-----------------------------------
@@ -705,11 +731,10 @@
   (labels ( (map-subst-var (one-form)
                          (subst-var var form one-form)))
     
-    (typecase body
+    (etypecase body
       (var-ref 
        (if  (equal  (?var body) var)
             (progn 
-              (decf (?read (?var body )))
               (incf *subst-number*)
               form)
             body))
@@ -795,14 +820,13 @@
       
       (class-def 
        (dolist (one-slot-descr (?slot-descr-list body))
-         (setf (?initform one-slot-descr)
-               (subst-var var form (?initform one-slot-descr))))
+         (unless (or (null (?initform one-slot-descr))
+                     (eq (?initform one-slot-descr) :UNBOUND))
+           (setf (?initform one-slot-descr)
+                 (subst-var var form (?initform one-slot-descr)))))
        body)
       
       (cont body)
-      (slot-desc
-       (setf (?initform body) (subst-var var form (?initform body)))
-       body)
       (form body))))
 
 ;;;-------------------------------------------------------------------------
@@ -810,57 +834,88 @@
 ;;; Die Effekte, die durch Funktionsaufrufe entstehen werden in 
 ;;; "effect" gesammelt, die textuell sichtbaren "also Referenzieren
 ;;; von Variablen oder Veraenderung durch SETQ" werden in local-effect
-;;; abgespeichert.
+;;; abgespeichert. Wenn der Parameter but-form gebunden wird, wird
+;;;  die but-form nicht durchlaufen. (dieser Parameter wird zu einer anderen
+;;; Analyse ben"otigt. Wenn der parameter until-var gesetzt wird, wird die 
+;;; die Analyse na dieser Variablenreferenz beendet. Dies wird ben"otigt 
+;;; um die Seiteneffekte nach dieser Variablenreferenz zu ignorieren.
 ;;;-------------------------------------------------------------------------
 
-(defun effect-of-form (form effect local-effect &optional (but-form nil))
+(defun effect-of-form (form effect local-effect &optional (but-form nil)
+                            (until-var nil))
   (etypecase form 
     (if-form
      (unless (eq but-form form)
-       (effect-of-form (?pred form) effect local-effect but-form)
-       (effect-of-form (?then form) effect local-effect but-form)
-       (effect-of-form (?else form) effect local-effect but-form)))
+       (effect-of-form (?pred form) effect local-effect but-form until-var)
+       (effect-of-form (?then form) effect local-effect but-form until-var)
+       (effect-of-form (?else form) effect local-effect but-form until-var)))
     (progn-form
      (unless (eq but-form form)
        (dolist (one-form (?form-list form))
-         (effect-of-form one-form effect local-effect but-form))))
+         (effect-of-form one-form effect local-effect but-form until-var))))
     
     (let*-form
      (unless (eq but-form form)
-       (effect-of-form (?body form) effect local-effect but-form)
-       (dolist (one-init-form (?init-list form))
-         (effect-of-form one-init-form effect local-effect but-form))
+
+       ;; ACHTUNG: Hier muss zun"aechst die Var-list untersucht werden,
+       ;;          dann wird die Init-list und abschliessend der Rumpf 
+       ;;          analysiert werden. Diese Reihenfolge ist sehr wichtig, 
+       ;;          und darf nicht geaendert werden, weil die Berechnung 
+       ;;          evtl bei einer gesuchten Variablenreferenz abgebrochen
+       ;;          wird. In diesem fall garantiert diese Reihenfolge dass
+       ;;          an der richtigen Stelle abgebrochen wird. 
+       ;;---------------------------------------------------------------------
        (dolist (one-var (?var-list form))
          (when (dynamic-p one-var)
            (when (listp (?write-list effect))
-             (pushnew one-var (?write-list effect)))))))
+             (pushnew one-var (?write-list effect)))))
+
+       ;; Die Var-list wird als erste untersucht damit die dynamisch gebundenen 
+       ;; Variablen, die durch einen Let neu gebunden werden, in die WRITE-LIST
+       ;; von EFFECT eingetragen werden, bevor die Init-list untersucht wird.
+       ;; Denn bei der Untersuchung von der Init-list kann die Analyse 
+       ;; bei der gesuchten Variablenreferenz abgebrochen werden.
+       ;;----------------------------------------------------------------------
+       
+       (dolist (one-init-form (?init-list form))
+         (effect-of-form one-init-form effect local-effect but-form 
+                         until-var))
+       (effect-of-form (?body form) effect 
+                       local-effect but-form until-var)))
     
     (var-ref 
-     (unless (eq but-form form)
-       (pushnew (?var form) (?read-list local-effect))))
-    
-    
+     (if (and until-var 
+              (eq until-var (?var form)))
+         (throw 'var-reached nil) 
+         (unless (eq but-form form)
+           (pushnew (?var form) (?read-list local-effect)))))
+      
+      
     (tagbody-form 
      (unless (eq but-form form)
-       (effect-of-form (?first-form  form) effect local-effect but-form)
+       (effect-of-form (?first-form  form) effect local-effect but-form 
+                       until-var)
        (dolist (tagged-form (?tagged-form-list form))
-         (effect-of-form (?form tagged-form) effect local-effect but-form))))
+         (effect-of-form (?form tagged-form) effect local-effect but-form
+                         until-var))))
     
     (switch-form 
      (unless (eq but-form form)
-       (effect-of-form (?form form) effect local-effect but-form)
+       (effect-of-form (?form form) effect local-effect but-form until-var)
        (dolist (one-labeled-form (?case-list form))
-         (effect-of-form one-labeled-form effect local-effect but-form))
-       (effect-of-form (?otherwise form) effect local-effect but-form)))
+         (effect-of-form one-labeled-form effect local-effect but-form
+                         until-var))
+       (effect-of-form (?otherwise form) effect local-effect but-form
+                       until-var)))
     
     (labeled-form
      (unless (eq but-form form)
-       (effect-of-form (?value form) effect local-effect but-form)
-       (effect-of-form (?form form) effect  local-effect but-form)))
+       (effect-of-form (?value form) effect local-effect but-form until-var)
+       (effect-of-form (?form form) effect  local-effect but-form until-var)))
     
     (let/cc-form 
      (unless (eq but-form form)
-       (effect-of-form (?body form) effect local-effect but-form)))
+       (effect-of-form (?body form) effect local-effect but-form until-var)))
     
     (app
      
@@ -871,27 +926,30 @@
              (if (null (?has-funs-as-args functional))
                  
                  ;; In dem Fall, wo die applizierte Form eine bekannte 
-                 ;; Funktion ist, die keine Parameter hat, die an Funktionale
-                 ;; Objekte gebunden  werden m"ussen, wird der Effekt der 
+                 ;; Funktion ist, die keine spec-vars, wird der Effekt der 
                  ;; Funktion in "EFFECT" kopiert, und die Argumente in einem 
                  ;; lokalen Effekt analysiert, um eine detailliertere 
                  ;; Seiteneffektinformation zu bekommen.
                  ;;-----------------------------------------------------------
-                 (progn 
-                   (union-all-effects effect effect (get-effect functional))
+                 (let ((fun-effect (if (eq functional *error-function*)
+                                       (empty-effect)
+                                       (get-effect functional))))
                    (dolist (one-arg arg-list)
-                     (effect-of-form one-arg effect local-effect  but-form)))
+                     (effect-of-form one-arg effect local-effect  but-form
+                                     until-var))
+                   (union-all-effects effect effect fun-effect ))
                  
                  ;; Wenn der Slot HAS-FUNS-AS-ARGS der applizierten Funktion 
                  ;; nicht leer ist, werden die Bindungen an die Variablen im 
-                 ;; Slot HAS-UFNS-AS-ARGS "uberpr"uft : Falls eine solcher 
+                 ;; Slot HAS-UFNS-AS-ARGS "uberpr"uft: Falls eine solcher 
                  ;; Variablen an einer special-variable der *current-function* 
                  ;; gebunden ist, wird "EFFECT" updated und auf TOP-EFFECT 
-                 ;; gesetzt,  denn solche Applikationen haben keinen TOP-EFFECT 
-                 ;; bei der Seiteneffektanalyse, denn sie werden gesondert 
-                 ;; behandelt. Anschlie"send werden die Argumente auch 
-                 ;; analysiert um evtl s"amtliche Applikationen bei denen
-                 ;; richtig zu behandeln.
+                 ;; gesetzt,  denn solche Applikationen haben keinen 
+                 ;; TOP-EFFECT bei der Seiteneffektanalyse, denn sie werden 
+                 ;; gesondert behandelt. Anschlie"send werden die Argumente 
+                 ;; auch analysiert um evtl s"amtliche Applikationen bei denen'
+                 ;; eine Variable auf Funktionsposition steht oder als 
+                 ;; funktionales Objekt "ubergeben wurde richtig zu behandeln.
                  ;;-----------------------------------------------------------
                  (check-args-for-spec-vars form effect local-effect))
              
@@ -919,7 +977,7 @@
     
     (labels-form 
      (unless (eq but-form form)
-
+       
        ;; Die Effekte der lokalen Funktionen werden mitgerechnet, um zu 
        ;; "uberpr"ufen ob in den R"umpfen dieser Funktionen substituiert 
        ;; werden kann. Dies ist ganz wichtig damit auch die Slots "read" 
@@ -929,45 +987,48 @@
        (dolist (one-local-fun (?fun-list form))
          (unless (equal one-local-fun but-form)
            (union-all-effects effect effect (get-effect one-local-fun))))
-       (effect-of-form (?body form) effect local-effect but-form)))
+       (effect-of-form (?body form) effect local-effect but-form
+                       until-var)))
     
     (mv-lambda 
      (unless (eq but-form form)
-       (effect-of-form (?params form) effect local-effect but-form)
-       (effect-of-form (?body form)   effect local-effect but-form)
-       (effect-of-form (?arg form)    effect local-effect but-form)))
-
+       (effect-of-form (?params form) effect local-effect but-form until-var)
+       (effect-of-form (?body form)   effect local-effect but-form until-var)
+       (effect-of-form (?arg form)    effect local-effect but-form until-var)))
+    
     (setq-form
      (unless (eq but-form form)
-       (effect-of-form (?form form) effect local-effect but-form)
+       (effect-of-form (?form form) effect local-effect but-form until-var)
        (let ((loc  (?location form)))
          (when (var-ref-p loc)
            (pushnew (?var loc) (?write-list local-effect))))))
     
     (class-def
      (dolist (one-slot-descr (?slot-descr-list form))
-       (effect-of-form (?initform one-slot-descr)  effect local-effect
-                       but-form)))
+       (unless (or (null (?initform one-slot-descr))
+                   (eq (?initform one-slot-descr) :unbound))
+         (effect-of-form (?initform one-slot-descr)  effect local-effect
+                         but-form until-var))))
     (tagged-form (setf (?data-effects effect) 
                        (max-data-effects :jump (?data-effects effect))))
-
+    
     (params (let ((key-list  (?key-list form ))
                   (opt-list  (?opt-list form )))
               (when key-list 
                 (dolist (one-key-param key-list)
                   (effect-of-form (?init one-key-param)
-                                  effect local-effect but-form)))
+                                  effect local-effect but-form until-var)))
               (when opt-list
                 (dolist (one-opt-param opt-list)
                   (effect-of-form (?init one-opt-param) 
-                                  effect local-effect but-form)))))
+                                  effect local-effect but-form until-var)))))
     
-              
+    
     (cont (empty-effect))
     (form (empty-effect))))
 
 ;;;--------------------------------------------------------------------------
-;;; check-args-for-spec-vars bildet die Argument liste auf die Parameterliste
+;;; check-args-for-spec-vars bildet die Argumentliste auf die Parameterliste
 ;;; bei einem Aufruf einer Funktion mit special-vars also HAS-FUNS-AS-ARGS 
 ;;; nicht nil. Wenn eine solche Variable an einer Variablen gebunden ist
 ;;; wird EFFECT auf TOP gesetzt, sonst wird der Effekt der Appikation 
@@ -1014,7 +1075,7 @@
         
         ;; Hier ist der kritische Fall, wenn eine special-var der applizierten 
         ;; Funktion an einer special-var der gerade analysierten Funktion 
-        ;;gebunden ist. Bei der Seiteneffektanalyse hat die ganze Applikation 
+        ;; gebunden ist. Bei der Seiteneffektanalyse hat die ganze Applikation 
         ;; keinen TOP-EFFECT, denn das Argument ist auch eine special-var,
         ;; und diese werden gesondert behandelt.
         ;; Die Optimierungen sollen hier aber den TOP-EFFECT annehmen. 

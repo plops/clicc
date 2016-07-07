@@ -5,8 +5,23 @@
  *            ------------------------------------------------------
  * Funktion : System-Funktionen: Structures
  *
- * $Revision: 1.9 $
+ * $Revision: 1.13 $
  * $Log: structure.c,v $
+ * Revision 1.13  1994/01/24  16:26:39  sma
+ * New-struct bekommt jetzt keinen type mehr uebergeben, dieser wird in
+ * LISP zugewiesen.
+ *
+ * Revision 1.12  1994/01/22  18:20:12  sma
+ * Alle anderen funktionen werden jetzt inline-compiliert.
+ *
+ * Revision 1.11  1994/01/13  16:42:48  sma
+ * Quelltext verschönert, Funktionen vereinfacht. (Funktionen sind jetzt
+ * bereit, nach gcinline verschoben zu werden.)
+ *
+ * Revision 1.10  1994/01/05  12:55:16  sma
+ * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
+ * versehen und den Postfix _internal entfernt. STACK(base,x) -> ARG(x)
+ *
  * Revision 1.9  1993/10/14  12:56:46  sma
  * new-struct-internal gestrichen, dafür new-struct von lisp nach C
  * verschoben und 2x TYPE_OF durch CL_STRUCTP ersetzt.
@@ -36,83 +51,20 @@
  * Initial revision
  *----------------------------------------------------------------------------*/
 
-#include "c_decl.h"
+#include <c_decl.h>
 #include "sys.h"
 
-/* Fehlermeldungen
-   --------------- */
-char No_struct[] = "~a is not a structure";
-
 #define STRUCT_HEADER 2
-#define STRUCT_OFFSET 1
 
 /*------------------------------------------------------------------------------
- * structp object
+ * RT::NEW-STRUCT size
  *----------------------------------------------------------------------------*/
-void structp(base)
-CL_FORM *base;
+LISP_FUN(rt_new_struct)
 {
-   RET_BOOL(CL_STRUCTP(STACK(base, 0)));
-}
-
-/*------------------------------------------------------------------------------
- * struct-type structure
- *----------------------------------------------------------------------------*/
-void struct_type(base)
-CL_FORM *base;
-{
-   CL_FORM *header = GET_FORM(STACK(base, 0));
-
-   if (! CL_STRUCTP(STACK(base, 0)))
-      Lerror(STACK(base, 0), No_struct);
-   COPY(AR_BASE(header), STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * new-struct size type
- * Erzeugt neue Structur der Größe size vom Typ type
- *----------------------------------------------------------------------------*/
-void new_struct(base)
-CL_FORM *base;
-{
-	long size = GET_FIXNUM(STACK(base, 0));
-   CL_FORM *strct;
+	long size = GET_FIXNUM(ARG(0));
+   CL_FORM *structure;
    
-   strct = form_alloc(STACK(base, 2), size + STRUCT_HEADER);
-   SET_AR_SIZE(size + STRUCT_OFFSET, strct);
-   COPY(STACK(base, 1), AR_BASE(strct));
-   LOAD_STRUCT(strct, STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * struct-size struct
- *----------------------------------------------------------------------------*/
-void struct_size(base)
-CL_FORM *base;
-{
-   CL_FORM *header = GET_FORM(STACK(base, 0));
-   LOAD_FIXNUM(AR_SIZE(header) - STRUCT_OFFSET, STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * struct-ref-internal structure index
- *----------------------------------------------------------------------------*/
-void struct_ref_internal(base)
-CL_FORM *base;
-{
-   CL_FORM *header = GET_FORM  (STACK(base, 0));
-   long     index  = GET_FIXNUM(STACK(base, 1));
-   COPY(OFFSET(AR_BASE(header), STRUCT_OFFSET + index), STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * set-struct-ref-internal structure index newvalue
- *----------------------------------------------------------------------------*/
-void set_struct_ref_internal(base)
-CL_FORM *base;
-{
-   CL_FORM *header = GET_FORM  (STACK(base, 0));
-   long     index  = GET_FIXNUM(STACK(base, 1));
-   COPY(STACK(base, 2), OFFSET(AR_BASE(header), STRUCT_OFFSET + index));
-   COPY(STACK(base, 2), STACK(base, 0));
+   structure = form_alloc(ARG(1), size + STRUCT_HEADER);
+   INIT_STRUCT(structure, size);
+   LOAD_STRUCT(structure, ARG(0));
 }

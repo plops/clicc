@@ -5,8 +5,12 @@
 ;;;            ------------------------------------------------------
 ;;; Inhalt   : Laufzeitfunktionen zur Bearbeitung von UNIX Pathnames
 ;;;
-;;; $Revision: 1.8 $
+;;; $Revision: 1.9 $
 ;;; $Log: filesys.lisp,v $
+;;; Revision 1.9  1993/12/09  16:59:54  sma
+;;; Parameter der Aufrufe von error korrigiert. rt::shrink-vector durch
+;;; shrink-simple-string ersetzt.
+;;;
 ;;; Revision 1.8  1993/06/16  15:20:38  hk
 ;;;  Copyright Notiz eingefuegt.
 ;;;
@@ -28,7 +32,7 @@
 ;;;
 ;;; Revision 1.3  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.8 $ eingefuegt
+;;; $Revision: 1.9 $ eingefuegt
 ;;;
 ;;; Revision 1.2  1993/01/19  16:46:25  uho
 ;;; Beim Aufruf von %make-pathname keywords eingefuegt.
@@ -206,11 +210,8 @@
 		      (setf (schar result dst) char)
 		      (incf dst)))))))
     (when quoted
-      (error 'namestring-parse-error
-	     :complaint "Backslash in bad place."
-	     :namestring namestr
-	     :offset (1- end)))
-    (rt::shrink-vector result dst)))
+      (error "Backslash in bad place in ~S." namestr))
+    (shrink-simple-string result dst)))
 
 (defun maybe-make-pattern (namestr start end)
   (declare (type simple-base-string namestr)
@@ -258,10 +259,8 @@
                       (let ((close-bracket
                              (position #\] namestr :start index :end end)))
                         (unless close-bracket
-                          (error 'namestring-parse-error
-                                 :complaint "``['' with no corresponding ``]''"
-                                 :namestring namestr
-                                 :offset index))
+                          (error "``['' with no corresponding ``]'' in ~S"
+                                 namestr))
                         (add-q (list :character-set
                                      (subseq namestr
                                              (1+ index)
@@ -704,7 +703,7 @@
 	      ((zerop q)
 	       (incf i)
 	       (replace res res :start2 i :end2 len)
-	       (rt::shrink-vector res (- len i)))
+	       (shrink-simple-string res (- len i)))
 	   (declare (simple-string res)
 		    (fixnum len i r))
 	   (multiple-value-setq (q r) (truncate q 10))

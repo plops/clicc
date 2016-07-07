@@ -17,8 +17,36 @@
  *            - set-constant-flag
  *            - setup-symbols-iterator
  *
- * $Revision: 1.12 $
+ * $Revision: 1.19 $
  * $Log: symbols.c,v $
+ * Revision 1.19  1994/06/22  13:27:38  hk
+ * lisp.h wird nicht eingelesen, sondern nur eine extern Deklaration f"ur
+ * die Funktion rt_setup_symbol des Lisp-Moduls eingef"ugt. lisp.h
+ * existiert evtl. noch gar nicht, wenn man diese datei "ubersetzt.
+ *
+ * Revision 1.18  1994/05/20  08:44:38  uho
+ * lisp.h mit eingelesen, um Prototypen von Lisp-Funktionen bekanntzumachen.
+ *
+ * Revision 1.17  1994/01/24  16:41:52  sma
+ * Definitiond der Symbole T und NIL gelöscht. Passiert jetzt `erst' im
+ * LISP-Modul.
+ *
+ * Revision 1.16  1994/01/21  13:30:38  sma
+ * Fast alle Funktionen werden jetzt in cginline inline-compiliert. Dies
+ * ist der bescheidene Rest.
+ *
+ * Revision 1.15  1994/01/13  16:43:26  sma
+ * Änderungen an Funktionen für symbols. Mehr Lisp, weniger C.
+ * rt::(set)-struct-ref-internal heißt jetzt rt::structure-ref. Die
+ * set-Variante wird jetzt mit setf definiert.
+ *
+ * Revision 1.14  1994/01/05  12:55:50  sma
+ * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
+ * versehen und den Postfix _internal entfernt.
+ *
+ * Revision 1.13  1993/12/09  17:26:03  sma
+ * CL_INIT2-Makros. STACK(base, xxx) -> ARG(xxx). Neu eingerückt.
+ *
  * Revision 1.12  1993/09/07  17:19:04  sma
  * MAKE_-Makros eingeführt und setup_symbols_iterator verändert.
  *
@@ -63,305 +91,37 @@
 #include <c_decl.h>
 #include "sys.h"
 
-static char SYM_EXPECTED[] = "~a is not a symbol";
-static char TRY_CHANGE_CONST[] = 
-   "can not change value of ~a, which is a constant";
-static char STRING_EXPECTED[] = "~a is not a string";
+/* Referenz in das Lisp-Modul */
+/*----------------------------*/
+extern void rt_setup_symbol(/* CL_FORM *base */);
 
 /*------------------------------------------------------------------------------
- * Die Symbole NIL Und T
+ * RT::MAKE-SYMBOL name
  *----------------------------------------------------------------------------*/
-CL_INIT Ssys[] =
+LISP_FUN(rt_make_symbol)
 {
-   MAKE_SYMBOL(3, "NIL",
-               MAKE_NIL,        /* Property Liste */ 
-               MAKE_NIL,        /* Wert: Wird nicht benutzt */
-               MAKE_NIL,        /* Das Package wird vom Lisp Modul gesetzt */
-               CONST_SYM),      /* Constant-Flag: Wird nicht benutzt */
-   MAKE_SYMBOL(1, "T",
-               MAKE_NIL,
-               MAKE_T,
-               MAKE_NIL,
-               CONST_SYM),
-   END_SYMDEF                   /* Endmarkierung der Symboltabelle */
-};
+   CL_FORM *sym = form_alloc(ARG(1), SYM_SIZE);
 
-/*------------------------------------------------------------------------------
- * Konstanten für den Zugriff PLIST, VALUE und PACKAGE von NIL
- *----------------------------------------------------------------------------*/
-#define NIL_PLIST            ((CL_FORM *)&Ssys[OFF_SYM_PLIST])
-#define LOAD_NIL_PNAME(loc)  LOAD_SMSTR((CL_FORM *)&Ssys[OFF_SYM_PNAME], loc)
-#define NIL_PACKAGE          ((CL_FORM *)&Ssys[OFF_SYM_PACKAGE])
-
-/*------------------------------------------------------------------------------
- * symbol-value symbol
- *----------------------------------------------------------------------------*/
-void Fsymbol_value(base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 0)))
-   {
-      return;
-   }
-   if (CL_SYMBOLP(STACK(base, 0)))
-   {
-      COPY(SYM_VALUE(STACK(base, 0)), STACK(base, 0));
-   }
-   else
-   {
-      Lerror(STACK(base, 0), SYM_EXPECTED);
-   }
+   INIT_SYMBOL(sym, ARG(0));  /* benötigt name in ARG(1) */
+   LOAD_SYMBOL(sym, ARG(0));
 }
 
 /*------------------------------------------------------------------------------
- * boundp symbol
- * Wenn UNBOUND -> NIL, sonst -> T
- *----------------------------------------------------------------------------*/
-void Fboundp(base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 0)))
-   {
-      LOAD_T(STACK(base, 0));
-   }
-   else if (CL_SYMBOLP(STACK(base, 0)))
-   {
-      RET_BOOL(! CL_UNBOUNDP(SYM_VALUE(STACK(base, 0))));
-   }
-   else
-   {
-      Lerror(STACK (base, 0), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * Prueft, ob das Argument der spezielle Wert UNBOUND ist.
- * Der kann nur entstehen, wenn auf ein ungebundenes Symbol zugeriffen wird,
- * ohne das Programm abzubrechen.
- * Wird in print benutzt.
- *----------------------------------------------------------------------------*/
-void unbound_value_p(base)
-CL_FORM *base;
-{
-   RET_BOOL(CL_UNBOUNDP(STACK(base, 0)));
-}
-
-/*------------------------------------------------------------------------------
- * set symbol value
- *----------------------------------------------------------------------------*/
-void Fset(base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 0)))
-   {
-      Lerror(STACK(base, 0), TRY_CHANGE_CONST);
-   }
-   else if (CL_SYMBOLP(STACK(base, 0)))
-   {
-      if(SYM_IS_CONST(STACK(base, 0)))
-         Lerror(STACK(base, 0), TRY_CHANGE_CONST);
-      COPY(STACK(base, 1), SYM_VALUE(STACK(base, 0)));
-   }
-   else
-   {
-      Lerror(STACK(base, 0), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * makunbound symbol
- *----------------------------------------------------------------------------*/
-void Fmakunbound(base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 0)))
-   {
-      Lerror(STACK (base, 0), TRY_CHANGE_CONST);
-   }
-   else if (CL_SYMBOLP(STACK(base, 0)))
-   {
-      if(SYM_IS_CONST(STACK(base, 0)))
-         Lerror(STACK(base, 0), TRY_CHANGE_CONST);
-      LOAD_UNBOUND(SYM_VALUE(STACK(base, 0)));
-   }
-   else
-   {
-      Lerror(STACK (base, 0), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * symbol-plist symbol
- *----------------------------------------------------------------------------*/
-void Fsymbol_plist (base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 0)))
-   {
-      COPY(NIL_PLIST, STACK(base, 0));
-   }
-   else if (CL_SYMBOLP(STACK(base, 0)))
-   {
-      COPY(SYM_PLIST(STACK(base, 0)), STACK(base, 0));
-   }
-   else
-   {
-      Lerror(STACK (base, 0), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * (setf symbol-plist) value symbol
- * Resultat: value
- *----------------------------------------------------------------------------*/
-void Fset_symbol_plist(base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 1)))
-   {
-      COPY(STACK(base, 0), NIL_PLIST);
-   }
-   else if (CL_SYMBOLP(STACK(base, 1)))
-   {
-      COPY(STACK(base, 0), SYM_PLIST(STACK(base, 1)));
-   }
-   else
-   {
-      Lerror(STACK (base, 1), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * symbol-name symbol
- *----------------------------------------------------------------------------*/
-void Fsymbol_name(base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 0)))
-   {
-      LOAD_NIL_PNAME(STACK(base, 0));
-   }
-   else if (CL_SYMBOLP(STACK(base, 0)))
-   {
-      LOAD_SYM_PNAME(STACK(base, 0), STACK(base, 0));
-   }
-   else
-   {
-      Lerror(STACK (base, 0), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * make-symbol print-name
- *----------------------------------------------------------------------------*/
-void Fmake_symbol(base)
-CL_FORM *base;
-{
-   CL_FORM *sym;
-
-   if (CL_STRINGP(STACK(base, 0)))
-   {
-      /* mittels copy-seq eine Kopie vom Typ CL_SMSTR erzeugen */
-      /* ----------------------------------------------------- */
-      Fcopy_seq(STACK(base, 0));
-   }
-   else if (! CL_SMSTRP(STACK(base, 0)))
-   {
-      Lerror(STACK (base, 0), STRING_EXPECTED);
-   }
-   /* Ausgelagert in obrepX.h - Erstellt neues Symbol */
-   SYM_MAKE_SYM(sym);
-   LOAD_SYMBOL(sym, STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * symbol-package sym
- *----------------------------------------------------------------------------*/
-void Fsymbol_package (base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 0)))
-   {
-      COPY(NIL_PACKAGE, STACK(base, 0));
-   }
-   else if (CL_SYMBOLP(STACK(base, 0)))
-   {
-      COPY(SYM_PACKAGE(STACK(base, 0)), STACK(base, 0));
-   }
-   else
-   {
-      Lerror(STACK (base, 0), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * symbol-package-index symbol
- *----------------------------------------------------------------------------*/
-void symbol_package_index (base)
-CL_FORM *base;
-{
-   COPY(SYM_PACKAGE(STACK(base, 0)), STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * set-symbol-package value sym
- * wird nur intern verwendet, keine Typueberpruefung notwendig
- *----------------------------------------------------------------------------*/
-void set_symbol_package (base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 1)))
-   {
-      COPY(STACK(base, 0), NIL_PACKAGE);
-   }
-   else if (CL_SYMBOLP(STACK(base, 1)))
-   {
-      COPY(STACK(base, 0), SYM_PACKAGE(STACK(base, 1)));
-   }
-   else
-   {
-      Lerror(STACK (base, 0), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * set-constant-flag sym                                                  
- * wird nur intern verwendet, keine Typueberpruefung notwendig
- *----------------------------------------------------------------------------*/
-void set_constant_flag (base)
-CL_FORM *base;
-{
-   if (CL_NILP(STACK(base, 0)))
-   {
-      return;
-   }
-   if (CL_SYMBOLP(STACK(base, 0)))
-   {
-      SYM_SET_CONST(STACK(base, 0));
-   }
-   else
-   {
-      Lerror(STACK (base, 0), SYM_EXPECTED);
-   }
-}
-
-/*------------------------------------------------------------------------------
- * setup-symbols-iterator first-sym package-vector
- * Wendet setup-symbol auf alle zur Uebersetzungszeit definierten
+ * RT::SETUP-SYMBOLS-ITERATOR first-sym package-vector
+ * Wendet setup-symbol auf alle zur Übersetzungszeit definierten
  * Symbole eines Moduls an.
  *----------------------------------------------------------------------------*/
-void setup_symbols_iterator (base)
-CL_FORM *base;
+LISP_FUN(rt_setup_symbols_iterator)
 {
-   CL_FORM *sym = GET_SYMBOL(STACK(base, 0));
+   CL_FORM *sym = GET_SYMBOL(ARG(0));
    
    /* das Array ist mit einem END_SYMDEF-Eintrag abgeschlossen */
    /* -------------------------------------------------------- */
-   while(!IS_END_SYMDEF(sym))
+   while (!IS_END_SYMDEF(sym))
    {
-      LOAD_SYMBOL(sym, STACK(base, 2));
-      COPY(STACK(base, 1), STACK(base, 3));
-      setup_symbol(STACK(base, 2));
+      LOAD_SYMBOL(sym, ARG(2));
+      COPY(ARG(1), ARG(3));
+      rt_setup_symbol(ARG(2));
       sym += SYM_SIZE; 
    }
 }

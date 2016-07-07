@@ -8,8 +8,24 @@
 ;;;            diese Funktionen als funktionale Objekte verwendet werden, dann
 ;;;            kommen die Definitionen in dieser Datei zur Anwendung.
 ;;;
-;;; $Revision: 1.4 $
+;;; $Revision: 1.9 $
 ;;; $Log: inline.lisp,v $
+;;; Revision 1.9  1994/01/27  16:21:43  kl
+;;; rt::fixnump eingetragen.
+;;;
+;;; Revision 1.8  1994/01/24  16:23:05  sma
+;;; Not kann nicht mehr inline-compiliert werden. Siehe Log-Msg von pred.lisp.
+;;;
+;;; Revision 1.7  1993/12/16  16:42:31  pm
+;;; Inlining der Foreign-Function-typtests herausgenommen.
+;;;
+;;; Revision 1.6  1993/12/12  16:18:18  sma
+;;; symbolp war irrtümlich gelöscht. Wieder eingefügt.
+;;;
+;;; Revision 1.5  1993/12/09  17:05:41  sma
+;;; Änderungen entsprechend compiler/cginline.lisp. stringp, arrayp,
+;;; vectorp raus, simple-bit-vector-p rein.
+;;;
 ;;; Revision 1.4  1993/09/28  15:20:04  pm
 ;;; C-Typtests werden jetzt inline-compiliert
 ;;;
@@ -24,7 +40,6 @@
 ;;;
 ;;;-----------------------------------------------------------------------------
 
-(defun arrayp (x) (arrayp x))
 (defun atom (x) (atom x))
 (defun characterp (x) (characterp x))
 (defun cons (x y) (cons x y))
@@ -34,20 +49,11 @@
 (defun floatp (x) (floatp x))
 (defun functionp (x) (functionp x))
 (defun integerp (x) (integerp x))
+(defun rt::fixnump (x) (rt::fixnump x))
 (defun listp (x) (listp x))
-(defun not (x) (not x))
 (defun numberp (x) (numberp x))
-(defun rt::simple-array-p (x) (rt::simple-array-p x))
 (defun simple-string-p (x) (simple-string-p x))
 (defun simple-vector-p (x) (simple-vector-p x))
-(defun stringp (x) (stringp x))
+(defun simple-bit-vector-p (x) (simple-bit-vector-p x))
 (defun symbolp (x) (symbolp x))
-(defun vectorp (x) (vectorp x))
-(defun rt::c-char-p (x) (rt::c-char-p x))
-(defun rt::c-short-p (x) (rt::c-short-p x))
-(defun rt::c-int-p (x) (rt::c-int-p x))
-(defun rt::c-long-p (x) (rt::c-long-p x))
-(defun rt::c-unsigned-char-p (x) (rt::c-unsigned-char-p x))
-(defun rt::c-unsigned-short-p (x) (rt::c-unsigned-short-p x))
-(defun rt::c-unsigned-int-p (x) (rt::c-unsigned-int-p x))
-(defun rt::c-unsigned-long-p (x) (rt::c-unsigned-long-p x))
+

@@ -18,8 +18,29 @@
 ;;;            - TERPRI
 ;;;            - FRESH-LINE
 ;;;
-;;; $Revision: 1.21 $
+;;; $Revision: 1.26 $
 ;;; $Log: print.lisp,v $
+;;; Revision 1.26  1994/06/07  09:30:50  hk
+;;; In pprint einen Aufruf von terpri eingef"ugt.
+;;;
+;;; Revision 1.25  1994/06/02  14:14:16  hk
+;;; Defaultwerte f"ur *print-length* und *print-level* abweichend vom
+;;; Steele auf 50 gesetzt, da *print-circle* nicht beachtet wird.
+;;; Beim Drucken von Strukturen wird :print-function beachtet.
+;;; Print-Funktionen f"ur readtable, stream, package und pathname werden nun
+;;; in den entsprechenden defstructs angegeben.
+;;;
+;;; Revision 1.24  1994/04/22  14:15:57  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Ausgabe verschoenert.
+;;;
+;;; Revision 1.23  1994/04/18  12:22:01  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Ausgaberoutine fuer Foreign-Types erweitert.
+;;;
+;;; Revision 1.22  1993/12/16  16:43:10  pm
+;;; inkonsistenzen in den Symbolnamen behoben.
+;;;
 ;;; Revision 1.21  1993/12/09  10:23:09  hk
 ;;; Fehler in write2 für Vectoren behoben.
 ;;;
@@ -79,7 +100,7 @@
 ;;;
 ;;; Revision 1.4  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.21 $ eingefuegt
+;;; $Revision: 1.26 $ eingefuegt
 ;;;
 ;;; Revision 1.3  1993/01/11  15:22:58  hk
 ;;; structure -> struct
@@ -111,8 +132,8 @@
 (defparameter *print-circle* nil)
 (defparameter *print-escape* t)
 (defparameter *print-gensym* t)
-(defparameter *print-length* nil)
-(defparameter *print-level* nil)
+(defparameter *print-length* 50)
+(defparameter *print-level* 50)
 (defparameter *print-pretty* nil)
 (defparameter *print-radix* nil)
  
@@ -406,66 +427,64 @@
 
     ((arrayp object) (write-string "#<array>" stream))
     ((floatp object) (print-float object stream))
-    ((functionp object) (write-string "#<function>" stream))
-    ((readtablep object) (write-string "#<readtable>" stream))
-    ((streamp object) (write-string "#<stream>" stream))
-    ((packagep object)
-     (write-string "#<Package \"" stream)
-     (write-string (package-name object) stream)
-     (write-string "\">" stream))
-    ((pathnamep object)
-     (write-string "#P\"" stream)
-     (write-string (namestring object) stream)
-     (write-char #\" stream)) 
+    ((functionp object) (write-string "#<function>" stream)) 
     ((rt::instancep object)
      (write-string "#<INSTANCE of " stream)
      (write2 (rt::instance-ref (rt::instance-ref object -1) 0) stream)
      (write-string ">" stream))
-
-    ;; Nach Package, Pathname, Stream, Readtable !
-    ;;--------------------------------------------
     ((rt::structp object)
      (cond
        ((eql *print-level* 0) (write-char #\# stream))
-       (T (let ((*print-level*
-                 (if *print-level* (1- *print-level*) *print-level*))
-                (type (rt::struct-type object)))
-            (write-string "#S(" stream)
-            (write2 type stream)
-            (dotimes (i (rt::struct-size object))
-              (when (and *print-length* (>= i *print-length*))
-                (write-string " ..." stream)
-                (return))
-              (write-string " #<slot> " stream)
-              (write2 (rt::struct-ref object i type) stream)))
-          (write-char #\) stream))))
+       (T (let* ((*print-level*
+                  (if *print-level* (1- *print-level*) *print-level*))
+                 (type (rt::struct-type object))
+                 (print-function (rt:struct-printer type)))
+            (cond
+              (print-function (funcall print-function object stream 0))
+              (T
+               (write-string "#S(" stream)
+               (write2 type stream)
+               (dotimes (i (rt::struct-size object))
+                 (when (and *print-length* (>= i *print-length*))
+                   (write-string " ..." stream)
+                   (return))
+                 (write-string " #<slot> " stream)
+                 (write2 (rt::struct-ref object i type) stream))
+               (write-char #\) stream)))))))
 
-    ((or (rt::c-char-p object)
-         (rt::c-unsigned-char-p object))
-     (write-string "<C(char):" stream)
+    ((or (ffi::c-char-p object)
+         (ffi::c-unsigned-char-p object))
+     (write-string "#<C-CHARACTER @ " stream)
      (write-char (ffi::lisp-character object) stream)
      (write-string ">" stream))
-    ((or (rt::c-short-p object)
-         (rt::c-int-p object)
-         (rt::c-long-p object)
-         (rt::c-unsigned-short-p object)
-         (rt::c-unsigned-int-p object)
-         (rt::c-unsigned-long-p object))
-     (write-string "<C(integer):" stream)
+    ((or (ffi::c-long-p object)
+         (ffi::c-unsigned-long-p object))
+     (write-string "#<C-INTEGER @ " stream)
      (print-integer (ffi::lisp-integer object) stream)
      (write-string ">" stream))
-    ((or (rt::c-float-p object)
-         (rt::c-double-p object)
-         (rt::c-long-double-p object))
-     (write-string "<C(float):" stream)
+    ((ffi::c-long-double-p object)
+     (write-string "#<C-FLOAT @ " stream)
      (print-float (ffi::lisp-float object) stream)
      (write-string ">" stream))
 
-    ((rt::c-struct-p object)
-     (write-string "<C(struct)>" stream))
-     
+    ((or (rt::c-struct-p object)
+         (rt::c-union-p object)
+         (rt::c-handle-p object)
+         (rt::c-array-p object))
+     (let* ((*print-level* 0))
+       (write-string "#<" stream)
+       (write2 (rt::internal-get-symbol object) stream)
+       (write-string " @ " stream)
+       (write2 (rt::internal-get-address object) stream)
+       (write-string ">" stream)))
+    ((ffi::c-string-p object)
+     (write-string "#<C-STRING @ " stream)
+     (write-string (ffi::make-lisp-string object) stream)
+     (write-string ">" stream))
+
     ((rt::unbound-value-p object)
      (write-string "#<Unbound>" stream))
+
     (T (write-string "#<!!! unknown type !!!!>" stream)))
   object)
     
@@ -495,6 +514,7 @@
     (case stream
       ((nil) (setq stream *standard-output*))
       ((T) (setq stream *terminal-io*)))
+    (terpri stream)
     (write2 object stream)
     (values)))
 

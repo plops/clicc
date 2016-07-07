@@ -5,8 +5,17 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Der Makroexpansinsmechanismus
 ;;;
-;;; $Revision: 1.29 $
+;;; $Revision: 1.32 $
 ;;; $Log: p1macro.lisp,v $
+;;; Revision 1.32  1994/06/07  15:35:23  hk
+;;; In p1-expand-user-macro: case -> ecase
+;;;
+;;; Revision 1.31  1994/06/03  14:10:27  hk
+;;; Bessere Fehlermeldung, falls Makro-Expansion scheitert
+;;;
+;;; Revision 1.30  1994/03/03  13:49:48  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
 ;;; Revision 1.29  1993/11/30  08:15:49  hk
 ;;; Fehlermeldung für undefinierte Funktionen bei Makroexpansion
 ;;; verschönert
@@ -156,12 +165,26 @@
       (t
        (clc-error "It was impossible to expand ~S, because ~a."
                   *CURRENT-FORM*
-                  (if (and (named-const-p evaluated-form)
-                           (eq :forward (?value evaluated-form)))
-                      (format nil "function ~s is not defined"
-                              (?symbol evaluated-form))
-                      (format nil "~%~s~%can not be evaluated at compile-time"
-                              evaluated-form)))
+                  (typecase evaluated-form
+                    (sym
+                     (format nil
+                             "reference to global variable ~s is not allowed"
+                             (?symbol evaluated-form)))
+                    (defined-named-const
+                     (format
+                      nil
+                      (ecase (?value evaluated-form)
+                        (:forward "function ~s is not defined")
+                        (:unknown
+                         "value of constant ~s is not known at compile time"))
+                      (?symbol evaluated-form)))
+                    (setq-form
+                     (format
+                      nil
+                      "assignment to global variable ~s is not allowed"
+                      (?symbol (?sym (?var (?location evaluated-form))))))
+                    (t (format nil "~%~s~%can not be evaluated at compile-time"
+                               evaluated-form))))
        nil))))
     
 ;;------------------------------------------------------------------------------

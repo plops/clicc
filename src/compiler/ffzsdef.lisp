@@ -5,8 +5,19 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Zwischensprachkonstrukte fuer das Foreign Function Interface
 ;;;
-;;; $Revision: 1.9 $
+;;; $Revision: 1.12 $
 ;;; $Log: ffzsdef.lisp,v $
+;;; Revision 1.12  1994/06/07  15:34:57  jh
+;;; provide eingefuegt.
+;;;
+;;; Revision 1.11  1994/04/18  12:11:14  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Weitere Annotation fuer das Zwischensprachkonstrukt fuer
+;;;   Call-Out-Functions.
+;;;
+;;; Revision 1.10  1993/12/16  16:36:29  pm
+;;; Bezeichner bei foreign-fun umbenannt. Zur Vereinheitlichung.
+;;;
 ;;; Revision 1.9  1993/11/03  11:46:27  pm
 ;;; Inkonsistenzen in den Symbolnamen behoben.
 ;;;
@@ -54,14 +65,12 @@
 ;; Slots im Einzelnen: 
 ;;
 ;; - arguments: Enthaelt die Typ-Signatur der Foreign-Function
-;; - pass-types: Enthaelt die Aufrufart (:by-value oder :by-reference)
 ;; - name: Name der zu generierenden FF
 ;; - callback: Die FF ruft selbst LISP-Funktionen auf.
 ;; - return-type: Der von der FF zurueckgelieferte Wert.
 ;;------------------------------------------------------------------------------
 (defzws foreign-fun (form)
   (arguments :type list)
-  (pass-types :type list)
   (name :type string)
   (callback :initform nil :type bool)
   return-type
@@ -69,6 +78,7 @@
   ;;-----------
   (par-spec :type integer)
   (symbol :type symbol)                 ; Name im Quelltext
+  (other-sym :type symbol)
 )
 
 
@@ -82,18 +92,9 @@
 ;; Fuer dieses Konstrukt muessen keine Methoden geschrieben werden.
 ;;------------------------------------------------------------------------------
 (defzws call-in-fun ()
-  (arg-type-list :type list)
+  (arguments :type list)
   (foreign-name :type string)
   return-type
 )
 
-;;------------------------------------------------------------------------------
-;; 
-;;------------------------------------------------------------------------------
-(defzws c-struct ()
-  (typsymbol :type symbol)
-  (type :type list)
-  (symbol :type symbol))
-
-;;------------------------------------------------------------------------------
 (provide "ffzsdef")

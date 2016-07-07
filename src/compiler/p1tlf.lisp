@@ -5,8 +5,16 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Top-Level-Forms
 ;;;
-;;; $Revision: 1.103 $
+;;; $Revision: 1.105 $
 ;;; $Log: p1tlf.lisp,v $
+;;; Revision 1.105  1994/04/18  12:18:03  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - UNEXPANDED-FOREIGN-FUN als Operator im Global-Environment
+;;;
+;;; Revision 1.104  1994/02/18  13:55:25  hk
+;;; (funcall f . args) wird direkt in zu einem app-Knoten mit form f und
+;;; arg-list args.
+;;;
 ;;; Revision 1.103  1993/12/16  12:49:07  hk
 ;;; In p1-export eine Queue verwendet, um das Umrehen des 1. Arguments zu
 ;;; verhindern.
@@ -443,6 +451,13 @@
   (let ((name (first form))
         (args (rest form)))
     (cond
+
+      ;; Aufrufe von FUNCALL k"onnen in der
+      ;; Zwischensprache direkt dargestellt werden
+      ;;------------------------------------------
+      ((eq 'L:FUNCALL name)
+       (make-app :form (p1-form (pop args)) :arg-list (p1-args args)))
+      
       ((symbolp name)
        (let* ((operator-def (get-operator-def name))
               (operator     (cdr operator-def))
@@ -468,6 +483,8 @@
             (p1-form (p1-expand-system-macro operator form)))
            ((:USER-MACRO :LOCAL-MACRO)
             (p1-form (p1-expand-user-macro operator form)))
+           (:UNEXPANDED-FOREIGN-FUN
+            (p1-form (p1-foreign-fun-call operator form)))
            ((:LOCAL-FUN :FOREIGN-FUN)
             (clc-check-nparams
              (?par-spec operator) (length args) (?symbol operator))

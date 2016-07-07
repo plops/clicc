@@ -5,8 +5,32 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Codegenerierung: Struktur- und Variablen-Deklarationen
 ;;;
-;;; $Revision: 1.10 $
+;;; $Revision: 1.17 $
 ;;; $Log: cgdefs.lisp,v $
+;;; Revision 1.17  1994/06/08  10:37:34  hk
+;;; *rest-optimization* mit nil initialisiert, damit opt-args weiterhin
+;;; von weight aufgerufen werden kann.
+;;;
+;;; Revision 1.16  1994/02/16  16:44:14  hk
+;;; (defvar *if-counter*) hinzugef"ugt.
+;;;
+;;; Revision 1.15  1994/02/08  13:55:23  sma
+;;; Neue Variablen *rest-optimization*, *rest-var-count*,
+;;; *rlo-statistics-rest-{funs, opt, usage}*
+;;;
+;;; Revision 1.14  1994/01/26  13:35:55  ft
+;;; Änderung der Darstellung von ungebundenen Slots.
+;;;
+;;; Revision 1.13  1994/01/21  16:47:52  ft
+;;; Notlösung für *SECRET-UNBOUND-SLOT-VALUE*.
+;;;
+;;; Revision 1.12  1994/01/21  08:23:55  ft
+;;; Neue Variable: *SECRET-UNBOUND-SLOT-VALUE* zur Unboundkennzeichnung
+;;; von Slots in der Zwischensprache.
+;;;
+;;; Revision 1.11  1994/01/07  10:17:52  hk
+;;; Definition von closure-result entfernt, da nicht benutzt.
+;;;
 ;;; Revision 1.10  1993/06/17  08:00:09  hk
 ;;; Copright Notiz eingefuegt
 ;;;
@@ -53,11 +77,6 @@
 (defzws stacktop-result (local-static))
 
 ;;------------------------------------------------------------------------------
-;; Das Resultat einer Closure soll erzeugt werden.
-;;------------------------------------------------------------------------------
-(defzws closure-result (local-static))
-
-;;------------------------------------------------------------------------------
 ;; Ein Wert im Multiple-Value-Buffer soll erzeugt werden.
 ;;------------------------------------------------------------------------------
 (defzws mv-buf ()
@@ -80,9 +99,7 @@
 ;; - wo der LISP-Wert erzeugt werden soll.
 ;;------------------------------------------------------------------------------
 (defvar *result-spec*)
-(proclaim '(type (or (member nil C-bool)
-                  static dynamic stacktop-result closure-result mv-buf)
-            *result-spec* ))
+(proclaim '(type (or (member nil C-bool) static dynamic mv-buf) *result-spec* ))
 
 ;;------------------------------------------------------------------------------
 ;; Ein String, der in C-Syntax einen Booleschen Ausdruck beschreibt;
@@ -137,6 +154,7 @@
 ;;------------------------------------------------------------------------------
 (defvar *tagbody-counter*)
 (defvar *cont-counter*)
+(defvar *if-counter*)
 
 ;;------------------------------------------------------------------------------
 ;; Beschreibung von Quelle und Ziel des letzten Kopierbefehls fuer Lisp-Daten.
@@ -178,6 +196,26 @@
 ;; Die Datei, in die der C-Code geschrieben wird
 ;;------------------------------------------------------------------------------
 (defvar *C-file*)
+
+;;------------------------------------------------------------------------------
+;; Flag, ob eine Optimierung eines Restlistenparamters durchgeführt werden
+;; soll bzw kann. Dieser wird dann direkt als Zeiger auf die im Stack liegende
+;; Restliste direkt in C verwaltet und das erzeugen der Restliste mit Flist
+;; wird unterdrückt.
+;;------------------------------------------------------------------------------
+(defvar *rest-optimization* nil)
+
+;;------------------------------------------------------------------------------
+;; Zähler für eindeutige Namen von Restvariablen
+;;------------------------------------------------------------------------------
+(defvar *rest-var-count*)
+
+;;------------------------------------------------------------------------------
+;; Für die Statistik
+;;------------------------------------------------------------------------------
+(defvar *rlo-statistics-rest-funs*)
+(defvar *rlo-statistics-rest-opt*)
+(defvar *rlo-statistics-rest-usage*)
 
 ;;------------------------------------------------------------------------------
 (provide "cgdefs")

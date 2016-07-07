@@ -5,8 +5,8 @@
             ------------------------------------------------------
  Funktion : README for CLiCC
 
- $Revision: 1.5 $
- $Id: README,v 1.5 1993/10/25 11:31:37 hk Exp $
+ $Revision: 1.8 $
+ $Id: README,v 1.8 1994/06/23 14:59:01 hk Exp $
 ------------------------------------------------------------------
 
  CLiCC is a Common Lisp to C Compiler.  It generates C-executables 
@@ -31,26 +31,31 @@
  
            CLiCC is available via anonymous ftp from
  
-           ftp.informatik.uni-kiel.de  (134.245.15.113) 
-           file: kiel/apply/clicc-0.6.2.tar.Z
+           ftp.informatik.uni-kiel.de  (134.245.15.114) 
+           file: kiel/apply/clicc-0.6.4.tar.gz
  
  -----------------------------------------------------------------
  
  See at the file COPYRIGHT for copyright and  warranty conditions.
  The file INSTALL describes the installation of CLiCC and the file
- src/compiler/README describes the usage of the compiler.
+ src/compiler/README describes how to use the compiler.  Check the
+ file NOTES for details about this new release.
  
  Look into the directory doc for papers about CL_0,  the generated 
  C code, the used intermediate representation of programs, and the
  migration of Common Lisp programs to CL_0.
  
- If you have any problems using CLiCC, please contact us. You will 
- find our  e-mail  and  mail  addresses below.  Any suggestions or 
- ideas to improve  CLiCC  are welcome.  We are very interested  in
- hearing about you, even if you just used CLiCC successfully.
+ If you have any problems using CLiCC, please contact us.      Any
+ suggestions or ideas to improve  CLiCC  are welcome.  We are very
+ interested  in hearing  about  you,  even if you just used  CLiCC
+ successfully.
  
  -----------------------------------------------------------------
  
+      Requests or comments regarding CLiCC should be send to:
+                 clicc@informatik.uni-kiel.de
+
+   Use one of the following addresses to contact us individually:
             Wolfgang Goerigk, wg@informatik.uni-kiel.de
             Ulrich Hoffmann, uho@informatik.uni-kiel.de
             Heinz Knutzen, hk@informatik.uni-kiel.de

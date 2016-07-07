@@ -5,8 +5,15 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Structures
 ;;;
-;;; $Revision: 1.24 $
+;;; $Revision: 1.26 $
 ;;; $Log: p1struct.lisp,v $
+;;; Revision 1.26  1994/06/03  14:09:33  hk
+;;; :PRINT-FUNCTION wird ber"ucksichtigt
+;;;
+;;; Revision 1.25  1994/01/13  16:36:23  sma
+;;; Statt set-struct-ref/set-struct-constructor werden jetzt setf-Methoden
+;;; benutzt.
+;;;
 ;;; Revision 1.24  1993/06/29  10:22:53  wg
 ;;; Einige (clicc-warning ...) in (clicc-message ...) geaendert.
 ;;;
@@ -193,7 +200,7 @@
            :constructor nil
            :copier      (intern-prefixed "COPY-" struct-name)
            :predicate   (intern-postfixed struct-name "-P")
-           :print-function 'print-structure))
+           :print-function 'std-struct-printer))
     
     ;;-----------------------------------
     ;; Analysieren der DEFSTRUCT-Optionen
@@ -259,7 +266,7 @@
         (incf index)))
     
     ;;--------------------------------
-    ;; 1. Neuen Datentyp bekannt geben
+    ;; 0. Neuen Datentyp bekannt geben
     ;;--------------------------------
     (let ((predicate (structdescr-predicate struct-info)))
       
@@ -348,8 +355,8 @@
                   defstruct-code)
                  (push 
                   `(L::DEFUN (L::SETF ,conc-name-slot) (newvalue struct)
-                    (rt::SET-STRUCT-REF
-                     struct ,index (L::QUOTE ,struct-name) newvalue))
+                    (L::SETF (rt::STRUCT-REF
+                              struct ,index (L::QUOTE ,struct-name)) newvalue))
                   defstruct-code))))
         
         ;; Body of FLET
@@ -377,14 +384,25 @@
         (p1-top-level-form
          `(L::SETF (L::GET ',struct-name 'rt::INCLUDED-STRUCT)
            ',(structdescr-include struct-info))))
-      
+
+      ;; Dem PRINTER wird die print-function bekanntgegeben:
+      ;;----------------------------------------------------
+      (let ((print-function (structdescr-print-function struct-info)))
+        (unless (eq print-function 'std-struct-printer)
+          (p1-top-level-form
+           `(L::SETF (rt::struct-printer ',struct-name)
+             ,(if (eq 'include print-function)
+                  `(rt::struct-printer
+                    ',(structdescr-include struct-info))
+                  `(L::FUNCTION ,print-function))))))
+
       ;; Dem READER wird der reader-constructor bekanntgegeben:
       ;;-------------------------------------------------------
       (if reader-constructor
-        (p1-top-level-form
-              `(rt::SET-STRUCT-CONSTRUCTOR ',struct-name
-                 (L::FUNCTION ,reader-constructor)))
-        (clicc-message "No structure reader function for ~A." struct-name)))))
+          (p1-top-level-form
+           `(L::SETF (rt::struct-constructor ',struct-name)
+             (L::FUNCTION ,reader-constructor)))
+          (clicc-message "No structure reader function for ~A." struct-name)))))
 
 ;;------------------------------------------------------------------------------
 ;; Analysiert die Optionen, die bei der Definition einer Struktur
@@ -514,6 +532,10 @@
                    (clicc-error
                     ":INCLUDE must name a DEFSTRUCT that is declared before."))
                  (setf (structdescr-include struct-info) include-name)
+
+                 (unless (elt options-supplied 5)
+                   ;; :print-function noch nicht angegeben: vererben
+                   (setf (structdescr-print-function struct-info) 'include))
                  (setq include-slots (structdescr-slots include-struct-info))
 
                  (dolist (new-slot-description (cddr option))
@@ -550,8 +572,10 @@
 
             (:PRINT-FUNCTION
              (get-defstruct-option-arg 5)
-             (when argument-p
-               (setf (structdescr-print-function struct-info) argument)))
+             (setf (structdescr-print-function struct-info)
+                   (if argument-p
+                       argument
+                       'std-struct-printer)))
             ((:TYPE :NAMED :INITIAL-OFFSET)
              (clicc-error
               "The defstruct option ~S has not been implemented yet."

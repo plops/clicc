@@ -5,8 +5,12 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Makros und Funktionen zur Handhabung der Typdeklarationen
 ;;;
-;;; $Revision: 1.36 $
+;;; $Revision: 1.37 $
 ;;; $Log: tidecl.lisp,v $
+;;; Revision 1.37  1994/05/13  12:33:10  hk
+;;; das Makro dec-type ver"andert, so da"s If-Ausdrcke bereits bei der
+;;; Expansion berechnet werden.
+;;;
 ;;; Revision 1.36  1993/12/09  10:32:22  hk
 ;;; provide wieder an das Dateiende
 ;;;
@@ -153,14 +157,12 @@
                                   &optional type-abstraction-function)
   (declare (ignore arrow))
   `(progn
-    (let ((function  (get-the-function ',function-name))
-          (arg-types (list ,@argument-types)))
-      (when arg-types
-        (setf (?argument-types function) arg-types))
+    (let ((function  (get-the-function ',function-name)))
+      (setf (?argument-types function) (list ,@argument-types))
       (setf (?result-type    function) ,result-type)
-      (when ,type-abstraction-function
-        (setf (?type-abstraction-function function) 
-              ,type-abstraction-function)))))
+      ,@(when type-abstraction-function
+             `((setf (?type-abstraction-function function) 
+               ,type-abstraction-function))))))
 
 
 ;;------------------------------------------------------------------------------

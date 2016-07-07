@@ -5,8 +5,28 @@
  *            ------------------------------------------------------
  * Funktion : System-Funktionen: Numbers
  *
- * $Revision: 1.14 $
+ * $Revision: 1.20 $
  * $Log: number.c,v $
+ * Revision 1.20  1994/04/28  09:50:35  sma
+ * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ *
+ * Revision 1.19  1994/01/26  19:19:55  kl
+ * Fltfix und F1minusfix als feststellige auf Fixnums spezialisierte
+ * Versionen von Flt und F1minus eingeführt.
+ *
+ * Revision 1.18  1994/01/22  18:47:40  sma
+ * Hoffentlich ist decode-float _jetzt_ endlich in ordnung.
+ *
+ * Revision 1.17  1994/01/22  17:50:36  sma
+ * Fehler korrigiert.
+ *
+ * Revision 1.16  1994/01/21  14:52:24  ft
+ * Erweiterung um die Funktion decode-float.
+ *
+ * Revision 1.15  1994/01/05  12:52:28  sma
+ * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
+ * versehen und den Postfix _internal entfernt. STACK(base,x) -> ARG(x)
+ *
  * Revision 1.14  1993/10/13  17:05:02  sma
  * Da GET_FIXNUM nicht immer als lvalue einsetzbar ist, ist
  * GE_TFIXNUM(STACK(base, 0))++ nicht allgemein möglich.
@@ -60,7 +80,6 @@
 #include <c_decl.h>
 #include "sys.h"
 
-
 enum number_type {type_fixnum, type_float};
 
 char No_number[]        = "~a is not a number";
@@ -73,12 +92,12 @@ char Illegal_base_num[] = "Illegal base-number ~a with non-integer power-number 
 double get_float(base)
 CL_FORM *base;
 {
-   if (CL_FIXNUMP(STACK(base, 0)))
-   	return((double)GET_FIXNUM(STACK(base, 0)));
-   else if (CL_FLOATP(STACK(base, 0)))
-   	return(GET_FLOAT(STACK(base, 0)));
+   if (CL_FIXNUMP(ARG(0)))
+   	return((double)GET_FIXNUM(ARG(0)));
+   else if (CL_FLOATP(ARG(0)))
+   	return(GET_FLOAT(ARG(0)));
    else
-      Lerror(STACK(base, 0), No_number);
+      Lerror(ARG(0), No_number);
    return 0; /* damit lint zufrieden ist */
 }
 
@@ -106,15 +125,15 @@ double   num_float;
 void Fzerop(base)
 CL_FORM *base;
 {
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	RET_BOOL(GET_FIXNUM(STACK(base, 0)) == 0);
+   	RET_BOOL(GET_FIXNUM(ARG(0)) == 0);
       break;
    case CL_FLOAT:
-   	RET_BOOL(GET_FLOAT(STACK(base, 0)) == 0);
+   	RET_BOOL(GET_FLOAT(ARG(0)) == 0);
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
 }
 
@@ -124,15 +143,15 @@ CL_FORM *base;
 void Fplusp(base)
 CL_FORM *base;
 {
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	RET_BOOL(GET_FIXNUM(STACK(base, 0)) > 0);
+   	RET_BOOL(GET_FIXNUM(ARG(0)) > 0);
       break;
    case CL_FLOAT:
-   	RET_BOOL(GET_FLOAT(STACK(base, 0)) > 0);
+   	RET_BOOL(GET_FLOAT(ARG(0)) > 0);
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
 }
 
@@ -142,15 +161,15 @@ CL_FORM *base;
 void Fminusp(base)
 CL_FORM *base;
 {
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	RET_BOOL(GET_FIXNUM(STACK(base, 0)) < 0);
+   	RET_BOOL(GET_FIXNUM(ARG(0)) < 0);
       break;
    case CL_FLOAT:
-   	RET_BOOL(GET_FLOAT(STACK(base, 0)) < 0);
+   	RET_BOOL(GET_FLOAT(ARG(0)) < 0);
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
 }
 
@@ -160,12 +179,12 @@ CL_FORM *base;
 void Foddp(base)
 CL_FORM *base;
 {
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	RET_BOOL(GET_FIXNUM(STACK(base, 0)) & 1);
+   	RET_BOOL(GET_FIXNUM(ARG(0)) & 1);
       break;
-   default: Lerror(STACK(base, 0), No_integer);
+   default: Lerror(ARG(0), No_integer);
    }
 }
 
@@ -175,12 +194,12 @@ CL_FORM *base;
 void Fevenp(base)
 CL_FORM *base;
 {
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	RET_BOOL(!(GET_FIXNUM(STACK(base, 0)) & 1));
+   	RET_BOOL(!(GET_FIXNUM(ARG(0)) & 1));
       break;
-   default: Lerror(STACK(base, 0), No_integer);
+   default: Lerror(ARG(0), No_integer);
    }
 }
 
@@ -197,57 +216,57 @@ int nargs;
 {
    int i;
 
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
    {
-   	long first = GET_FIXNUM(STACK(base, 0));
+   	long first = GET_FIXNUM(ARG(0));
 
    	for(i = 1; i < nargs; i++)
       {
-         switch(TYPE_OF(STACK(base, i)))
+         switch(TYPE_OF(ARG(i)))
          {
          case CL_FIXNUM:
-            if(GET_FIXNUM(STACK(base, i)) != first)
+            if(GET_FIXNUM(ARG(i)) != first)
                goto NIL;
             break;
          case CL_FLOAT:
-            if(GET_FLOAT(STACK(base, i)) != first)
+            if(GET_FLOAT(ARG(i)) != first)
                goto NIL;
             break;
-         default: Lerror(STACK(base, i), No_number);
+         default: Lerror(ARG(i), No_number);
          }
       }
       goto T;
    }
    case CL_FLOAT:
    {
-   	double first = GET_FLOAT(STACK(base, 0));
+   	double first = GET_FLOAT(ARG(0));
 
    	for(i = 1; i < nargs; i++)
       {
-         switch(TYPE_OF(STACK(base, i)))
+         switch(TYPE_OF(ARG(i)))
          {
          case CL_FIXNUM:
-            if(GET_FIXNUM(STACK(base, i)) != first)
+            if(GET_FIXNUM(ARG(i)) != first)
                goto NIL;
             break;
          case CL_FLOAT:
-            if(GET_FLOAT(STACK(base, i)) != first)
+            if(GET_FLOAT(ARG(i)) != first)
                goto NIL;
             break;
-         default: Lerror(STACK(base, i), No_number);
+         default: Lerror(ARG(i), No_number);
          }
       }
       goto T;
    }
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
  T:
-	LOAD_T(STACK(base, 0));
+	LOAD_T(ARG(0));
 	return;
  NIL:
-	LOAD_NIL(STACK(base, 0));
+	LOAD_NIL(ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -263,56 +282,56 @@ int nargs;
 
    for(i = 0; i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
       {
-      	num_fixnum = GET_FIXNUM(STACK(base, i));
+      	num_fixnum = GET_FIXNUM(ARG(i));
       	for(j = i + 1; j < nargs; j++)
          {
-            switch(TYPE_OF(STACK(base, j)))
+            switch(TYPE_OF(ARG(j)))
             {
             case CL_FIXNUM:
-               if(GET_FIXNUM(STACK(base, j)) == num_fixnum)
+               if(GET_FIXNUM(ARG(j)) == num_fixnum)
                   goto NIL;
                break;
             case CL_FLOAT:
-               if(GET_FLOAT(STACK(base, j)) == num_fixnum)
+               if(GET_FLOAT(ARG(j)) == num_fixnum)
                   goto NIL;
                break;
-            default: Lerror(STACK(base, j), No_number);
+            default: Lerror(ARG(j), No_number);
             }
          }
          break;
       }
       case CL_FLOAT:
       {
-      	num_float = GET_FIXNUM(STACK(base, i));
+      	num_float = GET_FIXNUM(ARG(i));
       	for(j = i + 1; j < nargs; j++)
          {
-            switch(TYPE_OF(STACK(base, j)))
+            switch(TYPE_OF(ARG(j)))
             {
             case CL_FIXNUM:
-               if(GET_FIXNUM(STACK(base, j)) == num_float)
+               if(GET_FIXNUM(ARG(j)) == num_float)
                   goto NIL;
                break;
             case CL_FLOAT:
-               if(GET_FLOAT(STACK(base, j)) == num_float)
+               if(GET_FLOAT(ARG(j)) == num_float)
                   goto NIL;
                break;
-            default: Lerror(STACK(base, j), No_number);
+            default: Lerror(ARG(j), No_number);
             }
          }
          break;
       }
-      default: Lerror(STACK(base, 0), No_number);
+      default: Lerror(ARG(0), No_number);
       }
    }
-   LOAD_T(STACK(base, 0));
+   LOAD_T(ARG(0));
    return;
 
  NIL:
-	LOAD_NIL(STACK(base, 0));
+	LOAD_NIL(ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -327,60 +346,70 @@ int nargs;
    double num_float;            /* LISP OBJECT of type FLOAT  */
    enum number_type num_type;
    
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	num_fixnum = GET_FIXNUM(STACK(base, 0));
+   	num_fixnum = GET_FIXNUM(ARG(0));
    	num_type = type_fixnum;
       break;
    case CL_FLOAT:
-   	num_float = GET_FLOAT(STACK(base, 0));
+   	num_float = GET_FLOAT(ARG(0));
    	num_type = type_float;
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
    for(i = 1; i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
       	if(num_type == type_fixnum)
          {
-      		if(!(num_fixnum < GET_FIXNUM(STACK(base, i))))
+      		if(!(num_fixnum < GET_FIXNUM(ARG(i))))
       			goto NIL;
          }
       	else
          {
-      		if(!(num_float < GET_FIXNUM(STACK(base, i))))
+      		if(!(num_float < GET_FIXNUM(ARG(i))))
       			goto NIL;
       		else
       			num_type = type_fixnum;
          }
-			num_fixnum = GET_FIXNUM(STACK(base, i));
+			num_fixnum = GET_FIXNUM(ARG(i));
          break;
       case CL_FLOAT:
       	if(num_type == type_fixnum)
          {
-      		if(!(num_fixnum < GET_FLOAT(STACK(base, i))))
+      		if(!(num_fixnum < GET_FLOAT(ARG(i))))
       			goto NIL;
       		else
       			num_type = type_float;
          }
       	else
          {
-      		if(!(num_float < GET_FLOAT(STACK(base, i))))
+      		if(!(num_float < GET_FLOAT(ARG(i))))
       			goto NIL;
          }
-			num_float = GET_FLOAT(STACK(base, i));
+			num_float = GET_FLOAT(ARG(i));
          break;
-      default: Lerror(STACK(base, i), No_number);
+      default: Lerror(ARG(i), No_number);
       }
    }
-   LOAD_T(STACK(base, 0));
+   LOAD_T(ARG(0));
    return;
 
  NIL:
-	LOAD_NIL(STACK(base, 0));
+	LOAD_NIL(ARG(0));
+}
+
+/*------------------------------------------------------------------------------
+ * <fix fixnum fixnum
+ *----------------------------------------------------------------------------*/
+void Fltfix(base)
+CL_FORM *base;
+{
+  if(!(GET_FIXNUM(ARG(0)) < GET_FIXNUM(ARG(1))))
+     LOAD_NIL(ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -395,60 +424,60 @@ int nargs;
    double num_float;            /* LISP OBJECT of type FLOAT  */
    enum number_type num_type;
    
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	num_fixnum = GET_FIXNUM(STACK(base, 0));
+   	num_fixnum = GET_FIXNUM(ARG(0));
    	num_type = type_fixnum;
       break;
    case CL_FLOAT:
-   	num_float = GET_FLOAT(STACK(base, 0));
+   	num_float = GET_FLOAT(ARG(0));
    	num_type = type_float;
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
    for(i = 1; i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
       	if(num_type == type_fixnum)
          {
-      		if(!(num_fixnum > GET_FIXNUM(STACK(base, i))))
+      		if(!(num_fixnum > GET_FIXNUM(ARG(i))))
       			goto NIL;
          }
       	else
          {
-      		if(!(num_float > GET_FIXNUM(STACK(base, i))))
+      		if(!(num_float > GET_FIXNUM(ARG(i))))
       			goto NIL;
       		else
       			num_type = type_fixnum;
          }
-			num_fixnum = GET_FIXNUM(STACK(base, i));
+			num_fixnum = GET_FIXNUM(ARG(i));
          break;
       case CL_FLOAT:
       	if(num_type == type_fixnum)
          {
-      		if(!(num_fixnum > GET_FLOAT(STACK(base, i))))
+      		if(!(num_fixnum > GET_FLOAT(ARG(i))))
       			goto NIL;
       		else
       			num_type = type_float;
          }
       	else
          {
-      		if(!(num_float > GET_FLOAT(STACK(base, i))))
+      		if(!(num_float > GET_FLOAT(ARG(i))))
       			goto NIL;
          }
-			num_float = GET_FLOAT(STACK(base, i));
+			num_float = GET_FLOAT(ARG(i));
          break;
-      default: Lerror(STACK(base, i), No_number);
+      default: Lerror(ARG(i), No_number);
       }
    }
-   LOAD_T(STACK(base, 0));
+   LOAD_T(ARG(0));
    return;
 
  NIL:
-	LOAD_NIL(STACK(base, 0));
+	LOAD_NIL(ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -463,60 +492,60 @@ int nargs;
    double num_float;            /* LISP OBJECT of type FLOAT  */
    enum number_type num_type;
    
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	num_fixnum = GET_FIXNUM(STACK(base, 0));
+   	num_fixnum = GET_FIXNUM(ARG(0));
    	num_type = type_fixnum;
       break;
    case CL_FLOAT:
-   	num_float = GET_FLOAT(STACK(base, 0));
+   	num_float = GET_FLOAT(ARG(0));
    	num_type = type_float;
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
    for(i = 1; i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
       	if(num_type == type_fixnum)
          {
-      		if(!(num_fixnum <= GET_FIXNUM(STACK(base, i))))
+      		if(!(num_fixnum <= GET_FIXNUM(ARG(i))))
       			goto NIL;
          }
       	else
          {
-      		if(!(num_float <= GET_FIXNUM(STACK(base, i))))
+      		if(!(num_float <= GET_FIXNUM(ARG(i))))
       			goto NIL;
       		else
       			num_type = type_fixnum;
          }
-			num_fixnum = GET_FIXNUM(STACK(base, i));
+			num_fixnum = GET_FIXNUM(ARG(i));
          break;
       case CL_FLOAT:
       	if(num_type == type_fixnum)
          {
-      		if(!(num_fixnum <= GET_FLOAT(STACK(base, i))))
+      		if(!(num_fixnum <= GET_FLOAT(ARG(i))))
       			goto NIL;
       		else
       			num_type = type_float;
          }
       	else
          {
-      		if(!(num_float <= GET_FLOAT(STACK(base, i))))
+      		if(!(num_float <= GET_FLOAT(ARG(i))))
       			goto NIL;
          }
-			num_float = GET_FLOAT(STACK(base, i));
+			num_float = GET_FLOAT(ARG(i));
          break;
-      default: Lerror(STACK(base, i), No_number);
+      default: Lerror(ARG(i), No_number);
       }
    }
-   LOAD_T(STACK(base, 0));
+   LOAD_T(ARG(0));
    return;
 
  NIL:
-	LOAD_NIL(STACK(base, 0));
+	LOAD_NIL(ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -531,60 +560,60 @@ int nargs;
    double num_float;            /* LISP OBJECT of type FLOAT  */
    enum number_type num_type;
    
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	num_fixnum = GET_FIXNUM(STACK(base, 0));
+   	num_fixnum = GET_FIXNUM(ARG(0));
    	num_type = type_fixnum;
       break;
    case CL_FLOAT:
-   	num_float = GET_FLOAT(STACK(base, 0));
+   	num_float = GET_FLOAT(ARG(0));
    	num_type = type_float;
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
    for(i = 1; i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
       	if(num_type == type_fixnum)
          {
-      		if(!(num_fixnum >= GET_FIXNUM(STACK(base, i))))
+      		if(!(num_fixnum >= GET_FIXNUM(ARG(i))))
       			goto NIL;
          }
       	else
          {
-      		if(!(num_float >= GET_FIXNUM(STACK(base, i))))
+      		if(!(num_float >= GET_FIXNUM(ARG(i))))
       			goto NIL;
       		else
       			num_type = type_fixnum;
          }
-			num_fixnum = GET_FIXNUM(STACK(base, i));
+			num_fixnum = GET_FIXNUM(ARG(i));
          break;
       case CL_FLOAT:
       	if(num_type == type_fixnum)
          {
-      		if(!(num_fixnum >= GET_FLOAT(STACK(base, i))))
+      		if(!(num_fixnum >= GET_FLOAT(ARG(i))))
       			goto NIL;
       		else
       			num_type = type_float;
          }
       	else
          {
-      		if(!(num_float >= GET_FLOAT(STACK(base, i))))
+      		if(!(num_float >= GET_FLOAT(ARG(i))))
       			goto NIL;
          }
-			num_float = GET_FLOAT(STACK(base, i));
+			num_float = GET_FLOAT(ARG(i));
          break;
-      default: Lerror(STACK(base, i), No_number);
+      default: Lerror(ARG(i), No_number);
       }
    }
-   LOAD_T(STACK(base, 0));
+   LOAD_T(ARG(0));
    return;
 
  NIL:
-	LOAD_NIL(STACK(base, 0));
+	LOAD_NIL(ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -605,25 +634,25 @@ int nargs;
  
    for(i = 0; i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
-      	num_fixnum += GET_FIXNUM(STACK(base, i));
+      	num_fixnum += GET_FIXNUM(ARG(i));
          break;
       case CL_FLOAT:
-      	num_float += GET_FLOAT(STACK(base, i));
+      	num_float += GET_FLOAT(ARG(i));
       	float_res = TRUE;
          break;
-      default: Lerror(STACK(base, i), No_number);
+      default: Lerror(ARG(i), No_number);
       }
    }
    if(float_res)
 	{
       num_float += num_fixnum;
-      LOAD_FLOAT(make_float(STACK(base, 0), num_float), STACK(base, 0));
+      LOAD_FLOAT(ARG(0), make_float(ARG(0), num_float), ARG(0));
 	}
    else
-      LOAD_FIXNUM(num_fixnum, STACK(base, 0));
+      LOAD_FIXNUM(ARG(0), num_fixnum, ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -640,39 +669,39 @@ int nargs;
  
    if(nargs > 1)
 	{
-      switch(TYPE_OF(STACK(base, 0)))
+      switch(TYPE_OF(ARG(0)))
       {
       case CL_FIXNUM:
-      	num_fixnum = GET_FIXNUM(STACK(base, 0));
+      	num_fixnum = GET_FIXNUM(ARG(0));
          break;
       case CL_FLOAT:
-      	num_float = GET_FLOAT(STACK(base, 0));
+      	num_float = GET_FLOAT(ARG(0));
       	float_res = TRUE;
          break;
-      default: Lerror(STACK(base, 0), No_number);
+      default: Lerror(ARG(0), No_number);
       }
    }
    for(i =(nargs > 1 ? 1 : 0); i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
-      	num_fixnum -= GET_FIXNUM(STACK(base, i));
+      	num_fixnum -= GET_FIXNUM(ARG(i));
          break;
       case CL_FLOAT:
-      	num_float -= GET_FLOAT(STACK(base, i));
+      	num_float -= GET_FLOAT(ARG(i));
       	float_res = TRUE;
          break;
-      default: Lerror(STACK(base, i), No_number);
+      default: Lerror(ARG(i), No_number);
       }
    }
    if(float_res)
 	{
       num_float += num_fixnum;
-      LOAD_FLOAT(make_float(STACK(base, 0), num_float), STACK(base, 0));
+      LOAD_FLOAT(ARG(0), make_float(ARG(0), num_float), ARG(0));
 	}
    else
-      LOAD_FIXNUM(num_fixnum, STACK(base, 0));
+      LOAD_FIXNUM(ARG(0), num_fixnum, ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -689,25 +718,25 @@ int nargs;
  
    for(i = 0; i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
-      	num_fixnum *= GET_FIXNUM(STACK(base, i));
+      	num_fixnum *= GET_FIXNUM(ARG(i));
          break;
       case CL_FLOAT:
-      	num_float *= GET_FLOAT(STACK(base, i));
+      	num_float *= GET_FLOAT(ARG(i));
       	float_res = TRUE;
          break;
-      default: Lerror(STACK(base, i), No_number);
+      default: Lerror(ARG(i), No_number);
       }
    }
    if(float_res)
 	{
       num_float *= num_fixnum;
-      LOAD_FLOAT(make_float(STACK(base, 0), num_float), STACK(base, 0));
+      LOAD_FLOAT(ARG(0), make_float(ARG(0), num_float), ARG(0));
 	}
    else
-      LOAD_FIXNUM(num_fixnum, STACK(base, 0));
+      LOAD_FIXNUM(ARG(0), num_fixnum, ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -726,24 +755,24 @@ int nargs;
  
    if(nargs > 1)
 	{
-      switch(TYPE_OF(STACK(base, 0)))
+      switch(TYPE_OF(ARG(0)))
       {
       case CL_FIXNUM:
-      	num_fixnum = GET_FIXNUM(STACK(base, 0));
+      	num_fixnum = GET_FIXNUM(ARG(0));
          break;
       case CL_FLOAT:
-      	num_float = GET_FLOAT(STACK(base, 0));
+      	num_float = GET_FLOAT(ARG(0));
       	float_res = TRUE;
          break;
-      default: Lerror(STACK(base, 0), No_number);
+      default: Lerror(ARG(0), No_number);
       }
    }
    for(i =(nargs > 1 ? 1 : 0); i < nargs; i++)
 	{
-      switch(TYPE_OF(STACK(base, i)))
+      switch(TYPE_OF(ARG(i)))
       {
       case CL_FIXNUM:
-      	div_fixnum = GET_FIXNUM(STACK(base, i));
+      	div_fixnum = GET_FIXNUM(ARG(i));
       	if(div_fixnum == 0)
       		goto div_by_zero;
       	if(! float_res)
@@ -762,7 +791,7 @@ int nargs;
          }
          break;
       case CL_FLOAT:
-      	div_float = GET_FLOAT(STACK(base, i));
+      	div_float = GET_FLOAT(ARG(i));
       	if(div_float == 0)
       		goto div_by_zero;
       	if(float_res)
@@ -773,15 +802,15 @@ int nargs;
       		float_res = TRUE;
          }
          break;
-      default: Lerror(STACK(base, i), No_number);
+      default: Lerror(ARG(i), No_number);
       }
    }
    if(float_res)
 	{
-      LOAD_FLOAT(make_float(STACK(base, 0), num_float), STACK(base, 0));
+      LOAD_FLOAT(ARG(0), make_float(ARG(0), num_float), ARG(0));
 	}
    else
-      LOAD_FIXNUM(num_fixnum, STACK(base, 0));
+      LOAD_FIXNUM(ARG(0), num_fixnum, ARG(0));
    return;
 
  div_by_zero:
@@ -794,19 +823,19 @@ int nargs;
 void F1plus(base)
 CL_FORM *base;
 {
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
       /* FIXNUM inkrementieren */
-   	LOAD_FIXNUM(GET_FIXNUM(STACK(base, 0)) + 1, STACK(base,0)); 
+   	LOAD_FIXNUM(ARG(1), GET_FIXNUM(ARG(0)) + 1, STACK(base,0)); 
       break;                    /* wird als Resultat zur"uckgeliefert */
    case CL_FLOAT:
       /* Eine neue Fliesskommazahl im Heap allozieren und 'number' + 1 dort
          abspeichern */
-		LOAD_FLOAT(make_float(STACK(base, 0), GET_FLOAT(STACK(base, 0)) + 1),
-		            STACK(base, 0));
+		LOAD_FLOAT(ARG(1), make_float(ARG(0), GET_FLOAT(ARG(0)) + 1),
+                 ARG(0));
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
 }
 
@@ -816,20 +845,30 @@ CL_FORM *base;
 void F1minus(base)
 CL_FORM *base;
 {
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
       /* FIXNUM dekrementieren */
-   	LOAD_FIXNUM(GET_FIXNUM(STACK(base, 0)) - 1, STACK(base, 0)); 
+   	LOAD_FIXNUM(ARG(1), GET_FIXNUM(ARG(0)) - 1, ARG(0)); 
       break;                    /* wird als Resultat zur"uckgeliefert */
    case CL_FLOAT:
       /* Eine neue Fliesskommazahl im Heap allozieren und 'number' - 1 dort
          abspeichern */
-		LOAD_FLOAT(make_float(STACK(base, 0), GET_FLOAT(STACK(base, 0)) - 1),
-		            STACK(base, 0));
+		LOAD_FLOAT(ARG(1), make_float(ARG(0), GET_FLOAT(ARG(0)) - 1),
+                 ARG(0));
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
+}
+
+/*------------------------------------------------------------------------------
+ * 1-fix fixnum
+ *----------------------------------------------------------------------------*/
+void F1minusfix(base)
+CL_FORM *base;
+{
+   /* FIXNUM dekrementieren */
+ 	LOAD_FIXNUM(ARG(1), GET_FIXNUM(ARG(0)) - 1, ARG(0)); 
 }
 
 /*------------------------------------------------------------------------------
@@ -841,47 +880,47 @@ CL_FORM *base;
  *----------------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------------------
- * expt base-number power-number
+ * RT::EXPT base-number power-number
  *----------------------------------------------------------------------------*/
-void expt_internal(base)
+void rt_expt(base)
 CL_FORM *base;
 {
    double base_num, power;
 
-   switch(TYPE_OF(STACK(base, 1)))
+   switch(TYPE_OF(ARG(1)))
    {
    case CL_FIXNUM:
    {
-   	long power_fixnum = GET_FIXNUM(STACK(base, 1));
+   	long power_fixnum = GET_FIXNUM(ARG(1));
       /*
         Falls 'power-number' = 0 vom Typ INTEGER,
         ist das Ergebnis 1 vom Typ von 'base-number'.
         */
       if(power_fixnum == 0L)
       {
-         switch(TYPE_OF(STACK(base, 0)))
+         switch(TYPE_OF(ARG(0)))
          {
          case CL_FIXNUM:
-            LOAD_FIXNUM(1, STACK(base, 0));
+            LOAD_FIXNUM(ARG(0), 1, ARG(0));
             return;
          case CL_FLOAT:
-            LOAD_FLOAT(make_float(STACK(base, 0), 1.0), STACK(base, 0));
+            LOAD_FLOAT(ARG(0), make_float(ARG(0), 1.0), ARG(0));
             return;
-         default: Lerror(STACK(base, 0), No_number);
+         default: Lerror(ARG(0), No_number);
          }
       }
       /*
         Sind 'base-number' und 'power-number' beide vom Typ RATIONAL
        (hier INTEGER), ist das Ergebnis exakt.
         */
-      if(TYPE_OF(STACK(base, 0)) == CL_FIXNUM)
+      if(TYPE_OF(ARG(0)) == CL_FIXNUM)
       {
-      	long base_fixnum = GET_FIXNUM(STACK(base, 0));
+      	long base_fixnum = GET_FIXNUM(ARG(0));
       	long result      = 1;
 
       	while(power_fixnum-- > 0)
       		result *= base_fixnum;
-      	LOAD_FIXNUM(result, STACK(base, 0));
+      	LOAD_FIXNUM(ARG(0), result, ARG(0));
       	return;
       }
 
@@ -889,44 +928,44 @@ CL_FORM *base;
       break;
    }
    case CL_FLOAT:
-      power = GET_FLOAT(STACK(base, 1));
+      power = GET_FLOAT(ARG(1));
       if(power == 0.0)
       {
-         switch(TYPE_OF(STACK(base, 0)))
+         switch(TYPE_OF(ARG(0)))
          {
          case CL_FIXNUM:
-            if(GET_FIXNUM(STACK(base, 0)) == 0L)
-               Lerror(STACK(base, 0), Illegal_base_num);
-            LOAD_FIXNUM(1L, STACK(base, 0));
+            if(GET_FIXNUM(ARG(0)) == 0L)
+               Lerror(ARG(0), Illegal_base_num);
+            LOAD_FIXNUM(ARG(0), 1L, ARG(0));
             return;
          case CL_FLOAT:
-            if(GET_FLOAT(STACK(base, 0)) == 0.0)
-               Lerror(STACK(base, 0), Illegal_base_num);
-            LOAD_FLOAT(make_float(STACK(base, 0), 1.0), STACK(base, 0));
+            if(GET_FLOAT(ARG(0)) == 0.0)
+               Lerror(ARG(0), Illegal_base_num);
+            LOAD_FLOAT(ARG(0), make_float(ARG(0), 1.0), ARG(0));
             return;
-         default: Lerror(STACK(base, 0), No_number);
+         default: Lerror(ARG(0), No_number);
          }
       }
       break;
-   default: Lerror(STACK(base, 1), No_number);
+   default: Lerror(ARG(1), No_number);
    }
-   base_num = get_float(STACK(base, 0));
-   LOAD_FLOAT(make_float(STACK(base, 0), pow(base_num, power)),
-              STACK(base, 0));
+   base_num = get_float(ARG(0));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), pow(base_num, power)),
+              ARG(0));
 }
 	
 /*------------------------------------------------------------------------------
- * log number base
+ * RT::LOG number base
  *----------------------------------------------------------------------------*/
-void log_internal(base)
+void rt_log(base)
 CL_FORM *base;
 {
    double number, base_num;
 
-   number   = get_float(STACK(base, 0));
-   base_num = get_float(STACK(base, 1));
-   LOAD_FLOAT(make_float(STACK(base, 0), log(number) / log(base_num)),
-               STACK(base, 0));
+   number   = get_float(ARG(0));
+   base_num = get_float(ARG(1));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), log(number) / log(base_num)),
+               ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -935,8 +974,8 @@ CL_FORM *base;
 void Fsqrt(base)
 CL_FORM *base;
 {     
-   double number = get_float(STACK(base, 0));
-   LOAD_FLOAT(make_float(STACK(base, 0), sqrt(number)), STACK(base, 0));
+   double number = get_float(ARG(0));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), sqrt(number)), ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -949,8 +988,8 @@ CL_FORM *base;
 void Fsin(base)
 CL_FORM *base;
 {
-   double radians = get_float(STACK(base, 0));
-   LOAD_FLOAT(make_float(STACK(base, 0), sin(radians)), STACK(base, 0));
+   double radians = get_float(ARG(0));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), sin(radians)), ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -959,8 +998,8 @@ CL_FORM *base;
 void Fcos(base)
 CL_FORM *base;
 {
-   double radians = get_float(STACK(base, 0));
-   LOAD_FLOAT(make_float(STACK(base, 0), cos(radians)), STACK(base, 0));
+   double radians = get_float(ARG(0));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), cos(radians)), ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -969,8 +1008,8 @@ CL_FORM *base;
 void Ftan(base)
 CL_FORM *base;
 {
-   double radians = get_float(STACK(base, 0));
-   LOAD_FLOAT(make_float(STACK(base, 0), tan(radians)), STACK(base, 0));
+   double radians = get_float(ARG(0));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), tan(radians)), ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -979,8 +1018,8 @@ CL_FORM *base;
 void Fasin(base)
 CL_FORM *base;
 {
-   double radians = get_float(STACK(base, 0));
-   LOAD_FLOAT(make_float(STACK(base, 0), asin(radians)), STACK(base, 0));
+   double radians = get_float(ARG(0));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), asin(radians)), ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -989,8 +1028,8 @@ CL_FORM *base;
 void Facos(base)
 CL_FORM *base;
 {
-   double radians = get_float(STACK(base, 0));
-   LOAD_FLOAT(make_float(STACK(base, 0), acos(radians)), STACK(base, 0));
+   double radians = get_float(ARG(0));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), acos(radians)), ARG(0));
 }
 
 /*------------------------------------------------------------------------------
@@ -999,8 +1038,8 @@ CL_FORM *base;
 void Fatan(base)
 CL_FORM *base;
 {
-   double radians = get_float(STACK(base, 0));
-   LOAD_FLOAT(make_float(STACK(base, 0), atan(radians)), STACK(base, 0));
+   double radians = get_float(ARG(0));
+   LOAD_FLOAT(ARG(0), make_float(ARG(0), atan(radians)), ARG(0));
 }
 
 
@@ -1009,22 +1048,22 @@ CL_FORM *base;
  *----------------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------------------
- * float number
+ * RT::FLOAT number
  *----------------------------------------------------------------------------*/
-void float_internal(base)
+void rt_float(base)
 CL_FORM *base;
 {
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
    {
-   	double num_float = GET_FIXNUM(STACK(base, 0));
-   	LOAD_FLOAT(make_float(STACK(base, 0), num_float), STACK(base, 0));
+   	double num_float = GET_FIXNUM(ARG(0));
+   	LOAD_FLOAT(ARG(0), make_float(ARG(0), num_float), ARG(0));
    	break;
    }
    case CL_FLOAT:
    	break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
 }
 
@@ -1039,29 +1078,29 @@ int ctype;
    long   integer, fix_numerator, fix_denominator;
    BOOL   float_rest = FALSE;
 
-   switch(TYPE_OF(STACK(base, 0)))
+   switch(TYPE_OF(ARG(0)))
    {
    case CL_FIXNUM:
-   	fix_numerator = GET_FIXNUM(STACK(base, 0));
+   	fix_numerator = GET_FIXNUM(ARG(0));
       numerator = fix_numerator;
       break;
    case CL_FLOAT:
-   	numerator  = GET_FLOAT(STACK(base, 0));
+   	numerator  = GET_FLOAT(ARG(0));
    	float_rest = TRUE;
       break;
-   default: Lerror(STACK(base, 0), No_number);
+   default: Lerror(ARG(0), No_number);
    }
-   switch(TYPE_OF(STACK(base, 1)))
+   switch(TYPE_OF(ARG(1)))
    {
    case CL_FIXNUM:
-   	fix_denominator = GET_FIXNUM(STACK(base, 1));
+   	fix_denominator = GET_FIXNUM(ARG(1));
       denominator = fix_denominator;
       break;
    case CL_FLOAT:
-   	denominator = GET_FLOAT(STACK(base, 1));
+   	denominator = GET_FLOAT(ARG(1));
    	float_rest  = TRUE;
       break;
-   default: Lerror(STACK(base, 1), No_number);
+   default: Lerror(ARG(1), No_number);
    }
    quotient = numerator / denominator;
 
@@ -1085,53 +1124,53 @@ int ctype;
       break;
 	}
 
-   LOAD_FIXNUM(integer, STACK(base, 0));
+   LOAD_FIXNUM(ARG(0), integer, ARG(0));
    if(float_rest)
 	{
-      LOAD_FLOAT(make_float(STACK(base, 1), numerator - integer * denominator),
-                 STACK(base, 1));
+      LOAD_FLOAT(ARG(1), make_float(ARG(1), numerator - integer * denominator),
+                 ARG(1));
 	}
    else
 	{
-      LOAD_FIXNUM(fix_numerator - integer * fix_denominator, STACK(base, 1));
+      LOAD_FIXNUM(ARG(1), fix_numerator - integer * fix_denominator, ARG(1));
 	}
-   Fvalues(STACK(base, 0), 2);
+   Fvalues(ARG(0), 2);
 }
 
 /*------------------------------------------------------------------------------
- * floor-internal number divisor
+ * RT::FLOOR number divisor
  *----------------------------------------------------------------------------*/
-void floor_internal(base)
+void rt_floor(base)
 CL_FORM *base;
 {
-   convert_to_int(STACK(base, 0), 0);
+   convert_to_int(ARG(0), 0);
 }
 
 /*------------------------------------------------------------------------------
- * ceiling-internal number divisor
+ * RT::CEILING number divisor
  *----------------------------------------------------------------------------*/
-void ceiling_internal(base)
+void rt_ceiling(base)
 CL_FORM *base;
 {
-   convert_to_int(STACK(base, 0), 1);
+   convert_to_int(ARG(0), 1);
 }
 
 /*------------------------------------------------------------------------------
- * truncate-internal number divisor
+ * RT::TRUNCATE number divisor
  *----------------------------------------------------------------------------*/
-void truncate_internal(base)
+void rt_truncate(base)
 CL_FORM *base;
 {
-   convert_to_int(STACK(base, 0), 2);
+   convert_to_int(ARG(0), 2);
 }
 
 /*------------------------------------------------------------------------------
- * round-internal number divisor
+ * RT::ROUND number divisor
  *----------------------------------------------------------------------------*/
-void round_internal(base)
+void rt_round(base)
 CL_FORM *base;
 {
-   convert_to_int(STACK(base, 0), 3);
+   convert_to_int(ARG(0), 3);
 }
 
 /*------------------------------------------------------------------------------
@@ -1143,10 +1182,10 @@ CL_FORM *base;
    unsigned long i;
    int bits = 0;
    
-   if(!CL_FIXNUMP(STACK(base, 0)))
-      Lerror(STACK(base, 0), "~a is not a fixnum");
+   if(!CL_FIXNUMP(ARG(0)))
+      Lerror(ARG(0), "~a is not a fixnum");
 
-   i = (unsigned long)GET_FIXNUM(STACK(base, 0));
+   i = (unsigned long)GET_FIXNUM(ARG(0));
    if((long)i < 0)
       i = ~i;
    
@@ -1155,5 +1194,28 @@ CL_FORM *base;
       bits++;
       i >>= 1;
    }
-   LOAD_FIXNUM(bits, STACK(base, 0));
+   LOAD_FIXNUM(ARG(0), bits, ARG(0));
+}
+
+/*------------------------------------------------------------------------------
+ * Die folgenden Funktionen basieren auf der Implementation von floats !!!
+ * Augenblicklich erfolgt diese durch C-Daten vom Typ double.
+ *----------------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------------------
+ * decode-float float
+ * Multiple Werte: 1. Mantisse
+ *                 2. Exponent
+ *                 3. Vorzeichen ( -1.0 oder 1.0 )
+ *----------------------------------------------------------------------------*/
+LISP_FUN(Fdecode_float)
+{
+   double f = GET_FLOAT(ARG(0));
+   int n;
+   
+   LOAD_FLOAT(ARG(0), make_float(base, frexp(f, &n)), ARG(0));
+   LOAD_FIXNUM(ARG(0), n, OFFSET(mv_buf, 0));
+   LOAD_FLOAT(ARG(0), make_float(base, f < 0.0 ? -1.0 : 1.0), 
+              OFFSET(mv_buf, 1));
+   mv_count = 3;
 }

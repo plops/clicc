@@ -5,8 +5,8 @@
             ------------------------------------------------------
  Funktion : README for the directory src/compiler
 
- $Revision: 1.3 $
- $Id: README,v 1.3 1993/11/19 11:35:56 hk Exp $
+ $Revision: 1.4 $
+ $Id: README,v 1.4 1994/03/02 11:48:50 hk Exp $
 -----------------------------------------------------------------------------
 
 This directory contains the Common LIsp to C Compiler (CLiCC).
@@ -33,7 +33,7 @@ executable file named <name>. See ../../bin for details.
 
 CLiCC may be configured by global variables and / or keyword
 parameters in the call to the function clicc. Look at the definition
-of clicc in file clcload.lisp and at the variable describtions in the
+of clicc in file clcload.lisp and at the variable descriptions in the
 files clcdef.lisp and config.lisp.
 
 

@@ -5,8 +5,34 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Start und Abschluss von Pass 1
 ;;;
-;;; $Revision: 1.77 $
+;;; $Revision: 1.84 $
 ;;; $Log: p1main.lisp,v $
+;;; Revision 1.84  1994/05/22  16:16:39  sma
+;;; Erzeugen einer leeren '*-ffi.h'-Datei verhindert.
+;;;
+;;; Revision 1.83  1994/04/18  12:17:01  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Finalisieren der FFtypes eingebaut.
+;;;
+;;; Revision 1.82  1994/02/21  09:59:37  ft
+;;; Aufruf von export-classes in p1-end hinzugefügt.
+;;;
+;;; Revision 1.81  1994/02/09  14:01:49  hk
+;;; Zusätzliche Packages RT und FFI für das *lisp-moduke* werden erst in
+;;; p1-end und nicht schon in init-pass1 in den Slot package-list des
+;;; Moduls eingetragen, damit die Initialisierungsfunktion des Lisp Moduls
+;;; *package* auf das Lisp-Package setzt.
+;;;
+;;; Revision 1.80  1994/02/04  08:16:30  hk
+;;; Fehler im Formatstring der Fehlermeldung in pass_1-of-file behoben.
+;;;
+;;; Revision 1.79  1994/02/02  12:37:48  hk
+;;; (require "p1compmac") entfernt, da nicht mehr benötigt.
+;;;
+;;; Revision 1.78  1994/02/01  11:26:30  hk
+;;; Fehlermeldung in pass_1-of-file verschönert.
+;;; make-instance 'global-fun -> make-global-fun, wg. raw slots
+;;;
 ;;; Revision 1.77  1993/12/22  12:04:12  hk
 ;;; Packages müssen auch initailiert werden, wenn das Modul keine Symbole
 ;;; definiert.
@@ -296,7 +322,6 @@
 (require "p1macro")   ; muss vor "p1tlf" stehen !!
 (require "p1foreign")
 (require "ffload")
-(require "p1compmac")
 (require "p1tlf")
 (require "p1lambda")
 (require "p1spform")
@@ -329,9 +354,6 @@
                     :name name)))
   
   (addnew-q (find-package "KEYWORD") (?package-list *module*))
-  (when *lisp-module*
-    (addnew-q (find-package "RT") (?package-list *module*))
-    (addnew-q (find-package "FFI") (?package-list *module*)))
 
   (setq *SYNTAX-EXPORT* ()))            ; Liste der syntakt. exp. Konstrukte
 
@@ -394,7 +416,7 @@
   (let ((*CLICC-FILENAME* (clc-probe-file filename ext)))
     (if (null *CLICC-FILENAME*)
 
-        (clc-error "File ~A~A does not exist.~%" filename ext)
+        (clc-error "File \"~A~@[.~A~]\" does not exist.~%" filename ext)
 
         (with-open-file (lisp-stream *CLICC-FILENAME* :direction :input)
           (clicc-message "File ~S" *CLICC-FILENAME*)      
@@ -407,6 +429,11 @@
   (unless (slot-boundp *module* 'package)
     (setf (?package *module*) (find-package "USER"))
     (add-q (find-package "USER") (?package-list *module*)))
+  (when *lisp-module*
+    (addnew-q (find-package "RT") (?package-list *module*))
+    (addnew-q (find-package "FFI") (?package-list *module*)))
+  (finalize-fftypes)
+  
   (finalize-classes)
   (finalize-generic-funs)
   (symbolize-class-names)
@@ -414,6 +441,7 @@
   (dequeue-module)
   (generate-init-fun)
   (collect-packages)
+  (export-classes)
   (export-funs)
   (finalize-call-in-funs)
 
@@ -485,17 +513,15 @@
                          set-*package*))))))
     
     (setf (?toplevel-forms *module*)
-          (make-instance
-           'global-fun
+          (make-global-fun
            :symbol 'toplevel-forms
-           :params (make-instance 'params
-                                  :var-list nil
-                                  :opt-list nil
-                                  :rest nil
-                                  :key-list nil
-                                  :allow-other-keys
-                                  nil
-                                  :all-vars nil)
+           :params (make-params :var-list nil
+                                :opt-list nil
+                                :rest nil
+                                :key-list nil
+                                :allow-other-keys
+                                nil
+                                :all-vars nil)
            :par-spec 0
            :mv-spec 1
            :body (let ((forms (if *lisp-module*
@@ -507,8 +533,7 @@
                                    (calc-setup-sym/packg)
                                    (get-toplevel-form-list)))))
                    (if forms
-                       (make-instance 'progn-form
-                                      :form-list forms)
+                       (make-progn-form :form-list forms)
                        empty-list))))))
 
 ;;------------------------------------------------------------------------------

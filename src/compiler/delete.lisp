@@ -6,8 +6,31 @@
 ;;; Inhalt   : Funktionen zum Aufspueren und Beseitigen von unbenutzten
 ;;;            Funktionen, Symbolen und benannten Konstanten.
 ;;;
-;;; $Revision: 1.26 $
+;;; $Revision: 1.33 $
 ;;; $Log: delete.lisp,v $
+;;; Revision 1.33  1994/04/05  15:07:54  jh
+;;; ?used-Methode fuer importierte Funktionen definiert.
+;;;
+;;; Revision 1.32  1994/03/03  13:47:57  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.31  1994/02/08  11:27:11  sma
+;;; Klammer eingefügt (hätte ich bloß nix geändert...)
+;;;
+;;; Revision 1.30  1994/02/08  11:07:31  sma
+;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
+;;;
+;;; Revision 1.29  1994/02/04  14:25:06  kl
+;;; Formatstring zur Meldung über unbenutzte Klassen korrigiert.
+;;;
+;;; Revision 1.28  1994/02/01  12:10:22  hk
+;;; dec-used-slot nur auf definierte, nicht auf importierte Funktionen
+;;; anwenden.
+;;;
+;;; Revision 1.27  1994/01/31  13:49:19  hk
+;;; inc-used-slot nur auf definierte, nicht auf importierte Funktionen
+;;; anwenden.
+;;;
 ;;; Revision 1.26  1993/09/21  15:02:53  jh
 ;;; dec-used-slot hinzugefuegt.
 ;;;
@@ -128,8 +151,8 @@
 (defmethod clear-used-slot ((a-zws-object zws-object))
   (setf (?used a-zws-object) 0))
 
-(defmethod clear-read-slot ((a-named-const named-const))
-  (setf (?read a-named-const) 0))
+(defmethod clear-read-slot ((a-defined-named-const defined-named-const))
+  (setf (?read a-defined-named-const) 0))
 
 (defmethod clear-read-and-write-slot ((a-var var))
   (setf (?read a-var) 0
@@ -162,9 +185,9 @@
       (?exported a-sym)
       (constant-value-p a-sym)))
 
-(defmethod is-used ((a-named-const named-const))
-  (or (plusp (?read a-named-const))
-      (?exported a-named-const)))
+(defmethod is-used ((a-defined-named-const defined-named-const))
+  (or (plusp (?read a-defined-named-const))
+      (?exported a-defined-named-const)))
 
 (defmethod is-used ((a-var var))
   (or (plusp (?write a-var))
@@ -181,6 +204,9 @@
 (defmethod is-used ((a-imported-static imported-static))
   (or (call-next-method)
       (?exported a-imported-static)))
+
+(defmethod ?used ((an-imported-fun imported-fun))
+  most-positive-fixnum)
 
 ;;------------------------------------------------------------------------------
 ;; inc-used-slot erhoeht den Inhalt der used slots von Funktionen, Symbolen und
@@ -210,12 +236,13 @@
 (defmethod inc-used-slot ((a-var-ref var-ref) &optional write)
   (inc-used-slot (?var a-var-ref) write))
 
-(defmethod inc-used-slot ((a-named-const named-const) &optional write)
-  (unless (analysed-p a-named-const)
-    (mark-as-analysed a-named-const)
-    (inc-used-slot (?value a-named-const)))
+(defmethod inc-used-slot ((a-defined-named-const defined-named-const)
+                          &optional write)
+  (unless (analysed-p a-defined-named-const)
+    (mark-as-analysed a-defined-named-const)
+    (inc-used-slot (?value a-defined-named-const)))
   (unless write
-    (incf (?read a-named-const))))
+    (incf (?read a-defined-named-const))))
 
 (defmethod inc-used-slot ((a-sym sym) &optional write)
   (declare (ignore write))
@@ -289,19 +316,17 @@
   (call-next-method)
   (inc-used-slot (?sym a-key)))
 
-(defmethod inc-used-slot ((a-fun fun) &optional write)
+(defmethod inc-used-slot ((a-fun defined-fun) &optional write)
   (declare (ignore write))
   (unless (analysed-p a-fun)
     (mark-as-analysed a-fun)
     (clear-used-slot a-fun)
-    (when (slot-boundp a-fun 'params)
-      (inc-used-slot (?params a-fun)))
-    (when (slot-boundp a-fun 'body)
-      (let ((*delete-path* (cons a-fun *delete-path*)))
-        (inc-used-slot (?body a-fun)))
-      (when (and (defined-fun-p a-fun) (member 'local-fun *objects-to-delete*))
-        (setf (?local-funs a-fun)
-              (remove-if-not #'is-used (?local-funs a-fun))))))
+    (inc-used-slot (?params a-fun))
+    (let ((*delete-path* (cons a-fun *delete-path*)))
+      (inc-used-slot (?body a-fun)))
+    (when (member 'local-fun *objects-to-delete*)
+      (setf (?local-funs a-fun)
+            (remove-if-not #'is-used (?local-funs a-fun)))))
   (incf (?used a-fun)))
 
 (defmethod inc-used-slot ((an-app app) &optional write)
@@ -400,9 +425,10 @@
 (defmethod dec-used-slot ((a-var-ref var-ref) &optional write)
   (dec-used-slot (?var a-var-ref) write))
 
-(defmethod dec-used-slot ((a-named-const named-const) &optional write)
+(defmethod dec-used-slot ((a-defined-named-const defined-named-const)
+                          &optional write)
   (unless write
-    (decf (?read a-named-const))))
+    (decf (?read a-defined-named-const))))
 
 (defmethod dec-used-slot ((a-sym sym) &optional write)
   (declare (ignore write))
@@ -465,7 +491,7 @@
   (call-next-method)
   (dec-used-slot (?sym a-key)))
 
-(defmethod dec-used-slot ((a-fun fun) &optional write)
+(defmethod dec-used-slot ((a-fun defined-fun) &optional write)
   (declare (ignore write))
   (decf (?used a-fun)))
 
@@ -639,8 +665,7 @@
   (remove-if #'is-used (?class-def-list a-module)))
 
 (defun write-unused-objects (a-module)
-  (clicc-message "----------------------------------------------------------~
-                  -----------------")
+  (clicc-message-line)
   (let ((unused-funs (list-unused-funs a-module))
         (unused-syms (list-unused-syms a-module))
         (unused-named-consts (list-unused-named-consts a-module))
@@ -672,11 +697,10 @@
                      (length unused-funs))
       (clicc-message "~D unused local function~:p found"
                      (length *unused-local-funs*))
-      (clicc-message "~D unused ~:* ~[classes~;class~:;classes~] found"
+      (clicc-message "~D unused~:* ~[classes~;class~:;classes~] found"
                      (length unused-classes))))
 
-  (clicc-message "----------------------------------------------------------~
-                  -----------------"))
+  (clicc-message-line))
 
 ;;------------------------------------------------------------------------------
 (provide "delete")

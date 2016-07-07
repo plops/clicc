@@ -5,10 +5,10 @@
 #            Uses optional parameter OPTIMIZE = <-{O | g}>.
 #            Uses environment variable CLICCROOT.
 #
-#  $Source: /home3/apply/public/clicc-0.6.2a/src/runtime/lisp2c/RCS/GNUmakefile,v $
-#  $Author: ft $
-#  $Revision: 1.8 $
-#  $Date: 1993/07/15 15:14:13 $
+#  $Source: /home3/apply/public/clicc-0.6.4/src/runtime/lisp2c/RCS/GNUmakefile,v $
+#  $Author: uho $
+#  $Revision: 1.9 $
+#  $Date: 1994/02/18 12:11:46 $
 #------------------------------------------------------------------------------
 
 CC	= acc
@@ -16,6 +16,8 @@ LIB	= $(CLICCROOT)/lib
 OPTIMIZE = -g # alternative to -O is -g
 CFLAGS	= -I$(LIB) $(OPTIMIZE)
 ARFLAGS	= r
+RANLIB  = ranlib
+RM      = rm
 
 SOURCES 	= $(wildcard *.c)
 SYNTAX		= $(LIB)/lisp.syntax
@@ -55,5 +57,5 @@ $(DEF): lisp.def
 $(LIBRARY): $(SOURCES)
 	-$(COMPILE.c) $?
 	$(AR) $(ARFLAGS) $@ *.o
-	rm *.o
-	ranlib $@
+	$(RM) *.o
+	$(RANLIB) $@

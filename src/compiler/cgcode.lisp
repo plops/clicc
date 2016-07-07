@@ -5,8 +5,20 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Codegenerierung: Funktionen, die C-Code erzeugen
 ;;;
-;;; $Revision: 1.30 $
+;;; $Revision: 1.34 $
 ;;; $Log: cgcode.lisp,v $
+;;; Revision 1.34  1994/04/28  10:00:34  sma
+;;; Erzeugung eines GLOB_FUNARGs durch Makroaufruf abstrahiert.
+;;;
+;;; Revision 1.33  1994/02/08  13:54:21  sma
+;;; Änderungen für Optimierung von &rest-Paramtern.
+;;;
+;;; Revision 1.32  1994/02/03  17:30:27  sma
+;;; Änderungen für Optimierung von &rest-Paramtern.
+;;;
+;;; Revision 1.31  1993/12/09  14:04:42  sma
+;;; CC-Stack erzeugt jetzt ARG(xxx) statt STACK(base, xxx).
+;;;
 ;;; Revision 1.30  1993/11/22  09:24:02  hk
 ;;; Neuer C-Code ONLY_ONCE in Initialisierungsfunktionen, der bewirkt,
 ;;; da_ diese Funktionen hvchstens 1x ausgef|hrt werden.
@@ -137,7 +149,8 @@
    C-static-GLOBAL_FUNARG-Init C-initstart C-initend CC-MacroCall CC-Call
    CC-Cast CC-Address CC-NameConc CC-make-bool CC-bool CC-op+ CC-op- CC-op>
    CC-op< CC-opIor CC-op^ CC-op& CC-op~ CC-op<< CC-op>>
-   CC-op!= CC-op== CC-arrayptr CC-arraykomp CC-structkomp CC-Stack CC-mv_buf))
+   CC-op!= CC-op== CC-op&& CC-opIIor CC-arrayptr CC-arraykomp CC-structkomp 
+   CC-Stack CC-mv_buf))
 
 ;;------------------------------------------------------------------------------
 ;; Namen von Identifikatoren
@@ -146,6 +159,8 @@
 (defconstant C-display "display")
 (defconstant C-new_display "new_display")
 (defconstant C-nargs "nargs")
+(defconstant C-local "local")
+(defconstant C-rest "rest")
 (defconstant C-ALL_OPT_SUPPLIED "ALL_OPT_SUPPLIED")
 (defconstant C-keylist "keylist")
 (defconstant C-supl_flags "supl_flags")
@@ -477,11 +492,11 @@
 
 ;;------------------------------------------------------------------------------
 (defun C-GLOBAL_FUNARG-Init (name fun-name par-spec)
-  (C-Decl "GLOBAL_FUNARG " name " = {" fun-name  ", " par-spec "}"))
+  (C-MacroCall "GEN_GLOBAL_FUNARG" name fun-name par-spec))
 
 ;;------------------------------------------------------------------------------
 (defun C-static-GLOBAL_FUNARG-Init (name fun-name par-spec)
-  (C-Decl "static GLOBAL_FUNARG " name " = {" fun-name  ", " par-spec "}"))
+  (C-MacroCall "GEN_STATIC_GLOBAL_FUNARG" name fun-name par-spec))
 
 ;;------------------------------------------------------------------------------
 (defun C-ArrayInitDecl (typ name)
@@ -602,7 +617,7 @@
 
 ;;------------------------------------------------------------------------------
 (defun CC-op<< (e1 e2)
-  (CC-Code e1 " <<  " e2))
+  (CC-Code e1 " << " e2))
 
 ;;------------------------------------------------------------------------------
 (defun CC-op!= (e1 e2)
@@ -611,6 +626,14 @@
 ;;------------------------------------------------------------------------------
 (defun CC-op== (e1 e2)
   (CC-Code e1 " == " e2))
+
+;;------------------------------------------------------------------------------
+(defun CC-op&& (e1 e2)
+  (CC-Code e1 " && " e2))
+
+;;------------------------------------------------------------------------------
+(defun CC-opIIor (e1 e2)
+  (CC-Code e1 " || " e2))
 
 ;;------------------------------------------------------------------------------
 (defun CC-arrayptr (array index)
@@ -625,10 +648,22 @@
   (CC-Code struct "." komp))
 
 ;;------------------------------------------------------------------------------
+;; C-Code zum Zugriff auf eine `rest'-Variable
+;;------------------------------------------------------------------------------
+(defun CC-restvar (offset)
+  (getCode "~A_~A" C-rest (1- (- offset))))
+
+;;------------------------------------------------------------------------------
 ;; C-Code zum Zugriff auf einen Offset im aktuellen Activation Record.
 ;;------------------------------------------------------------------------------
 (defun CC-Stack (offset)
-    (CC-MacroCall "STACK" "base" offset))
+  (if *rest-optimization*
+      (if (minusp offset)
+          (CC-restvar offset)
+          (if (< offset *rest-optimization*)
+              (CC-MacroCall "ARG" offset)
+              (CC-MacroCall "LOCAL" (- offset *rest-optimization*))))
+      (CC-MacroCall "ARG" offset)))
 
 ;;------------------------------------------------------------------------------
 ;; C-Code zum Zugriff auf einen Offset in anderen Activation Records.

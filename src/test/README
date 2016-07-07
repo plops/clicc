@@ -5,15 +5,15 @@
             ------------------------------------------------------
  Funktion : README for the directory src/test
 
- $Revision: 1.1 $
- $Id: README,v 1.1 1993/06/19 20:25:36 hk Exp $
+ $Revision: 1.2 $
+ $Id: README,v 1.2 1994/01/10 11:07:50 hk Exp $
 -----------------------------------------------------------------------------
 
 This directory contains a test suite for CLiCC
 ----------------------------------------------
 
 Compile the file testmain.lisp with CLiCC, run the command
- clg testmain  and execute the resulting file  testmain .
+../../bin/cl testmain and execute the resulting file testmain.
 
 When you type 'a', every test will be run and its result will be
 checked against the expected result. 

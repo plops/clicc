@@ -6,8 +6,27 @@
  * Funktion : Laufzeitsystem
  *            - Low Level Hash-Funktionen
  *
- * $Revision: 1.8 $
+ * $Revision: 1.13 $
  * $Log: hash.c,v $
+ * Revision 1.13  1994/04/28  09:47:43  sma
+ * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ *
+ * Revision 1.12  1994/04/23  16:47:33  sma
+ * hash() umgeschrieben, so daß keine Länge mehr übergeben werden muß.
+ *
+ * Revision 1.11  1994/01/24  16:29:02  sma
+ * combine-hash jetzt in LISP implementiert.
+ *
+ * Revision 1.10  1994/01/05  12:48:26  sma
+ * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
+ * versehen.
+ *
+ * Revision 1.9  1993/12/09  15:08:05  sma
+ * string-hash und sxhash-simple-string gelöscht und in Lisp
+ * programmiert. sxhash-string funktioniert jetzt nur noch mit
+ * simple-strings statt mit beliebigen strings. STACK(base, xxx) ->
+ * ARG(xxx)
+ *
  * Revision 1.8  1993/06/30  16:41:45  hk
  * Neue Funktionen: sxhash_simple_string, sxhash_string, combine_hash.
  *
@@ -37,19 +56,16 @@
 #include "sys.h"
 
 /*------------------------------------------------------------------------------
- * Berechnet einen Hash-Index (unsigned long) aus den Zeichen eines Strings
- * angegebener Laenge.
+ * Berechnet einen Hash-Index (unsigned long) aus den Zeichen eines C-Strings.
  *----------------------------------------------------------------------------*/
-unsigned long hash(str, len)
+unsigned long hash(str)
 char *str;
-long len;
 {
    unsigned char c;
    unsigned long ret = 0;
    
-   for( ; len > 0; len--)
+   while ((c = *str++) != 0)
    {
-      c = *str++;
       ret <<= 4;
       ret += c;
    }
@@ -57,49 +73,10 @@ long len;
 }
 
 /*------------------------------------------------------------------------------
- * string_hash string hash-size
- * berechnet Fixnum aus string, 0 <= Resultat < hash-size
+ * RT::SXHASH-STRING string
+ * Berechnet einen Hash-Index (Fixnum) aus einem simple-string
  *----------------------------------------------------------------------------*/
-void string_hash(base)
-CL_FORM *base;
+LISP_FUN(rt_sxhash_string)
 {
-   LOAD_FIXNUM(hash(get_c_string(STACK(base, 0)),
-                    AR_SIZE(GET_FORM(STACK(base, 0))))
-               % GET_FIXNUM(STACK(base, 1)),
-               STACK(base, 0) ); 
-}
-
-/*------------------------------------------------------------------------------
- * sxhash-simple-string simple-string
- * Berechnet einen Hash-Index (Fixnum) aus einem simple String
- *----------------------------------------------------------------------------*/
-void sxhash_simple_string(base)
-CL_FORM *base;
-{
-   LOAD_FIXNUM(hash(sm_get_c_string(STACK(base, 0)),
-                    AR_SIZE(GET_FORM(STACK(base, 0)))),
-               STACK(base, 0)); 
-}
-
-/*------------------------------------------------------------------------------
- * sxhash-string string
- * Berechnet einen Hash-Index (Fixnum) aus einem String
- *----------------------------------------------------------------------------*/
-void sxhash_string(base)
-CL_FORM *base;
-{
-   LOAD_FIXNUM(hash(get_c_string(STACK(base, 0)),
-                    AR_SIZE(GET_FORM(STACK(base, 0)))),
-               STACK(base, 0)); 
-}
-
-/*------------------------------------------------------------------------------
- * combine-hash hash1 hash2
- * Kombiniert zwei Hash-Indizes zu einem neuen Hash-Index
- *----------------------------------------------------------------------------*/
-void combine_hash(base)
-CL_FORM *base;
-{
-   LOAD_FIXNUM(GET_FIXNUM(STACK(base, 0)) ^ GET_FIXNUM(STACK(base, 1)),
-               STACK(base, 0)); 
+   LOAD_FIXNUM(ARG(0), hash(get_c_string(ARG(0))), ARG(0));
 }

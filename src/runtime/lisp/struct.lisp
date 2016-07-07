@@ -5,8 +5,26 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Laufzeitsystem (19. Structures)
 ;;;
-;;; $Revision: 1.9 $
+;;; $Revision: 1.14 $
 ;;; $Log: struct.lisp,v $
+;;; Revision 1.14  1994/06/09  09:25:09  hk
+;;; rt:struct-ref anders kodiert
+;;;
+;;; Revision 1.13  1994/06/02  14:18:57  hk
+;;; Neue Funktionen rt:struct-printer und (setf rt:struct-printer)
+;;; definiert.
+;;;
+;;; Revision 1.12  1994/05/05  14:51:11  sma
+;;; Wenn in make-struct do in dolist umgeschrieben wird, wird die Funktion
+;;; restlisten-optimiert.
+;;;
+;;; Revision 1.11  1994/01/24  16:18:11  sma
+;;; rt:struct-type in LISP implementiert.
+;;;
+;;; Revision 1.10  1994/01/13  16:46:31  sma
+;;; setf-Methoden statt set-*. Sourcecode verschönert/einfacher
+;;; programmiert.
+;;;
 ;;; Revision 1.9  1993/10/14  13:09:36  sma
 ;;; rt:new-struct nach structure.c verschoben
 ;;;
@@ -25,7 +43,7 @@
 ;;;
 ;;; Revision 1.5  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.9 $ eingefuegt
+;;; $Revision: 1.14 $ eingefuegt
 ;;;
 ;;; Revision 1.4  1993/01/11  14:38:35  hk
 ;;; structure -> struct
@@ -43,85 +61,99 @@
 (in-package "LISP")
 
 (export
- '(rt::struct rt::struct-typep rt::make-struct rt::copy-struct
-   rt::struct-ref rt::set-struct-ref rt::struct-constructor
-   rt::set-struct-constructor rt::included-struct) "RT")
+ '(rt::struct rt::struct-typep rt::struct-type rt::make-struct rt::copy-struct
+   rt::struct-ref rt::struct-constructor rt::struct-printer
+   rt::included-struct) "RT")
 
 ;;------------------------------------------------------------------------------
-;; Fuer Fehlermeldungen
+;; Für Fehlermeldungen
 ;;------------------------------------------------------------------------------
 (defconstant NO_STRUCT "~S is not a structure of type ~S")
 
 ;;------------------------------------------------------------------------------
-;; 
+;; RT::STRUCT Datentyp
 ;;------------------------------------------------------------------------------
 (deftype rt:struct () '(satisfies rt::structp))
 
 ;;-----------------------------------------------------------------------------
-;; STRUCT-TYPEP object type
+;; RT::STRUCT-TYPEP object type
 ;;-----------------------------------------------------------------------------
 (defun rt:struct-typep (object type)
-  (cond
-    ((not (rt::structp object)) NIL)
-    (t (let ((struct-type (rt::struct-type object)))
-         (loop
-           (cond
-             ((eq struct-type type)
-              (return T))
-             (t (setq struct-type (get struct-type 'rt::INCLUDED-STRUCT))
-                (when (not struct-type)
-                  (return NIL)))))))))
+  (if (rt::structp object)
+      (let ((struct-type (rt::struct-type object)))
+        (loop
+         (when (eq type struct-type)
+           (return object))
+         (unless (setq struct-type (get struct-type 'rt::included-struct))
+           (return nil))))))
+
+;;------------------------------------------------------------------------------
+;; RT::STRUCT-TYPE structure
+;;------------------------------------------------------------------------------
+(defun rt:struct-type (structure)
+  (rt::structure-ref structure -1))
 
 ;;-----------------------------------------------------------------------------
-;; MAKE-STRUCT type &REST slot-values
+;; RT::MAKE-STRUCT type &rest slot-values
 ;;-----------------------------------------------------------------------------
 (defun rt:make-struct (type &rest slot-values)
-  (let ((new-structure (rt::new-struct (length slot-values) type)))
-    (do ((i 0 (1+ i)))
-        ((null slot-values) new-structure)
-      (rt::set-struct-ref new-structure i type (pop slot-values)))))
+  (let ((new-structure (rt::new-struct (length slot-values))))
+    (setf (rt::structure-ref new-structure -1) type)
+    (let ((i 0))
+      (dolist (slot slot-values new-structure)
+        (setf (rt::structure-ref new-structure i) slot)
+        (incf i)))))
 
 ;;-----------------------------------------------------------------------------
-;; COPY-STRUCT structure type
+;; RT::COPY-STRUCT structure type
 ;;-----------------------------------------------------------------------------
 (defun rt:copy-struct (structure type)
-  (when (not (rt:struct-typep structure type))
+  (unless (rt:struct-typep structure type)
     (error NO_STRUCT structure type))
   (let* ((structure-size (rt::struct-size structure))
-         (copy-of-structure (rt::new-struct structure-size type)))
-    (dotimes (index structure-size)
-
-      ;; Optimierung per Hand.
-      ;; Kann sonst mit Typanalyse und INLINE-Uebersetzung erreicht werden.
-      ;;-------------------------------------------------------------------
-      (rt::set-struct-ref-internal copy-of-structure index
-                                   (rt::struct-ref-internal structure index)))
-    copy-of-structure))
+         (copy-of-structure (rt::new-struct structure-size)))
+    (setf (rt::structure-ref copy-of-structure -1) type)
+    (dotimes (index structure-size copy-of-structure)
+      (setf (rt::structure-ref copy-of-structure index)
+            (rt::structure-ref structure index)))))
 
 ;;-----------------------------------------------------------------------------
-;; STRUCT-REF structure index type
+;; RT::STRUCT-REF structure index type
 ;;-----------------------------------------------------------------------------
 (defun rt:struct-ref (structure index type)
-  (when (not (rt:struct-typep structure type))
-    (error NO_STRUCT structure type))
-  (rt::struct-ref-internal structure index))
+  (if (rt:struct-typep structure type)
+      (rt::structure-ref structure index)
+      (error NO_STRUCT structure type)))
 
 ;;-----------------------------------------------------------------------------
-;; SET-STRUCT-REF structure index type newvalue
+;; (SETF RT::STRUCT-REF) newvalue structure index type
 ;;-----------------------------------------------------------------------------
-(defun rt:set-struct-ref (structure index type newvalue)
-  (when (not (rt:struct-typep structure type))
-    (error NO_STRUCT structure type))
-  (rt::set-struct-ref-internal structure index newvalue))
+(defun (setf rt:struct-ref) (newvalue structure index type)
+  (if (rt:struct-typep structure type)
+      (setf (rt::structure-ref structure index) newvalue)
+      (error NO_STRUCT structure type)))
 
 ;;-----------------------------------------------------------------------------
-;; STRUCT-CONSTRUCTOR symbol
+;; RT::STRUCT-CONSTRUCTOR symbol
 ;;-----------------------------------------------------------------------------
 (defun rt:struct-constructor (symbol)
-  (get symbol 'rt::STRUCT-CONSTRUCTOR))
+  (get symbol 'rt::struct-constructor))
 
 ;;-----------------------------------------------------------------------------
-;; SET-STRUCT-CONSTRUCTOR symbol constructor
+;; (SETF RT::STRUCT-CONSTRUCTOR) constructor symbol
 ;;-----------------------------------------------------------------------------
-(defun rt:set-struct-constructor (symbol constructor)
-  (setf (get symbol 'rt::STRUCT-CONSTRUCTOR) constructor))
+(defun (setf rt:struct-constructor) (constructor symbol)
+  (setf (get symbol 'rt::struct-constructor) constructor))
+
+;;-----------------------------------------------------------------------------
+;; RT::STRUCT-PRINTER symbol
+;;-----------------------------------------------------------------------------
+(defun rt:struct-printer (symbol)
+  (get symbol 'rt::struct-printer))
+
+;;-----------------------------------------------------------------------------
+;; (SETF RT::STRUCT-PRINTER) print-function symbol
+;;-----------------------------------------------------------------------------
+(defun (setf rt:struct-printer) (print-function symbol)
+  (setf (get symbol 'rt::struct-printer) print-function))
+

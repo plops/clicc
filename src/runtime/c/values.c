@@ -8,8 +8,14 @@
  *            - VALUES-LIST
  *            - save_values
  *
- * $Revision: 1.6 $
+ * $Revision: 1.8 $
  * $Log: values.c,v $
+ * Revision 1.8  1994/04/28  09:54:41  sma
+ * Fehler korrigiert, der durch das entfernen von OFFSET entstanden ist.
+ *
+ * Revision 1.7  1994/04/22  14:13:07  sma
+ * STACK(base, x) -> ARG(x) und "int mv_args" entfernt.
+ *
  * Revision 1.6  1993/07/06  11:12:48  sma
  * OFFSET-Makro eingeführt
  *
@@ -38,7 +44,6 @@ char LIST_EXPECTED[] = "~A is not a list";
 #define MV_LIMIT 20
 #define MV_BUFSIZE (MV_LIMIT - 1)
 
-int mv_args;
 int mv_count;
 CL_FORM mv_buf[MV_BUFSIZE];
 
@@ -51,7 +56,7 @@ int nargs;
 {
    if(nargs == 0)
    {
-      LOAD_NIL(STACK(base, 0));
+      LOAD_NIL(ARG(0));
    }
    else if(nargs > MV_LIMIT)
       Labort(TOO_MANY_VALUES);
@@ -61,7 +66,7 @@ int nargs;
 
       for(i = 1; i < nargs; i++)
       {
-         COPY(STACK(base, i), OFFSET(mv_buf, i-1));
+         COPY(ARG(i), &mv_buf[i-1]);
       }
    }
    mv_count = nargs;
@@ -73,7 +78,7 @@ int nargs;
 void Fvalues_list (base)
 CL_FORM *base;
 {
-   CL_FORM *values = STACK(base, 0);
+   CL_FORM *values = ARG(0);
 
    mv_count = 0;
 
@@ -87,12 +92,12 @@ CL_FORM *base;
       /* Zeiger auf das 1. Element der Liste */
       values = GET_CAR(values);
       /* 1. Element auf den Stack */
-      COPY(values, STACK(base, 0));
+      COPY(values, ARG(0));
       values++;
       break;
 
    default:
-      Lerror(STACK (base, 0), LIST_EXPECTED);
+      Lerror(ARG(0), LIST_EXPECTED);
       break;
    }
 
@@ -102,7 +107,7 @@ CL_FORM *base;
       if(mv_count >= MV_BUFSIZE)
          Labort(TOO_MANY_VALUES);
       values = GET_CAR(values);
-      COPY(values, OFFSET(mv_buf, mv_count));
+      COPY(values, &mv_buf[mv_count]);
       mv_count++;
       values++;
    }
@@ -121,7 +126,7 @@ CL_FORM *base;
    int i;
 
    for(i = 1; i < mv_count; i++)
-      COPY(OFFSET(mv_buf, i-1), STACK(base, i));
-   Flist(STACK(base, 0), mv_count);
+      COPY(&mv_buf[i-1], ARG(i));
+   Flist(ARG(0), mv_count);
    mv_count = 1;
 }

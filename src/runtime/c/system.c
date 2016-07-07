@@ -5,8 +5,29 @@
  *            ------------------------------------------------------
  * Funktion : Laufzeitsystem-Routinen: Speicherverwaltung, Abort-Funktion
  *
- * $Revision: 1.21 $
+ * $Revision: 1.26 $
  * $Log: system.c,v $
+ * Revision 1.26  1994/05/18  15:22:45  sma
+ * Anpassung für obrep2. INIT_FUN-Makro in memallot eingefügt, MALLOC und
+ * HEAP_ALIGN entfernt. gc() geändert für Anpassung an neuen obrep2-gc.
+ *
+ * Revision 1.25  1994/01/26  10:13:27  sma
+ * Verweis auf die Symbole NIL + T in Ssys gelöscht.
+ *
+ * Revision 1.24  1994/01/06  13:48:41  hk
+ * gc erhält nun eine Zeichen als zusätzliches Argument. Dieses Zeichen
+ * wird in der Garbage Colllection Meldung ausgegeben und zeigt an,
+ * welche Speicheranforderung nicht erfüllt werden konnte:
+ * o = form, x = fixnum, c = char, b = bit, l = float
+ *
+ * Revision 1.23  1993/12/16  16:40:44  pm
+ * FLAbort fuer Fehlermeldungen des FFI. Wird an Parameterposition
+ * benotigt, und muss deswegen einen Wert zurueckgeben.
+ *
+ * Revision 1.22  1993/12/09  15:17:53  sma
+ * swap_bits eingefügt zur garbage collection von bit-vectors.
+ * STACK(base, xxx) -> ARG(xxx)
+ *
  * Revision 1.21  1993/11/12  13:05:20  sma
  * Funktion bits_alloc reserviert ein Array von Bits.
  *
@@ -164,12 +185,12 @@ unsigned nelem, minelem, elsize, *actnelem;
 {
    PTR heap;
 
-   while ((heap = MALLOC(nelem * elsize)) == NULL)
+   while ((heap = malloc(nelem * elsize)) == NULL)
    {
       nelem /= 2;
       if (nelem < minelem)
       {  /* less than required, try minimal requirements */
-         if ((heap = MALLOC(minelem * elsize)) == NULL)
+         if ((heap = malloc(minelem * elsize)) == NULL)
          {
             *actnelem = 0;
             return NULL;
@@ -253,6 +274,8 @@ void memallot()
    fl_heapsize /= 2;
    fl_heap = fl_toh = fl_heap1;
    fl_eoh = old_fl_heap = fl_heap1 + fl_heapsize;
+
+   INIT_FUN;
 }
 
 
@@ -266,7 +289,6 @@ long num;
    CL_FORM *new_location = form_toh;
 
    memcpy((PTR)form_toh, (PTR)from, num * sizeof(CL_FORM));
-   HEAP_ALIGN(num);
    form_toh += num;
    return new_location;
 }
@@ -326,20 +348,34 @@ long num;
 }
 
 /*------------------------------------------------------------------------------
+ * Kopiert 'num' BITS eines Bitvektors in den neuen Heap.
+ *----------------------------------------------------------------------------*/
+long *bits_swap (from, num)
+long *from;
+long num;
+{
+   long *new_location = fx_toh;
+
+   num = (num + BITS_PER_FIXNUM - 1) / BITS_PER_FIXNUM;
+   memcpy((PTR)fx_toh, (PTR)from, num * sizeof(long));
+   fx_toh += num;
+   return new_location;
+}
+
+/*------------------------------------------------------------------------------
  * Garbage-Collector
  *----------------------------------------------------------------------------*/
-void gc (base)
+void gc (base, type)
 CL_FORM *base;
+char type; 
 {
    extern void gc_main();
    CL_FORM *form_tmp = form_heap;
    long    *fx_tmp = fx_heap;
    double  *fl_tmp = fl_heap;
-
-   CL_FORM *lptr;
    double fo_room, fx_room, fl_room;
 
-   fprintf (stderr, ";;; GC -- ");
+   fprintf (stderr, ";;; GC -%c- ", type);
    fflush(stderr);
 
    /* Vertauschen der Heap-Bereiche */
@@ -359,22 +395,7 @@ CL_FORM *base;
    fl_toh = fl_heap;
    fl_eoh = fl_heap + fl_heapsize;
 
-   /* Traversieren der Wurzelbereiche im Hauptmodul und den importierten
-    * Modulen
-    *--------------------------------------------------------------------*/
-   gc_symbols(Ssys);
-   gc_main();
-
-   /* Traversieren des LISP-Laufzeitstacks */
-   /* ------------------------------------ */
-   for (lptr = stack; lptr < base; lptr++)
-      SAVE_FORM (lptr);
-   
-   /* Traversieren des Binding-Stacks */
-   /* ------------------------------- */
-   /* 'bind_top' zeigt auf den naechsten freien Eintrag. */
-   for (lptr = bind_stack; lptr < bind_top; lptr++)
-      SAVE_FORM (lptr);
+   do_gc(base);
 
    fo_room = (double)(form_toh - form_heap) / form_heapsize;
    fx_room = (double)(fx_toh - fx_heap) / fx_heapsize;
@@ -414,7 +435,7 @@ long num;
    /* -------------------------------------------------- */
    if (fx_toh + num > fx_eoh)
    {
-      gc (base);
+      gc (base, 'x');
       if (fx_toh + num > fx_eoh)
       {
          Labort("Not enough memory for heap allocation of FIXNUM");
@@ -446,7 +467,7 @@ unsigned long rnum;
    /*----------------------------------------------------*/
    if (fx_toh + num > fx_eoh)
    {
-      gc (base);
+      gc (base, 'c');
       if (fx_toh + num > fx_eoh)
       {
          Labort("Not enough memory for heap allocation of CHARACTER");
@@ -473,7 +494,7 @@ long num;
    /* -------------------------------------------------- */
    if (fl_toh + num > fl_eoh)
    {
-      gc (base);
+      gc (base, 'l');
       if (fl_toh + num > fl_eoh)
       {
          Labort("Not enough memory for heap allocation of FLOAT");
@@ -495,14 +516,11 @@ long num;
 {
    CL_FORM *lptr;
 
-   /* definiert in obrepX.h */
-   HEAP_ALIGN(num);
-
     /* Kein Platz mehr fuer <num> Forms, Garbage Collector starten */
     /* ----------------------------------------------------------- */
    if (form_toh + num > form_eoh)
    {
-      gc (base);
+      gc (base, 'o');
       if(form_toh + num > form_eoh)
       {
          Labort("Not enough memory for heap allocation of FORM");
@@ -528,7 +546,7 @@ long num;
 
    if (fx_toh + num > fx_eoh)
    {
-      gc(base);
+      gc(base, 'b');
       if (fx_toh + num > fx_eoh)
       {
          Labort("Not enough memory for heap allocation of FIXNUM");
@@ -551,6 +569,17 @@ char *msg;
 }
 
 /*------------------------------------------------------------------------------
+ * Damit der C-Typinferenzer zufieden ist.
+ *----------------------------------------------------------------------------*/
+long FLAbort (msg)
+char *msg;
+{
+   Labort(msg);
+   return 0; /* dummy */
+}
+
+   
+/*------------------------------------------------------------------------------
  * Gibt eine Laufzeitfehlermeldung aus und bricht ab.
  * Parameter: base ist einer Zeiger in den Lisp-Stack, an die Position des
  *                 fehlerhaften Ausdrucks
@@ -562,9 +591,9 @@ CL_FORM *base;
 char *msg;
 {
    extern void Ferror();
-   make_string(STACK(base, 1), msg);
-   COPY(STACK(base, 0), STACK(base, 2));
-   Ferror(STACK(base, 1), 2);
+   make_string(ARG(1), msg);
+   COPY(ARG(0), ARG(2));
+   Ferror(ARG(1), 2);
 }
 
 /*------------------------------------------------------------------------------

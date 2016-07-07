@@ -7,8 +7,11 @@
 ;;;            Zwischensprachausdruecke zaehlen und Statistiken ueber 
 ;;;            in den Annotationen liegenden Informationen erstellen.
 ;;;
-;;; $Revision: 1.35 $
+;;; $Revision: 1.36 $
 ;;; $Log: statistics.lisp,v $
+;;; Revision 1.36  1994/02/08  11:13:21  sma
+;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
+;;;
 ;;; Revision 1.35  1993/10/08  21:28:01  kl
 ;;; Debugmeldung entfernt.
 ;;;
@@ -266,8 +269,7 @@
 ;; Ausgabe der Typstatistiken.
 ;;------------------------------------------------------------------------------
 (defun write-type-statistics ()
-  (clicc-message "----------------------------------------------------------~
-                  -------------")
+  (clicc-message-line)
   (clicc-message "The module contains ~D forms, typed as follows:"
                  *number-of-forms*)
   
@@ -290,8 +292,7 @@
            percent
            (output-type type))))))
 
-  (clicc-message "----------------------------------------------------------~
-                  -------------"))
+  (clicc-message-line))
 
 
 ;;------------------------------------------------------------------------------
@@ -327,8 +328,7 @@
 
     )
 
-  (clicc-message "----------------------------------------------------------~
-                  -------------"))
+  (clicc-message-line))
 
 
 ;;------------------------------------------------------------------------------
@@ -361,8 +361,7 @@
                          percent
                          symbol)))))
 
-  (clicc-message "----------------------------------------------------------~
-                  -------------"))
+  (clicc-message-line))
 
 
 ;;------------------------------------------------------------------------------

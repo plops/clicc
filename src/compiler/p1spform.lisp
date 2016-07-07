@@ -5,8 +5,25 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Special forms
 ;;;
-;;; $Revision: 1.41 $
+;;; $Revision: 1.45 $
 ;;; $Log: p1spform.lisp,v $
+;;; Revision 1.45  1994/02/18  13:42:55  hk
+;;; let*-form wird nur generiert, wenn var-list nicht leer ist.
+;;; let/cc-form wird nur generiert, wenn es mindestens ein angewandtes
+;;; Vorkommen gibt.
+;;;
+;;; Revision 1.44  1994/02/18  10:47:45  hk
+;;; p1-progn: Kein progn-form generieren, wenn nur ein Ausdruck.
+;;; p1-tagbody: Kein Abschlie"sendes NIL, wenn davor ein (GO ..) steht.
+;;;
+;;; Revision 1.43  1994/01/07  13:46:41  hk
+;;; Unbenannte Funktionen bekommen nun den Namen LAMBDA statt Gxxx.
+;;;
+;;; Revision 1.42  1994/01/05  12:31:17  sma
+;;; Namensänderung im Laufzeitsystem: _INTERNAL bei rt::CATCH-INTERNAL,
+;;; rt::UNWIND-PROTECT-INTERNAL, rt::THROW-INTERNAL und rt::PROGV-INTERNAL
+;;; gestrichen.
+;;;
 ;;; Revision 1.41  1993/10/15  10:21:09  hk
 ;;; p1-progn optimiert
 ;;;
@@ -173,7 +190,7 @@
   
   (let ((name (first name_rest)))
     (cond
-      ((or (symbolp name) (and (consp name) (eq (car name) 'clicc-lisp::SETF)))
+      ((or (symbolp name) (and (consp name) (eq (car name) 'L::SETF)))
        (let* ((operator-def (if (consp name)
                                 (get-setf-fun-def name)
                                 (get-operator-def name)))
@@ -208,10 +225,10 @@
       ;; (labels ((<new-name> (..) ...))
       ;;   (function <new-name>))
       ;;--------------------------
-      ((and (consp name) (eq (car name) 'clicc-lisp::LAMBDA))
+      ((and (consp name) (eq (car name) 'L::LAMBDA))
        (p1-form
-        (let ((symbol (gensym)))
-          `(clicc-lisp::LABELS ((,symbol ,@ (cdr name))) (function ,symbol)))))
+        (let ((symbol 'L::LAMBDA))
+          `(L::LABELS ((,symbol ,@ (cdr name))) (function ,symbol)))))
       (t (clicc-error NO_OPERATOR name)))))
 
 ;;------------------------------------------------------------------------------
@@ -259,9 +276,10 @@
 ;; progn {form}*
 ;;------------------------------------------------------------------------------
 (defun p1-progn (forms)
-  (if (null forms)
-      (p1-form forms)
-      (make-instance 'progn-form :form-list (mapcar #'p1-form forms))))
+  (cond
+    ((p1-endp forms) (p1-form forms))
+    ((p1-endp (cdr forms)) (p1-form (car forms)))
+    (t (make-instance 'progn-form :form-list (mapcar #'p1-form forms)))))
 
 ;;------------------------------------------------------------------------------
 ;; let ( {var || (var [value])}*) {declaration}* {form}* 
@@ -406,9 +424,11 @@
       ;; enthalten soll oder nicht. 
       ;; Zur Zeit werden in der let*-Schleife, die special-Variablen gebunden
       ;; und als special deklariert.
-      
-      (make-instance 'let*-form
-                     :var-list vars :init-list values :body (p1-progn body)))))
+
+      (if vars
+          (make-instance 'let*-form
+                         :var-list vars :init-list values :body (p1-progn body))
+          (p1-progn body)))))
 
 
 ;;------------------------------------------------------------------------------
@@ -553,12 +573,15 @@
     (when (not (symbolp name)) (clicc-error NO_LEGAL_BLOCKNAME name))
 
     (let ((*LOCAL-ENVIRONMENT* (copy-env *LOCAL-ENVIRONMENT*))
-          (cont (make-instance 'cont)))
+          (cont (make-instance 'cont :read 0)))
       
       ;; Block wird durch Let/cc repraesentiert
       ;;---------------------------------------
       (bind-block name cont)
-      (make-instance 'let/cc-form :cont cont :body (p1-progn forms)))))
+      (let ((body (p1-progn forms)))
+        (if (> (?read cont) 0)
+            (make-instance 'let/cc-form :cont cont :body body)
+            body)))))
 
 ;;------------------------------------------------------------------------------
 ;; return-from name [result]
@@ -568,24 +591,26 @@
     (tagbody
        (setq name
              (if (atom name_result)
-               (go no-match)
-               (pop name_result)))
+                 (go no-match)
+                 (pop name_result)))
        (setq result
              (if (p1-endp name_result)
-               nil
-               (pop name_result)))
+                 nil
+                 (pop name_result)))
        (when (null name_result) (go end))
      NO-MATCH
        (clicc-error NO_MATCH_SF "(BLOCK-NAME &OPTIONAL VALUE)" "RETURN-FROM")
      END)
 
     (when (not (symbolp name)) (clicc-error NO_LEGAL_BLOCKNAME name))
+    (let ((cont (get-block-bind name)))
+      (incf (?read cont))
 
-    ;; Return-From wird durch Aufruf einer Continuation repraesentiert
-    ;;----------------------------------------------------------------
-    (make-instance 'app
-                   :form (get-block-bind name)
-                   :arg-list (list (p1-form result)))))
+      ;; Return-From wird durch Aufruf einer Continuation repraesentiert
+      ;;----------------------------------------------------------------
+      (make-instance 'app
+                     :form cont
+                     :arg-list (list (p1-form result))))))
 
 ;;------------------------------------------------------------------------------
 (defmacro tagp (tag/statement)
@@ -622,7 +647,7 @@
     ;; und Bearbeiten der Forms in einer Umgebung, in der die Zuordnung
     ;; von GO-Forms zu Tags erfolgen kann.
     ;;---------------------------------------------------------------
-    (let (tag
+    (let (tagged-form
           first-form
           (forms (empty-queue))
           (tagged-form-list (empty-queue)))
@@ -631,27 +656,31 @@
         (cond
           ((tagp tag/statement)
            (cond
-             ((null tag) (setq first-form (p1-progn (queue2list forms))))
-             (t (setf (?form tag) (p1-progn (queue2list forms)))
-                (add-q tag tagged-form-list)))
-           (setq tag (get-tag-bind tag/statement))
+             ((null tagged-form)
+              (setq first-form (p1-progn (queue2list forms))))
+             (t (setf (?form tagged-form) (p1-progn (queue2list forms)))
+                (add-q tagged-form tagged-form-list)))
+           (setq tagged-form (get-tag-bind tag/statement))
            (setq forms (empty-queue)))
         
           (t (add-q tag/statement forms))))
 
-      ;; Resultat von Tagbody ist nil
+      ;; Resultat von Tagbody ist nil, ist nur notwendig, wenn am Ende kein
+      ;; GO steht
       ;;-----------------------------
-      (add-q nil forms)
+      (unless (let ((last-form (last-q forms)))
+                (and (consp last-form) (eq 'L:GO (car last-form))))
+        (add-q nil forms))
       
       (cond
-        ((null tag)
+        ((null tagged-form)
 
          ;; keine Tags, dann progn generieren
          ;;----------------------------------
          (p1-progn (queue2list forms)))
            
-        (t (setf (?form tag) (p1-progn (queue2list forms)))
-           (add-q tag tagged-form-list)
+        (t (setf (?form tagged-form) (p1-progn (queue2list forms)))
+           (add-q tagged-form tagged-form-list)
            (setf (?first-form tagbody-form) first-form)
            (setf (?tagged-form-list tagbody-form)
                  (queue2list tagged-form-list))
@@ -679,27 +708,27 @@
   (let ((fun (car fun_forms))
         (forms (cdr fun_forms)))
     (cond
-      ((null forms) (p1-form `(clicc-lisp::FUNCALL ,fun)))
+      ((null forms) (p1-form `(L::FUNCALL ,fun)))
     
       ((atom forms)
        (clicc-error NO_MATCH_SF "(FUNCTION &REST FORMS)" "MULTIPLE-VALUE-CALL"))
     
       ((and (= (length forms) 1)
-            (consp fun) (eq 'clicc-lisp::FUNCTION (car fun))
+            (consp fun) (eq 'L::FUNCTION (car fun))
             (consp (cdr fun))
             (consp (cadr fun))
-            (eq 'clicc-lisp::LAMBDA (caadr fun)))
+            (eq 'L::LAMBDA (caadr fun)))
        (p1-form `((MV-LAMBDA . ,(cdadr fun)) ,(first forms))))
     
       (t (labels ((gen-nested-mv-lambdas (forms rest-vars)
                     (if (p1-endp forms)
-                        `(clicc-lisp::APPLY
+                        `(L::APPLY
                           ,fun
                           ,(if (= (length rest-vars) 1)
                                (first rest-vars)
-                               `(clicc-lisp::append ,@rest-vars)))
+                               `(L::append ,@rest-vars)))
                         (let ((rest-var (gensym)))
-                          `((MV-LAMBDA (clicc-lisp::&REST ,rest-var)
+                          `((MV-LAMBDA (L::&REST ,rest-var)
                              ,(gen-nested-mv-lambdas
                                (cdr forms)
                                (append rest-vars (list rest-var))))
@@ -720,8 +749,8 @@
     (if (null body)
         (p1-form form1)
         (p1-form
-         `((MV-LAMBDA (clicc-lisp::&rest ,rest-var)
-            ,@body (clicc-lisp::APPLY #'clicc-lisp::VALUES ,rest-var))
+         `((MV-LAMBDA (L::&rest ,rest-var)
+            ,@body (L::APPLY #'L::VALUES ,rest-var))
            ,form1)))))
 
 ;;------------------------------------------------------------------------------
@@ -734,8 +763,8 @@
   (when (atom tag_forms)
     (clicc-error NO_MATCH_SF "(TAG &REST FORMS)" "CATCH"))
   
-  (p1-form `(rt::CATCH-INTERNAL ,(first tag_forms)
-             #'(clicc-lisp::LAMBDA () ,@(rest  tag_forms)))))
+  (p1-form `(rt::CATCH ,(first tag_forms)
+             #'(L::LAMBDA () ,@(rest  tag_forms)))))
 
 ;;------------------------------------------------------------------------------
 ;; unwind-protect protected-form {cleanup-form}*
@@ -748,15 +777,15 @@
     (clicc-error NO_MATCH_SF
                  "(PROTECTED-FORM &REST CLEANUP-FORMS)" "UNWIND-PROTECT"))
   
-  (p1-form `(rt::UNWIND-PROTECT-INTERNAL
-             #'(clicc-lisp::LAMBDA () ,(first protected-form_cleanup-forms))
-             #'(clicc-lisp::LAMBDA () ,@(rest  protected-form_cleanup-forms)))))
+  (p1-form `(rt::UNWIND-PROTECT
+             #'(L::LAMBDA () ,(first protected-form_cleanup-forms))
+             #'(L::LAMBDA () ,@(rest  protected-form_cleanup-forms)))))
 
 
 ;;------------------------------------------------------------------------------
 ;; throw tag result
 ;;
-;; Wird durch den Aufruf der Systemfunktion 'throw-internal' realisiert, die
+;; Wird durch den Aufruf der Systemfunktion 'rt::throw' realisiert, die
 ;; mittels mv-lambda aufgerufen wird.
 ;;------------------------------------------------------------------------------
 (defun p1-throw (tag_result)
@@ -777,9 +806,9 @@
 
     (let ((tag-var (gensym))
           (rest-var (gensym)))
-      (p1-form `(clicc-lisp::LET ((,tag-var ,tag))
+      (p1-form `(L::LET ((,tag-var ,tag))
                  ((MV-LAMBDA (&rest ,rest-var)
-                   (clicc-lisp::APPLY #'rt::THROW-INTERNAL ,tag-var ,rest-var))
+                   (L::APPLY #'rt::THROW ,tag-var ,rest-var))
                   ,result))))))
 
 ;;------------------------------------------------------------------------------
@@ -813,8 +842,7 @@
        (clicc-error NO_MATCH_SF "(SYMBOLS VALS &REST FORMS)" "PROGV")
      END)
 
-    (p1-form `(rt::PROGV-INTERNAL
-               ,symbols ,values #'(clicc-lisp::LAMBDA () ,@forms)))))
+    (p1-form `(rt::PROGV ,symbols ,values #'(L::LAMBDA () ,@forms)))))
 
 ;;------------------------------------------------------------------------------
 (defun parse-the (value-type_form)
@@ -840,12 +868,11 @@
 (defun p1-the (value-type_form)
   (multiple-value-bind (value-type form)
       (parse-the value-type_form)
-    (p1-form `(clicc-lisp::LET ((result ,form))
-               (clicc-lisp::IF
-                (clicc-lisp::TYPEP result (clicc-lisp::QUOTE ,value-type))
+    (p1-form `(L::LET ((result ,form))
+               (L::IF
+                (L::TYPEP result (L::QUOTE ,value-type))
                 result
-                (rt::the-type-error result
-                                    (clicc-lisp::QUOTE ,value-type))))))) 
+                (rt::the-type-error result (L::QUOTE ,value-type))))))) 
 
 ;;------------------------------------------------------------------------------
 ;; eval-when ({situation}*) {form}* 

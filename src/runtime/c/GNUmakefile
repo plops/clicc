@@ -5,16 +5,18 @@
 #            Uses optional parameter OPTIMIZE = <-{O | g}>.
 #            Uses Environment variable CLICCROOT.
 #
-# $Revision: 1.6 $
-# $Source: /home3/apply/public/clicc-0.6.2a/src/runtime/c/RCS/GNUmakefile,v $
-# $Author: ft $
-# $Date: 1993/07/15 15:14:34 $
+# $Revision: 1.7 $
+# $Source: /home3/apply/public/clicc-0.6.4/src/runtime/c/RCS/GNUmakefile,v $
+# $Author: uho $
+# $Date: 1994/02/18 12:08:06 $
 #------------------------------------------------------------------------------
 
 CC	= acc
 OPTIMIZE = -O # alternative to -O is -g
 CFLAGS	= -I$(CLICCROOT)/lib $(OPTIMIZE)
 ARFLAGS	= r
+RANLIB  = ranlib
+RM	= rm
 
 ifeq ($(findstring -g,$(OPTIMIZE)), -g)
 override CFLAGS := $(CFLAGS) -DDEBUG
@@ -46,8 +48,8 @@ all: $(LIBRARY) $(MAIN.O) $(INITIALIZE.O)
 $(LIBRARY): $(SOURCES)
 	$(COMPILE.c) $?
 	$(AR) $(ARFLAGS) $@ $(?:.c=.o)
-	rm *.o
-	ranlib $@
+	$(RM) *.o
+	$(RANLIB) $@
 
 $(MAIN.O): $(MAIN.C)
 	$(COMPILE.c) -o $@ $<

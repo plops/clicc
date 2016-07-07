@@ -6,8 +6,30 @@
 ;;; Funktion : Definition der Function do-clicc zum Aufruf von CLICC
 ;;;            Laden der uebrigen Module
 ;;;
-;;; $Revision: 1.45 $
+;;; $Revision: 1.51 $
 ;;; $Log: clcmain.lisp,v $
+;;; Revision 1.51  1994/06/07  17:29:54  jh
+;;; prepare-export-write und simplify-params eingebaut.
+;;;
+;;; Revision 1.50  1994/05/01  23:10:02  hk
+;;; "Preparing Module Interface Specification" nur wenn *OPTIMIZE*
+;;;
+;;; Revision 1.49  1994/04/05  15:02:22  jh
+;;; prepare-export-write eingebaut.
+;;;
+;;; Revision 1.48  1994/02/18  14:03:28  hk
+;;; look-for-type-errors wird auch ausgef"uhrt, wenn Inlining angeschaltet ist.
+;;; Bei der ersten Optimierung wird *optimize-verbosity* auf 2 erh"oht, da
+;;; es verd"achtig ist, wenn bereits so fr"uh wesentliches optimiert
+;;; werden kann.
+;;;
+;;; Revision 1.47  1994/02/08  11:05:37  sma
+;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
+;;;
+;;; Revision 1.46  1994/01/24  16:30:11  sma
+;;; Während der Kompilation des inline-modules wird nicht versucht, dem
+;;; Symbol den Typ T_SYMBOL_T zuzuweisen.
+;;;
 ;;; Revision 1.45  1993/12/30  09:27:32  hk
 ;;; Tail-Rekursions-Eliminierung nur, wenn (= *NERRORS* 0).
 ;;;
@@ -216,12 +238,19 @@
     ;; Das Symbol T hat zunaechst den Typ SYMBOL. Wenn es von irgendwelchen
     ;; Optimierungen ins Programm eingebaut wird, sollte es den genaueren Typ
     ;; T-SYMBOL haben, um gleich weitere Optimierungen zu ermoeglichen.
-    (setf (?type (get-symbol-bind 'L::T)) T-SYMBOL-T)
+    (unless *INLINE-MODULE*
+      (setf (?type (get-symbol-bind 'L::T)) T-SYMBOL-T))
 
     (if *OPTIMIZE*
         (progn
           (when (= *NERRORS* 0)
             (search-and-delete-unused-objects))
+
+          (when (and (= *NERRORS* 0)
+                     (= *ITERATIONS* 1)
+                     (not *no-inlining*))
+            (simplify-params #'used-dynamic-vars-simple))
+          
           ;; Die Tail-Rekursion. 
           ;; ACHTUNG Die Tail-Rekursion soll vor PASS_3 laufen,
           ;; da hier continuations erzeugt werden, die noch in 
@@ -240,7 +269,12 @@
             (pass_3))                   ; level-, mv-Slots etc. setzen.
           
           (when (= *NERRORS* 0)
-            (let ((*no-seo* t))
+            (let ((*no-seo* t)
+
+                  ;; Wenn so fr"uh bereits wesentliches optimiert werden
+                  ;; kann, dann ist es verd"achtig
+                  ;;------------------------------
+                  (*optimize-verbosity* (max *optimize-verbosity* 2)))
               (do-optimization)))
 
           (when (= *NERRORS* 0)
@@ -248,9 +282,9 @@
         
           (dotimes (iteration *ITERATIONS*)
             (when (> *ITERATIONS* 1)
-              (clicc-message "----------------------------")
+              (clicc-message-line 28)
               (clicc-message "~D. iteration step" (1+ iteration))
-              (clicc-message "----------------------------")
+              (clicc-message-line 28)
               (clicc-message " "))
         
             (when (= *NERRORS* 0)
@@ -279,11 +313,25 @@
               (do-optimization))
             
             (when (= *NERRORS* 0)
-              (search-and-delete-unused-objects)))
+              (search-and-delete-unused-objects))
+
+            (when (and (= *NERRORS* 0)
+                       (> *ITERATIONS* 1)
+                       (= iteration 0)
+                       (not *no-inlining*))
+              (simplify-params #'used-dynamic-vars-with-side-effects)
+              (pass_3)))
         
           ;; Suche nach Typfehlern
-          (when (and (= *NERRORS* 0) *NO-INLINING*)
-            (look-for-type-errors *module*)))
+          (when (= *NERRORS* 0)
+            (look-for-type-errors *module*))
+
+          (when (and *module-compiler*
+                     (not *inline-module*)
+                     (not *no-inlining*)
+                     (= 0 *NERRORS*))
+              (clicc-message "Preparing Module Interface Specification")
+              (prepare-export-write)))
 
         ;; Wenn nicht optimiert wird, muessen zumindest die named-consts,
         ;; die als Referenzen auf Funktionen gedient haben, ersetzt werden.
@@ -294,11 +342,11 @@
           (set-used-slots-for-cg)
           (pass_3)
           (do-optimization)))
-
+    
     (when (= *NERRORS* 0)
       (clicc-message "Annotation for code generation")
       (pass_3))
-    
+
     (unless *NO-CODEGEN*
       (when (= *NERRORS* 0)
         (clicc-message "Code Generation")

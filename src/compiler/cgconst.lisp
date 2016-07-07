@@ -15,8 +15,48 @@
 ;;;            - Global Closures
 ;;;            - Klassen
 ;;;
-;;; $Revision: 1.49 $
+;;; $Revision: 1.59 $
 ;;; $Log: cgconst.lisp,v $
+;;; Revision 1.59  1994/05/22  15:03:31  sma
+;;; Die neue globale Variable *OBREP* regelt die Art der
+;;; Datenrepräsentation. Sie ist auf 1 für die bisherige Datenrepräsenatation
+;;; gesetzt. Die Anpassungen beziehen sich auf die Größe von CONS-Zellen
+;;; und die Codeerzeugung für FIXNUMs und FLOATs.
+;;;
+;;; Revision 1.58  1994/04/29  10:59:32  hk
+;;; Der exported Slot eines Symbols kann auch den Wert 'inline haben. Nur
+;;; aus dem Package exportieren, wenn der Wert T vorliegt.
+;;;
+;;; Revision 1.57  1994/04/28  10:12:56  sma
+;;; Und noch ein Fehler in C-string beseitigt (es fehlte das 3. Argument).
+;;; Sorry.
+;;;
+;;; Revision 1.56  1994/04/28  10:07:16  sma
+;;; Auskommentiere Programmteile gelöscht; falsche Kommentar-Bilder
+;;; gelöscht; C-const-t und CC-const-t gelöscht; C-integer, C-float und
+;;; C-character geändert, das 3. Argument stacktop generiert wird; statt
+;;; CL_INIT2(x) wird wieder `CL_INIT x =' erzeugt; Erzeugung von
+;;; statischen konstanten String und Floats abstrahiert.
+;;;
+;;; Revision 1.55  1994/01/26  13:35:28  ft
+;;; Änderung der Darstellung von ungebundenen Slots.
+;;;
+;;; Revision 1.54  1994/01/21  16:49:38  ft
+;;; Behelfskorrektur an *SECRET-UNBOUND-SLOT-VALUE*.
+;;;
+;;; Revision 1.53  1994/01/21  08:20:06  ft
+;;; Änderung der Zwischensprachrepr. des Werts unbound für Slots.
+;;;
+;;; Revision 1.52  1994/01/21  08:13:30  sma
+;;; Erneute Änderung der Symbolrepräsentation (letzte Änderung war keine
+;;; so gute Idee)
+;;;
+;;; Revision 1.51  1994/01/13  16:34:56  sma
+;;; Änderung der Symbol-Repräsentation.
+;;;
+;;; Revision 1.50  1993/12/09  14:05:35  sma
+;;; Verwendet jetzt MAKE_CONSREF statt MAKE_LIST.
+;;;
 ;;; Revision 1.49  1993/11/30  08:39:00  ft
 ;;; Verarbeitung von Slotbeschreibungen korrigiert.
 ;;;
@@ -194,6 +234,15 @@
 (in-package "CLICC")     
 
 ;;------------------------------------------------------------------------------
+;; Datenrepräsentationsverfahren (Objekt-Repräsentation)
+;;------------------------------------------------------------------------------
+(defvar *OBREP* 1)                      ; 1, 2 oder 3 möglich
+(defconstant min-smallfixnum -1000)     ; Bereich der vordefinierten 
+(defconstant max-smallfixnum  1000)     ; Konstanten bei Obrep = 2
+
+;;------------------------------------------------------------------------------
+;; Code für den Zugriff auf `Literale' generieren
+;;------------------------------------------------------------------------------
 (defmethod cg-form ((form sym))
   (case *result-spec*
     ((nil))
@@ -215,13 +264,9 @@
     (t (let ((dest (CC-dest *result-spec*)))
          (etypecase form
            (null-form      (C-nil dest))
-           (character-form (C-character (?value form) dest))
            (int            (C-integer   (?value form) dest))
-           (float-form
-            (cond
-              ((slot-boundp form 'adr)
-               (C-MacroCall "LOAD_FLOAT" (?adr form) dest))
-              (t (C-float  (?value form) dest)))))))))
+           (character-form (C-character (?value form) dest))
+           (float-form     (C-float form dest)))))))
 
 ;;------------------------------------------------------------------------------
 (defmethod cg-form ((obj structured-literal))
@@ -231,9 +276,7 @@
     (t (C-MacroCall (CC-NameConc "LOAD_" 
                                  (typecase (?value obj)
                                    (cons "CONS")
-                                   (string (progn
-                                             (add-comment (?value obj))
-                                             "SMSTR"))
+                                   (string (add-comment (?value obj)) "SMSTR")
                                    (vector "SMVEC_T")
                                    (array "SMAR_T")
                                    (literal-instance "STRUCT")
@@ -243,51 +286,7 @@
                     (CC-dest *result-spec*)))))
 
 ;;------------------------------------------------------------------------------
-;;                   |--------------------|      |----------|
-;;                   |RANK     |  *-------|----->|dim 0     |
-;; |-------------|   |--------------------|      |----------|
-;; |CL_SMAR | *--|-->|CL_FIXNUM|TOTAL_SIZE|      |    ...   |
-;; |-------------|   |--------------------|      |----------|
-;;                   |element 0           |      |dim RANK-1|
-;;                   |--------------------|      |----------|
-;;                   |       ...          |
-;;                   |--------------------|
-;;                   |element TOTAL_SIZE-1|
-;;                   |--------------------|
-;;------------------------------------------------------------------------------
-
-            
-;;------------------------------------------------------------------------------
-;; |-------------|   |--------------------|
-;; |CL_SMVEC| *--|-->|CL_FIXNUM|TOTAL_SIZE|
-;; |-------------|   |--------------------|
-;;                   |element 0           |
-;;                   |--------------------|
-;;                   |       ...          |
-;;                   |--------------------|
-;;                   |element TOTAL_SIZE-1|
-;;                   |--------------------|
-;;------------------------------------------------------------------------------
-
-            
-;;------------------------------------------------------------------------------
-;; '(1 2 3) ===> 
-;; |-----------|   |-------------|
-;; |CL_CONS| *-|-->|CL_FIXNUM| 1 |
-;; |-----------|   |-------------|
-;;                 |CL_CONS  | *-|--\
-;;                 |-------------|  |
-;;                 |CL_FIXNUM| 2 |<-/
-;;                 |-------------|
-;;                 |CL_CONS  | *-|--\
-;;                 |-------------|  |
-;;                 |CL_FIXNUM| 3 |<-/
-;;                 |-------------|
-;;                 |CL_NIL   |   |
-;;                 |-------------|
-;;
-;;------------------------------------------------------------------------------
-
+;; Erzeugt CL_INIT-Array mit konstanten Daten
 ;;------------------------------------------------------------------------------
 (defun gen-literals (literals name-postfix)
   (let (array-name
@@ -295,7 +294,7 @@
         fixnum-array-name
         float-table
         fixnum-table)
-
+    
     (labels
         ((gen-const-vector (elt adr)
            (let ((new-adr adr))
@@ -311,7 +310,10 @@
              
              (cons
               (add-comment (format nil "CONS(~A)" adr))
-              (incf adr 2)
+              (case *OBREP*
+                (1 (incf adr 2))
+                ((2 3) (C-init (CC-MacroCall "MAKE_CONS"))
+                 (incf adr 3)))
               (let ((new-adr (gen-immed (car elt) adr)))
                 (gen-immed (cdr elt) new-adr))
               (let ((new-adr (gen-const (car elt) adr)))
@@ -342,25 +344,17 @@
                 (dolist (dim (array-dimensions elt))
                   (vector-push-extend dim fixnum-table))
                 (gen-const-vector vector (1+ adr))))
-
+             
              (literal-instance
               (let* ((list (?value-list elt))
                      (len (length list)))
                 (incf adr (+ 2 len))
-                (C-init (CC-MacroCall "MAKE_INSTANCE" (1+ len)
+                (C-init (CC-MacroCall "MAKE_STRUCT" (1+ len)
                                       (CC-const-symbol (?class elt))))
                 (gen-const-vector list adr)))
-
-;;                (let ((new-adr adr))
-;;                  (dolist (l list)
-;;                    (setq new-adr (gen-immed l new-adr))))
-;;                (let ((new-adr adr))
-;;                  (dolist (l list)
-;;                    (setq new-adr (gen-const l new-adr)))
-;;                  new-adr)))
-
+             
              (t adr)))
-
+         
          (gen-immed (elt adr)
            (typecase elt
              
@@ -368,7 +362,7 @@
              ;;------------------------
              (null-form      (C-const-nil) adr)
              (character-form (C-const-character (?value elt)) adr)
-             (int            (C-const-fixnum    (?value elt)) adr)
+             (int            (C-const-fixnum (?value elt)) adr)
              (float-form     (C-const-float (float-address (?value elt))) adr)
              
              ;; Die Typen, die innerhalb strukturierter Literale auftreten:
@@ -378,53 +372,41 @@
              (sym            (C-const-symbol    elt) adr)
              (integer        (C-const-fixnum    elt) adr)
              (float          (C-const-float (float-address elt)) adr)
-             (structured-literal 
-              (if (equalp (?value elt) "SECRET-UNBOUND-SLOT-VALUE")
-                  (C-const-unbound)
-                  (C-init (CC-MacroCall (cg-type-spec (?value elt))
-                                        (CC-arrayptr array-name
-                                                     (if
-                                                      (is-array (?value elt)) 
-                                                      (1+ adr) 
-                                                      adr)))))
-              adr)
              (class-def      (C-const-class elt) adr)
              (global-fun     (C-const-fun elt) adr)
-             (T (C-init (CC-MacroCall 
-                         (cg-type-spec elt)
-                         (CC-arrayptr array-name
-                                      (if (is-array elt) (1+ adr) adr))))
-                (+ adr (sizeof elt)))))
+             (T (cond
+                  ((eq elt :unbound) (C-const-unbound) adr)
+                  (T (C-init (CC-MacroCall 
+                              (cg-type-spec elt)
+                              (CC-arrayptr array-name
+                                           (if (is-array elt) (1+ adr) adr))))
+                     (+ adr (sizeof elt)))))))
          
          (sizeof (elt)
            (typecase elt
-             (cons (+ 2 (sizeof (car elt)) (sizeof (cdr elt))))
+             (cons (+ (sizeof (car elt)) (sizeof (cdr elt))
+                      (case *OBREP* (1 2) ((2 3) 3))))
              (string 2)
-             
              (vector
               (let ((size (1+ (length elt))))
                 (dotimes (i (length elt))
                   (incf size (sizeof (aref elt i))))
                 size))
-
              (literal-instance
-              (+ 1 (length (?value-list elt))))
-
+              (1+ (length (?value-list elt))))
              (array
               (let ((vector (make-array (array-total-size elt)
                                         :displaced-to elt
                                         :element-type
                                         (array-element-type elt))))
                 (1+ (sizeof vector))))
-
              (T 0)))
-
-       
+         
          (float-address (float)
            (let ((pos (position float float-table)))
              (CC-arrayptr float-array-name
                           (if pos pos (vector-push-extend float float-table)))))
-                  
+         
          (cg-floats ()
            (when (and float-table (> (length float-table) 0))
              (C-StaticArrayInitDecl "double" float-array-name)
@@ -444,7 +426,9 @@
                       (C-init (CC-fixnum fixnum)))
                   fixnum-table)
              (C-initend))))
-      
+    
+      ;; Start der Funktion...
+      ;;----------------------
       (when literals
         
         (setq array-name (CC-NameConc "K" name-postfix))
@@ -465,12 +449,15 @@
           (setq float-table (make-array 1 :fill-pointer 0 :adjustable t))
           (setq float-array-name (CC-NameConc "O" name-postfix))
           (C-ExternArrayDecl "double" float-array-name))
+
+        (when (= *OBREP* 2) (init-extra-tables name-postfix))
         
         (C-CL_INIT-Decl array-name)
         (C-initstart)
         (let ((adr 0) (i 0))
           (dolist (struct literals)
-            (add-comment (format nil "~a" i)) (incf i 2)
+            (add-comment (format nil "~a" adr))
+            (incf i 2)
             (etypecase struct
               (float-form (setf (?adr struct) (float-address (?value struct))))
               (structured-literal
@@ -482,14 +469,15 @@
         (C-initend)
       
         (cg-floats)
-        (cg-fixnums)))))
+        (cg-fixnums)
+        (when (= *OBREP* 2) (cg-extra-tables))))))
 
 ;;------------------------------------------------------------------------------
 (defun C-CL_INIT-Decl (name)
-  (C-Ln "CL_INIT2(" name ")"))
+  (C-ArrayInitDecl "CL_INIT" name))
 
 (defun C-Static-CL_INIT-Decl (name)
-  (C-Ln "static CL_INIT2(" name ")"))
+  (C-StaticArrayInitDecl "CL_INIT" name))
 
 ;;------------------------------------------------------------------------------
 (defun is-array (elt) (and (arrayp elt) (not (vectorp elt))))
@@ -497,7 +485,7 @@
 ;;------------------------------------------------------------------------------
 (defun cg-type-spec (elt)
   (typecase elt
-    (cons "MAKE_LIST")
+    (cons "MAKE_CONSREF")
     (string "MAKE_STRREF")
     (vector "MAKE_VECREF")
     (array "MAKE_ARREF")
@@ -516,14 +504,6 @@
   "MAKE_NIL")
 
 ;;------------------------------------------------------------------------------
-(defun C-const-t ()
-  (C-init (CC-const-t)))
-
-;;------------------------------------------------------------------------------
-(defun CC-const-t ()
-  "MAKE_T")
-
-;;------------------------------------------------------------------------------
 (defun C-const-unbound ()
   (C-init (CC-const-unbound)))
 
@@ -537,10 +517,12 @@
 
 ;;------------------------------------------------------------------------------
 (defun CC-const-fixnum (i)
-  (CC-MacroCall "MAKE_FIXNUM" (CC-fixnum i)))
+  (case *OBREP*
+    ((1 3) (CC-MacroCall "MAKE_FIXNUM" (CC-fixnum i)))
+    (2 (CC-MacroCall "MAKE_FIXNUMREF" (extrafixnum i)))))
 
 ;;------------------------------------------------------------------------------
-;; Umgeht die Warnung "integer-overflow" des acc bei kleinster ganzer Zahl
+;; Umgeht die Warnung "integer-overflow" des acc bei -2^31
 ;;------------------------------------------------------------------------------
 (defun CC-fixnum (i)
   (if (eql i C-most-negative-fixnum)
@@ -552,7 +534,9 @@
   (C-init (CC-const-float f)))
 
 (defun CC-const-float (f)
-  (CC-MacroCall "MAKE_FLOAT" f))
+  (case *OBREP*
+    ((1 3) (CC-MacroCall "MAKE_FLOAT" f))
+    (2 (CC-MacroCall "MAKE_FLOATREF" (extrafloat f)))))
 
 ;;------------------------------------------------------------------------------
 (defun C-const-character (c)
@@ -602,22 +586,16 @@
 
 ;;------------------------------------------------------------------------------
 (defun C-float (float dest)
-  (C-blockstart)
-  (C-StaticDoubleInit "local_float" float)
-  (C-MacroCall "LOAD_FLOAT" (CC-Address "local_float") dest)
-  (C-blockend))
+  (if (slot-boundp float 'adr)
+      (C-MacroCall "LOAD_FLOAT" (CC-stack *stack-top*) (?adr float)   dest)
+      (C-MacroCall "GEN_FLOAT"  (CC-stack *stack-top*) (?value float) dest)))
 
 ;;------------------------------------------------------------------------------
 (defun C-string (string dest)
-  (C-blockstart)
-  (C-Static-CL_INIT-Decl "local_string")
-  (C-initstart)
-  (C-const-string string)
-  (C-initend)
-  (C-MacroCall "LOAD_SMSTR"
-               (CC-Cast "CL_FORM *" (CC-arrayptr "local_string" 0))
-               dest)
-  (C-blockend))
+  (C-MacroCall "GEN_SMSTR" 
+               (length string) 
+               (CC-const-string string)
+               dest))
 
 ;;------------------------------------------------------------------------------
 (defun CC-special (dynamic)
@@ -644,7 +622,9 @@
 
 ;;------------------------------------------------------------------------------
 (defun C-integer (i dest)
-   (C-MacroCall "LOAD_FIXNUM" (CC-fixnum i) dest))
+  (if (and (= *OBREP* 2) (integerp i) (< min-smallfixnum i max-smallfixnum))
+      (C-MacroCall "LOAD_SMALLFIXNUM" i dest)
+      (C-MacroCall "LOAD_FIXNUM" (CC-stack *stack-top*) (CC-fixnum i) dest)))
 
 ;;------------------------------------------------------------------------------
 (defun CCC-character (c)
@@ -671,7 +651,7 @@
 
 ;;------------------------------------------------------------------------------
 (defun C-character (c dest)
-  (C-MacroCall "LOAD_CHAR" (CC-character c) dest))
+  (C-MacroCall "LOAD_CHAR" (CC-stack *stack-top*) (CC-character c) dest))
 
 ;;------------------------------------------------------------------------------
 (defun C-const-class (class)
@@ -724,7 +704,7 @@
         (CC-const-nil)
         (let ((i (position packg (?package-list *module*) :test #'string=)))
           (if i
-              (CC-const-fixnum (if exported (- i) i))
+              (CC-const-fixnum (if (eq exported T) (- i) i))
               (progn
                 (clicc-warning
                  "~a will be uninterned, package ~a is unknown"
@@ -750,6 +730,8 @@
            (?sym-list *module*))
    (?symbol-base *module*))
   
+  (when (= *OBREP* 2) (init-extra-tables (?symbol-base *module*)))
+
   (C-empty-Ln)
   (C-CL_INIT-Decl (?symbol-base *module*))
   (C-initstart)
@@ -759,18 +741,19 @@
       ;; Kommentar ist Index in das Array
       ;; --------------------------------
       (add-comment (format nil "SYMBOL(~A)" i))
-      (incf i)
       (C-Newline)
       
+      ;; Symbol
+      ;;-------
       (C-init (CC-MacroCall
-               "MAKE_SYMBOL"
+               (if (eq (?constant-value sym) :no-const)
+                   "MAKE_SYMBOL"
+                   "MAKE_CONST_SYMBOL")
                ;; Name
                ;;-----
                (length (?name sym))
                (CC-const-string (?name sym))
-               ;; Property-Liste
-               ;;---------------
-               (CC-const-nil)
+
                ;; Wert Zelle
                ;;-----------
                (let ((value (?constant-value sym)))
@@ -795,18 +778,17 @@
                      (CC-const-unbound)))
                ;; Package
                ;;--------
-               (cg-package-cell sym)
-               
-               (if (eq (?constant-value sym) :no-const)
-                   "NORMAL_SYM"
-                   "CONST_SYM")))))
+               (cg-package-cell sym)))
+      
+      (incf i)))
   
   ;; Das letzte Symbol wird durch eine NULL-Form abgeschlossen. Diese
   ;; Eigenschaft wird vom Garbage-Collector und der Funktion
   ;; setup_symbols_iterator ausgenutzt.
   ;;-------------------------------------------------------------------
   (C-Ln "END_SYMDEF")
-  (C-initend))
+  (C-initend)
+  (when (= *OBREP* 2) (cg-extra-tables)))
 
 ;;------------------------------------------------------------------------------
 (defun cg-gen-classes()
@@ -880,6 +862,59 @@
                      (T nil)))))
            (?named-const-list *module*))
    (?named-const-base *module*)))
+
+;;------------------------------------------------------------------------------
+;; Die folgenden Funktionen werden nur für OBREP = 2 benötigt und bauen
+;; Tabellen mit den zusätzlichen Datenstrukturen für Fixnums und Floats auf
+;;------------------------------------------------------------------------------
+(defvar extrafixnum-table)
+(defvar extrafixnum-name)
+(defvar extrafloat-table)
+(defvar extrafloat-name)
+
+;;------------------------------------------------------------------------------
+
+(defun init-extra-tables (name-postfix)
+  (setq extrafixnum-table (make-array 1 :fill-pointer 0 :adjustable t))
+  (setq extrafixnum-name (CC-NameConc "XI" name-postfix))
+  (C-ExternArrayDecl "CL_INIT" extrafixnum-name)
+
+  (setq extrafloat-table (make-array 1 :fill-pointer 0 :adjustable t))
+  (setq extrafloat-name (CC-NameConc "XF" name-postfix))
+  (C-ExternArrayDecl "CL_INIT" extrafloat-name))
+
+(defun cg-extra-tables ()
+  (when (and extrafixnum-table (> (length extrafixnum-table) 0))
+    (C-StaticArrayInitDecl "CL_INIT" extrafixnum-name)
+    (C-initstart)
+    (map nil #'(lambda (fixnum) 
+                 (C-init (CC-MacroCall "MAKE_FIXNUM" fixnum)))
+         extrafixnum-table)
+    (C-initend))
+
+  (when (and extrafloat-table (> (length extrafloat-table) 0))
+    (C-StaticArrayInitDecl "CL_INIT" extrafloat-name)
+    (C-initstart)
+    (map nil #'(lambda (float) 
+                 (C-init (CC-MacroCall "MAKE_FLOAT" float)))
+         extrafloat-table)
+    (C-initend))
+
+  (setq extrafloat-table nil extrafixnum-table nil))
+
+(defun extrafixnum (i)
+  (if (< min-smallfixnum i max-smallfixnum)
+      (CC-arrayptr "fixnum_ob" (- i min-smallfixnum))
+      (let ((pos (position i extrafixnum-table)))
+        (CC-arrayptr extrafixnum-name
+                     (if pos pos 
+                         (vector-push-extend i extrafixnum-table))))))
+
+(defun extrafloat (f)
+  (let ((pos (position f extrafloat-table)))
+    (CC-arrayptr extrafloat-name
+                 (* (if pos pos 
+                        (vector-push-extend f extrafloat-table)) 2))))
 
 ;;------------------------------------------------------------------------------
 (provide "cgconst")

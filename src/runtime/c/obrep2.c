@@ -5,8 +5,26 @@
  *            ------------------------------------------------------
  * Funktion : obrep2.c - datenrepräsentationsspezifisch
  *
- * $Revision: 1.3 $
+ * $Revision: 1.8 $
  * $Log: obrep2.c,v $
+ * Revision 1.8  1994/06/17  15:12:33  sma
+ * make_fixnum entfernt, Funktion wurde als Makro in obrep2.h
+ * implementiert.
+ *
+ * Revision 1.7  1994/05/31  14:52:50  sma
+ * Neuer Typ CL_UNBOUND.
+ *
+ * Revision 1.6  1994/05/26  09:21:51  sma
+ * Fehler in gc_relocate bezeitigt. Ausserdem Wrong-Heap test eingebaut.
+ *
+ * Revision 1.5  1994/05/18  15:20:57  sma
+ * Komplett neu geschrieben. Funktionsfähig bis auf
+ * foreign-function-Datentypen.
+ *
+ * Revision 1.4  1994/02/18  12:11:00  uho
+ * Das Ermitteln konstanter Datenobjekte und der Heapkonsistenz wird
+ * durch Makroaufrufe vorgenommen.
+ *
  * Revision 1.3  1993/11/04  14:05:11  sma
  * Fehler in save_form2 gehoben
  *
@@ -29,459 +47,267 @@
 
 #if __OBREP == 2
 
-#define T_FORWARD 55
-#define LOAD_FORWARD(adr,loc)  ((loc)[0] = T_FORWARD, (loc)[1] = (long)(adr))
-#define SAVE_DIMS(fptr) \
-   AR_DIMS(fptr) = fx_swap(AR_DIMS(fptr), AR_RANK(fptr) + 1)
-
-TAG type_of();
-
+/*------------------------------------------------------------------------------
+ * LISP-Laufzeitstack
+ *----------------------------------------------------------------------------*/
+extern CL_FORM *stack;
+extern CL_FORM *eos;              /* end of stack */
+extern unsigned stacksize;
 
 /*------------------------------------------------------------------------------
- * globale Heap-Variablen
+ * LISP-Heap fuer CL_FORMs
  *----------------------------------------------------------------------------*/
 extern CL_FORM *fo_heap;
+extern CL_FORM *form_heap;
 extern CL_FORM *form_toh;
+extern CL_FORM *form_eoh;
 extern CL_FORM *old_form_heap;
 extern unsigned form_heapsize;
+
+/*------------------------------------------------------------------------------
+ * LISP-Heap fuer INTEGERs und STRINGs
+ *----------------------------------------------------------------------------*/
 extern long *fx_heap1;
+extern long *fx_heap;
 extern long *fx_toh;
+extern long *fx_eoh;
+extern long *old_fx_heap;
 extern unsigned fx_heapsize;
+
+
+/*------------------------------------------------------------------------------
+ * LISP-Heap fuer FLOATs
+ *----------------------------------------------------------------------------*/
 extern double *fl_heap1;
+extern double *fl_heap;
 extern double *fl_toh;
 extern double *fl_eoh;
+extern double *old_fl_heap;
 extern unsigned fl_heapsize;
 
+void gc_main();
+void gc_relocate();
+void gc_scan_newheap();
 
 /*------------------------------------------------------------------------------
- * Kopiere "form" rekursiv in anderen Heap.
+ * Speicherbereinigungsroutine
  *----------------------------------------------------------------------------*/
-void save_form2 (form) 
-CL_FORM *form;
+void do_gc(top)
+CL_FORM *top;
 {
-   long f, *fptr;
+   CL_FORM *p;
 
- AGAIN:
-   /* die untersten Bits von f enthalten TAG info */
-   f = *form;
+   /* Traversieren der Wurzelbereiche: Hauptmodul und importierte Modulen */
+   gc_main();
    
-   switch (f & 7)
-   {
-   case 0:
-      if (f == 0)               /* Unbound */
-         break;
-
-      if (f == NIL_VALUE)       /* NIL */
-         break;
-
-      /* f ist ein Zeiger, dereferenzieren */
-      fptr = (long *)f;
+   /* Traversieren des LISP-Laufzeitstacks */
+   for (p = stack; p < top; p++)
+      gc_relocate(p);
    
-      if (fptr < fo_heap)       /* konstantes Datum */
-         break;
+   /* Traversieren des Binding-Stacks */
+   for (p = bind_stack; p < bind_top; p++)
+      gc_relocate(p);
+   
+   /* Alle lebenden Daten in neuen heap ziehen */
+   gc_scan_newheap();
+}
 
-      if (fptr >= fo_heap + 2 * form_heapsize)
-         Labort("Unexpected pointer out of heap");
+#define CL_FORWARD ((1 << TAG_BITS) - 1)
+#define GCMARK(loc) (TYPE_OF(loc) == CL_FORWARD)
+#define GCSETMARK(loc) ((loc)->form[0].d = SIZE_TAG(CL_FORWARD, 0))
+#define GCREF(loc) ((loc)->form[1].form)
 
-      if (!(old_form_heap <= fptr && fptr < old_form_heap + form_heapsize))
-         Labort("Unexpected pointer in wrong heap.");
+/*------------------------------------------------------------------------------
+ * Verschiebe nicht-konstante Daten in neuen Heap
+ *----------------------------------------------------------------------------*/
+void gc_relocate(f)
+CL_FORM *f;
+{
+   CL_FORM *p, *np;
+   long sz;
 
-      if ((long)fptr & 7)
-         Labort("Unaligned ptr.");
- 
-      f = *fptr;
+   /* Daten im Konstantenspeicher werden nicht kopiert */
+   p = f->form;
+   if (FO_CONSTANTq(p))
+      return;
 
-      if (f == T_FORWARD)       /* Forward-Referenz */
-      {
-         *form = fptr[1];
-         break;
-      }
-
-      if ((f & 1) == 0)         /* CONS-Zelle */
-      {
-         COPY(fptr, form_toh);
-         COPY(fptr + 1, form_toh + 1);
-
-         *form = (long)form_toh;
-         
-         LOAD_FORWARD(form_toh, fptr);
-
-         fptr = form_toh;
-         form_toh += 2;
-         
-         /* CAR kopieren, wenn kein immediate-Wert */
-         if ((f & 7) == 0)
-            save_form2(fptr);
-
-         /* CDR kopieren, vermeide unnötige Tail-End-Rekursion */
-         form = fptr + 1;
-         goto AGAIN;
-      }
-
-      switch (f & 127)          /* Rest */
-      {
-      case T_IND:
-         COPY(fptr, form_toh);
-         COPY(fptr + 1, form_toh + 1);
-         
-         *form = (long)form_toh;
-
-         /* LOAD_FORWARD unnötig, da immer nur genau ein Zeiger auf
-          * einen T_IND existiert */
-
-         form_toh += 2;
-
-         form = form_toh - 1;
-         goto AGAIN;
-         
-      case T_SYMBOL:            /* Symbol */
-         *form = (long)form_swap(fptr, 6);
-
-         LOAD_FORWARD(*form, fptr);
-
-         fptr = (long *)*form;
-         save_form2(fptr + 2);
-         save_form2(fptr + 3);
-         save_form2(fptr + 4);
-         
-         goto smstr;
-         
-      case T_SMSTR:
-         COPY(fptr, form_toh);
-         COPY(fptr + 1, form_toh + 1);
-         
-         *form = (long)form_toh;
-
-         LOAD_FORWARD(form_toh, fptr);
-         
-         fptr = form_toh;
-         form_toh += 2;
-
-      {
-         long *str;
-      smstr:
-         str = (long *)fptr[1];
-
-         if (str >= fx_heap1 && str < fx_heap1 + 2 * fx_heapsize)
-         {
-            fptr[1] = (long)ch_swap((char *)str, fptr[0] >> 8);
-         }
-         break;
-      }
-       
-      case T_SMVEC_T:
-      case T_STRUCT:
-      case T_INSTANCE:
-         f = f >> 8;
-         *form = (long)form_swap(fptr, f + 1);
-         
-         LOAD_FORWARD(*form, fptr);
-         
-         fptr = (long *)*form + 1;
-         while (--f > 0)
-            save_form2(fptr++);
-            
-         form = fptr;
-         goto AGAIN;
-         
-      case T_CLOSURE:
-         f = f >> 8;
-         *form = (long)form_swap(fptr, f + 1);
-         
-         LOAD_FORWARD(*form, fptr);
-         
-         fptr = (long *)*form + 2;  /* code ueberspringen */
-         f--;
-         while (--f > 0)
-            save_form2(fptr++);
-            
-         form = fptr;
-         goto AGAIN;
-
-      case T_CFILE:
-      case T_GLOBFUN:
-      case T_DOWNFUN:
-         *form = (long)form_swap(fptr, 2);
-         
-         LOAD_FORWARD(*form, fptr);
-         
-         return;
-
-      case T_SMVEC_FIXNUM:
-         *form = (long)form_swap(fptr, 2);
-         LOAD_FORWARD(*form, fptr);
-         fptr = (long *)*form;
-         FIXNUM_AR(fptr) = fx_swap(FIXNUM_AR(fptr), AR_SIZE(fptr));
-         return;
-
-      case T_SMVEC_FLOAT:
-         *form = (long)form_swap(fptr, 2);
-         LOAD_FORWARD(*form, fptr);
-         fptr = (long *)*form;
-         FLOAT_AR(fptr) = fl_swap(FLOAT_AR(fptr), AR_SIZE(fptr));
-         return;
-
-      case T_VEC_T:
-      case T_VEC_FIXNUM:
-      case T_VEC_FLOAT:
-      case T_STRING:
-         *form = (long)(form_swap(fptr - 2, 4L) + 2);
-         LOAD_FORWARD(*form, fptr);
-         fptr = (long *)*form;
-         if (DISPLACED_P(fptr))
-         {
-            save_form2(DISPLACED_TO(fptr));
-         }
-         else
-         {
-            long sz;
-            sz = HAS_FILL_PTR(fptr) ? AR_SIZE_WHEN_FP(fptr) : AR_SIZE(fptr);
-            switch (f & 127)
-            {
-            case T_VEC_T:
-               FORM_AR(fptr) = form_swap(FORM_AR(fptr), sz);
-               fptr = FORM_AR(fptr);
-               while (--sz > 0)
-                  save_form2(fptr++);
-               form = fptr;
-               goto AGAIN;
-            case T_VEC_FIXNUM:
-               FIXNUM_AR(fptr) = fx_swap(FIXNUM_AR(fptr), sz);
-               break;
-            case T_VEC_FLOAT:
-               FLOAT_AR(fptr) = fl_swap(FLOAT_AR(fptr), sz);
-               break;
-            case T_STRING:
-               CHAR_AR(fptr) = ch_swap(CHAR_AR(fptr), sz);
-               break;
-            }
-         }
-         return;
-
-      case T_AR_T:
-      case T_AR_FIXNUM:
-      case T_AR_FLOAT:
-      case T_AR_CHAR:
-         *form = (long)(form_swap(fptr - 2, 4) + 2);
-         LOAD_FORWARD(*form, fptr);
-         fptr = (long *)*form;
-         SAVE_DIMS(fptr);
-         if (DISPLACED_P(fptr))
-         {
-            save_form2(DISPLACED_TO(fptr));
-         }
-         else
-         {
-            long sz;
-            sz = HAS_FILL_PTR(fptr) ? AR_SIZE_WHEN_FP(fptr) : AR_SIZE(fptr);
-            switch (f & 127)
-            {
-            case T_AR_T:
-               FORM_AR(fptr) = form_swap(FORM_AR(fptr), sz);
-               fptr = FORM_AR(fptr);
-               while (--sz > 0)
-                  save_form2(fptr++);
-               form = fptr;
-               goto AGAIN;
-            case T_AR_FIXNUM:
-               FIXNUM_AR(fptr) = fx_swap(FIXNUM_AR(fptr), sz);
-               break;
-            case T_AR_FLOAT:
-               FLOAT_AR(fptr) = fl_swap(FLOAT_AR(fptr), sz);
-               break;
-            case T_AR_CHAR:
-               CHAR_AR(fptr) = ch_swap(CHAR_AR(fptr), sz);
-               break;
-            }
-         }
-         return;
-
-      case T_SMAR_T:
-         f = f >> 8;
-         *form = (long)(form_swap(fptr - 1, f + 2) + 1);
-         LOAD_FORWARD(*form, fptr);
-         fptr = (long *)*form;
-         SAVE_DIMS(fptr);
-
-         fptr++;
-         while (--f > 0)
-            save_form2(fptr++);
-            
-         form = fptr;
-         goto AGAIN;
-
-      case T_SMAR_FIXNUM:
-         *form = (long)(form_swap(fptr - 1, 3) + 1);
-         LOAD_FORWARD(*form, fptr);
-         fptr = GET_FORM(form);
-         SAVE_DIMS(fptr);
-         FIXNUM_AR(fptr) = fx_swap(FIXNUM_AR(fptr), AR_SIZE(fptr));
-         return;
-
-      case T_SMAR_FLOAT:
-         *form = (long)(form_swap(fptr - 1, 3) + 1);
-         LOAD_FORWARD(*form, fptr);
-         fptr = GET_FORM(form);
-         SAVE_DIMS(fptr);
-         FLOAT_AR(fptr) = fl_swap(FLOAT_AR(fptr), AR_SIZE(fptr));
-         return;
-
-      case T_SMAR_CHAR:
-         *form = (long)(form_swap(fptr - 1, 3) + 1);
-         LOAD_FORWARD(*form, fptr);
-         fptr = GET_FORM(form);
-         SAVE_DIMS(fptr);
-         CHAR_AR(fptr) = ch_swap(CHAR_AR(fptr), AR_SIZE(fptr));
-         return;
-         
-      case T_C_FOREIGN:
-         Labort("sma-error: foreign function");
-
-      default:
-         Labort("sma-error, unbekannter TAG, Stufe 2");
-      }
-      break;
-
-   case 2:                      /* Fixnum */
-   case 6:                      /* Char */
-      break;
-      
-   case 4:                      /* Float */
+   /* Etwas Paranoia kann nicht schaden */
+   if (FO_WRONG_HEAPq(p))
+      Labort ("Wrong heap");
+   
+   /* Es es eine Referenz? */
+   if (GCMARK(f))
    {
-      double *dptr = (double *)(f - 4);
-      if (dptr >= fl_heap1 && dptr < fl_heap1 + 2 * fl_heapsize)
-      {
-         *fl_toh = *dptr;
-         *form = (long)fl_toh + 4;
-         if (++fl_toh >= fl_eoh)
-            Labort("Float-Heap Overflow.");
-      }
-      else if (!(dptr < fl_heap1))
-         Labort("sma-error, wrong float");
-         
-      break;
+      f->form = GCREF(f);
+      return;
    }
-      
+   
+   /* Datum in neuen Heap kopieren */
+   np = form_toh;
+   switch (TYPE_OF(f))
+   {
+   case CL_FIXNUM:
+   case CL_UNIQUE_TAG:
+      np[0] = p[0];
+      form_toh++;
+      f->form = np;
+      return;
+   case CL_CONS:
+      np[0] = p[0];
+      np[1] = p[1];
+      np[2] = p[2];
+      form_toh += CONS_SIZE;
+      break;
+   case CL_SYMBOL:
+      if (!AR_CONSTANTq(p, OFF_SYM_NAME))
+         AR_STRING(p + OFF_SYM_NAME) = ch_swap(AR_STRING(p + OFF_SYM_NAME), 
+                                               AR_SIZE(p + OFF_SYM_NAME));
+      sz = SYM_SIZE;
+      goto swap1;
+   case CL_STRUCT:
+      sz = AR_SIZE(p) + 2;
+      goto swap1;
+   case CL_CLOSURE:
+   case CL_INSTANCE:
+   case CL_SMVEC_T:
+      sz = AR_SIZE(p) + 1;
+   swap1:
+      memcpy(np, p, sizeof(CL_FORM) * sz);
+      form_toh += sz;
+      break;
+   case CL_SMVEC_FIXNUM:
+      FIXNUM_AR(p) = fx_swap(FIXNUM_AR(p), AR_SIZE(p));
+      goto swap2;
+   case CL_SMVEC_FLOAT:
+      FLOAT_AR(p) = fl_swap(FLOAT_AR(p), AR_SIZE(p));
+      goto swap2;
+   case CL_SMVEC_CHARACTER:
+      if (!AR_CONSTANTq(p,0))
+            AR_STRING(p) = ch_swap(AR_STRING(p), AR_SIZE(p));
+      goto swap2;
+   case CL_SMVEC_BIT:
+      BIT_AR(p) = bits_swap(BIT_AR(p), AR_SIZE(p));
+      goto swap2;
+   case CL_FLOAT:
+      FLOAT_AR(p) = fl_swap(FLOAT_AR(p), 1);
+   case CL_IND:
+   case CL_CFILE:
+   swap2:
+      np[0] = p[0];
+      np[1] = p[1];
+      form_toh += 2;
+      break;
    default:
-      Labort("sma-error, unbekannter Tag, Stufe 1");
+      fprintf(stderr, ";;; Unkonwn data type %d by GC\n", TYPE_OF(f));
+      exit(1);
    }
+   GCSETMARK(f);
+   GCREF(f) = np;
+   f->form = np;
 }
 
-
-/*------------------------------------------------------------------------------
- * Reserviert Speicher, der auf einer 8-Byte-Grenze liegt.
- *----------------------------------------------------------------------------*/
-PTR malloc8(size)
-unsigned size;
+void gc_scan_newheap()
 {
-   PTR mem = malloc(size + 7);
+   CL_FORM *p = form_heap;
+   long sz;
 
-   /* wenn mem==NULL, dann auch (NULL+7)&~7==NULL */
-   return (PTR)(((long)mem + 7) & ~7);
-}
-
-
-/*------------------------------------------------------------------------------
- * 
- *----------------------------------------------------------------------------*/
-TAG type_of(form)
-CL_FORM *form;
-{
-   long f, *fptr;
-   
-   f = *form;
-   
-   switch (f & 7)
+   while (p < form_toh)
    {
-   case 0:
-      if (f == 0)
-         return CL_UNBOUND;
-      
-      if (f == NIL_VALUE)
-         return CL_NIL;
-      
-      fptr = (long *)f;
-      f = *fptr;
+      if (form_toh >= form_eoh)
+         Labort("Heap overflow");
 
-      if ((f & 1) == 0)
-         return CL_CONS;
-      
-      switch (f & 127)
+      switch (TAG_FIELD(p))
       {
-      case T_SYMBOL:  
-         return CL_SYMBOL;
-
-      case T_VEC_T: 
-         return CL_VEC_T;
-      case T_VEC_FIXNUM:
-         return CL_VEC_FIXNUM;
-      case T_VEC_FLOAT:
-         return CL_VEC_FLOAT;
-      case T_STRING:
-         return CL_STRING;
-
-      case T_SMVEC_T: 
-         return CL_SMVEC_T;
-      case T_SMVEC_FIXNUM:
-         return CL_SMVEC_FIXNUM;
-      case T_SMVEC_FLOAT:
-         return CL_SMVEC_FLOAT;
-      case T_SMSTR:
-         return CL_SMSTR;
-
-      case T_SMAR_T:
-         return CL_SMAR_T;
-      case T_SMAR_FIXNUM:
-         return CL_SMAR_FIXNUM;
-      case T_SMAR_FLOAT:
-         return CL_SMAR_FLOAT;
-      case T_SMAR_CHAR:
-         return CL_SMAR_CHAR;
-         
-      case T_AR_T:
-         return CL_AR_T;
-      case T_AR_FIXNUM:
-         return CL_AR_FIXNUM;
-      case T_AR_FLOAT:
-         return CL_AR_FLOAT;
-      case T_AR_CHAR:
-         return CL_AR_CHAR;
-         
-      case T_INSTANCE:
-         return CL_INSTANCE;
-      case T_STRUCT:
-         return CL_STRUCT;
-
-      case T_CLOSURE:
-         return CL_CLOSURE;
-      case T_GLOBFUN:
-         return CL_GLOBFUN;
-      case T_DOWNFUN:
-         return CL_DOWNFUN;
-         
-      case T_CFILE:
-         return CL_CFILE;
+      case CL_FIXNUM:
+      case CL_UNIQUE_TAG:
+         p++;
+         break;
+      case CL_CONS:
+         gc_relocate(CAR(p));
+         gc_relocate(CDR(p));
+         p += CONS_SIZE;
+         break;
+      case CL_SYMBOL:
+         gc_relocate(OFFSET(p, OFF_SYM_VALUE));
+         gc_relocate(OFFSET(p, OFF_SYM_PLIST));
+         gc_relocate(OFFSET(p, OFF_SYM_PACKAGE));
+         p += SYM_SIZE;
+         break;
+      case CL_STRUCT:
+         sz = AR_SIZE(p) + 1;
+         goto scan;
+      case CL_CLOSURE:
+         sz = AR_SIZE(p) - 2;
+         p += 2;
+         goto scan;
+      case CL_INSTANCE:
+      case CL_SMVEC_T:
+         sz = AR_SIZE(p);
+      scan:
+         p++;
+         while (sz > 0)
+         {
+            gc_relocate(p);
+            p++;
+            sz--;
+         }
+         break;
+      case CL_IND:
+         gc_relocate(p + 1);
+      case CL_SMVEC_FIXNUM:
+      case CL_SMVEC_FLOAT:
+      case CL_SMVEC_CHARACTER:
+      case CL_SMVEC_BIT:
+      case CL_FLOAT:
+      case CL_CFILE:
+         p += 2;
+         break;
+      default:
+         fprintf(stderr, ";;; Unkonwn data type %d by GC\n", TAG_FIELD(p));
+         exit(1);
       }
-      break;
-      
-   case 2:
-      return CL_FIXNUM;
-      
-   case 4:
-      return CL_FLOAT;
-
-   case 6:
-      return CL_CHAR;
    }
-   Labort("sma-error: TYPE_OF-error");
 }
 
+/*============================================================================*/
 
 /*------------------------------------------------------------------------------
- * Spezielle Testfunktionen für (eq form #'eq) bzw. #'eql
+ * Konstruktor-Funktionen für einfache Daten
+ *----------------------------------------------------------------------------*/
+CL_FORM nil_ob, unbound_ob;
+CL_FORM char_ob[256];
+CL_FORM fixnum_ob[2000];
+
+void init_ob()
+{
+   int i;
+
+   /* NIL */
+   nil_ob.d = SIZE_TAG(CL_NIL, 0);
+   /* unbound */
+   unbound_ob.d = SIZE_TAG(CL_UNBOUND, 0);
+
+   /* Characters */
+   for (i = 0; i < 256; i++)
+      char_ob[i].d = SIZE_TAG(CL_CHAR, i);
+
+   /* Fixnums */
+   for (i = 0; i < 2000; i++)
+      fixnum_ob[i].d = SIZE_TAG(CL_FIXNUM, i - 1000);
+}
+
+/*------------------------------------------------------------------------------
+ * Konstruktor-Funktionen
  *----------------------------------------------------------------------------*/
 
-#define IS_FUNCTION_EQ(form) (CL_CLOSUREP(form) && GET_GFARG(form) == Feq)
-#define IS_FUNCTION_EQL(form) (CL_CLOSUREP(form) && GET_GFARG(form) == Feql)
+CL_FORM *make_flt(base, fl)
+CL_FORM *base;
+double *fl;
+{
+   CL_FORM *fld = form_alloc(base, 2);
+   fld[0].d = SIZE_TAG(CL_FLOAT, 0);
+   fld[1].fl = fl;
+   return fld;
+}
 
 #endif

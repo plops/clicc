@@ -5,8 +5,27 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Attributierung des Zwischencodes fuer die Codeerzeugung
 ;;;
-;;; $Revision: 1.68 $
+;;; $Revision: 1.73 $
 ;;; $Log: p3main.lisp,v $
+;;; Revision 1.73  1994/06/10  09:44:09  hk
+;;; ?mv-used wird ggf. auch wieder auf nil zur"uckgesetzt, da durch
+;;; fr"uhre Aufrufe von pass3 und inlining ein falsches T in diesen Slot
+;;; gelangt sein kann.
+;;;
+;;; Revision 1.72  1994/02/02  09:13:00  hk
+;;; (defvar *current-fun*) nach clcdef
+;;;
+;;; Revision 1.71  1994/01/21  14:03:46  hk
+;;; *CURRENT-FORM* wurde unoetig gebunden
+;;;
+;;; Revision 1.70  1994/01/10  09:08:59  hk
+;;; apply #'max (mapcar  --> reduce
+;;;
+;;; Revision 1.69  1994/01/05  12:32:10  sma
+;;; Namensänderung im Laufzeitsystem: -INTERNAL bei rt::CATCH-INTERNAL,
+;;; rt::UNWIND-PROTECT-INTERNAL, rt::THROW-INTERNAL und rt::PROGV-INTERNAL
+;;; gestrichen.
+;;;
 ;;; Revision 1.68  1993/12/09  08:52:07  hk
 ;;; Fehler behoben: Auswertung einer Klasse liefert EINEN Wert.
 ;;; p3-form spezialisiert nun über literal statt über simple literal,
@@ -254,7 +273,6 @@
 (in-package "CLICC")
 
 ;;------------------------------------------------------------------------------
-(defvar *CURRENT-FUN*)                  ; Momentan bearbeitete Funktion
 (defvar *LEVEL*)                        ; Aktuelles statisches Niveau
 (defvar *LOCAL-FUNS*)                   ; Direkt im Rumpf definierte lokale Fkt.
 (defvar *CONST-LIST*)                   ; In einer globalen Fkt. enthaltene
@@ -282,9 +300,9 @@
 ;;------------------------------------------------------------------------------
 (p0-special-funs
  (?pass3 "P3")
- rt::progv-internal
- rt::catch-internal
- rt::unwind-protect-internal
+ rt::progv
+ rt::catch
+ rt::unwind-protect
  L::apply
  L::values)
 
@@ -302,109 +320,108 @@
 
 ;;------------------------------------------------------------------------------
 (defun p3-defun (fun)
-  (let ((*CURRENT-FORM* (?symbol fun)))
 
-    ;; Globale Funktionen haben das statische Niveau 0.
-    ;;-------------------------------------------------
-    (let ((*LEVEL* 0)
-          (*CONST-LIST* (empty-queue)))
+  ;; Globale Funktionen haben das statische Niveau 0.
+  ;;-------------------------------------------------
+  (let ((*LEVEL* 0)
+        (*CONST-LIST* (empty-queue)))
 
-      (p3-fun-def fun)
-      (setf (?const-list fun) (queue2list *CONST-LIST*)))
+    (p3-fun-def fun)
+    (setf (?const-list fun) (queue2list *CONST-LIST*)))
 
-    ;; Bestimmen, welche lokalen Funktionen NICHT globalisiert werden
-    ;; koennen.  Eine lokale Funktion kann nicht globalisiert werden, wenn
-    ;; sie freie lexikalisch gebundene Variablen enthaelt oder wenn eine
-    ;; ihrer freien lokalen Funktionen nicht globalisiert werden kann.  Es
-    ;; wird zunaechst davon ausgegangen, dass alle lokalen Funktionen
-    ;; globalisierbar sind.  Wenn eine Funktion freie lexikalisch gebundene
-    ;; Variablen enthaelt, wird sie als nicht globalisierbar gekennzeichnet.
-    ;; Wenn eine Funktion f als nicht globalisierbar gekennzeichnet wurde,
-    ;; muessen alle lokalen Funktionen, in denen f direkt oder indirekt frei
-    ;; vorkommt, auch als nicht globalisierbar gekennzeichnet werden.
-    ;;---------------------------------------------------------------------
-    (process-local-funs fun
-                        #'(lambda (fun)
-                            (when (and (?free-lex-vars fun)
-                                       (?as-global-fun fun))
-                              (labels ((propagate (fun)
-                                         (setf (?as-global-fun fun) nil)
-                                         (dolist (fun (?free-in fun))
-                                           (when (?as-global-fun fun)
-                                             (propagate fun)))))
-                                (propagate fun)))))
+  ;; Bestimmen, welche lokalen Funktionen NICHT globalisiert werden
+  ;; koennen.  Eine lokale Funktion kann nicht globalisiert werden, wenn
+  ;; sie freie lexikalisch gebundene Variablen enthaelt oder wenn eine
+  ;; ihrer freien lokalen Funktionen nicht globalisiert werden kann.  Es
+  ;; wird zunaechst davon ausgegangen, dass alle lokalen Funktionen
+  ;; globalisierbar sind.  Wenn eine Funktion freie lexikalisch gebundene
+  ;; Variablen enthaelt, wird sie als nicht globalisierbar gekennzeichnet.
+  ;; Wenn eine Funktion f als nicht globalisierbar gekennzeichnet wurde,
+  ;; muessen alle lokalen Funktionen, in denen f direkt oder indirekt frei
+  ;; vorkommt, auch als nicht globalisierbar gekennzeichnet werden.
+  ;;---------------------------------------------------------------------
+  (process-local-funs fun
+                      #'(lambda (fun)
+                          (when (and (?free-lex-vars fun)
+                                     (?as-global-fun fun))
+                            (labels ((propagate (fun)
+                                       (setf (?as-global-fun fun) nil)
+                                       (dolist (fun (?free-in fun))
+                                         (when (?as-global-fun fun)
+                                           (propagate fun)))))
+                              (propagate fun)))))
 
-    ;; Lokale Funktionen, die als funktionales Objekt verwendet werden und
-    ;; von denen nicht gezeigt werden konnte, dass sie nur 'downward'
-    ;; verwendet werden, sind als Closure gekennzeichnet.  Die
-    ;; Closure-Eigenschaft muss an alle nicht globalisierten lokalen
-    ;; Funktionen, die in Closures frei vorkommen, propagiert werden.  Die
-    ;; lokal freien lex. Variablen von Closures kennzeichnen.
-    ;;---------------------------------------------------------------------
-    (process-local-funs fun
-                        #'(lambda (fun)
-                            (when (and (eq (?closure fun) :CLOSURE)
-                                       (not (?as-global-fun fun)))
-                              (labels ((propagate (fun)
-                                         (dolist (var (?free-lex-vars fun))
-                                           (setf (?closure var) t))
-                                         (dolist (fun (?free-local-funs fun))
-                                           (unless
-                                               (or (eq (?closure fun)
-                                                       :CLOSURE)
-                                                   (?as-global-fun fun))
-                                             (setf (?closure fun) :CLOSURE)
-                                             (propagate fun)))))
-                                (propagate fun)))))
+  ;; Lokale Funktionen, die als funktionales Objekt verwendet werden und
+  ;; von denen nicht gezeigt werden konnte, dass sie nur 'downward'
+  ;; verwendet werden, sind als Closure gekennzeichnet.  Die
+  ;; Closure-Eigenschaft muss an alle nicht globalisierten lokalen
+  ;; Funktionen, die in Closures frei vorkommen, propagiert werden.  Die
+  ;; lokal freien lex. Variablen von Closures kennzeichnen.
+  ;;---------------------------------------------------------------------
+  (process-local-funs fun
+                      #'(lambda (fun)
+                          (when (and (eq (?closure fun) :CLOSURE)
+                                     (not (?as-global-fun fun)))
+                            (labels ((propagate (fun)
+                                       (dolist (var (?free-lex-vars fun))
+                                         (setf (?closure var) t))
+                                       (dolist (fun (?free-local-funs fun))
+                                         (unless
+                                             (or (eq (?closure fun)
+                                                     :CLOSURE)
+                                                 (?as-global-fun fun))
+                                           (setf (?closure fun) :CLOSURE)
+                                           (propagate fun)))))
+                              (propagate fun)))))
 
-    ;; Ermitteln der max. statischen Aufruftiefe von Funktionen.  Die
-    ;; Berechnung erfolgt 'depth first', d.h. der Wert fuer eine Funktion
-    ;; haengt von den Werten der in dieser Funktion lokal definierten
-    ;; Funktionen ab. Bei lokalen Funktionen haengt max-level zudem noch von
-    ;; den auf gleichem Niveau aufgerufenen Funktionen ab.  Hier wird ein
-    ;; 'free-in' benutzt, das eine Funktion f auch dann angibt, wenn in ihr
-    ;; eine Funktion g nur indirekt frei vorkommt. Es wuerde reichen, nur
-    ;; die direkte Relation zu betrachten, die indirekte Relation schadet
-    ;; aber nicht.
-    ;;---------------------------------------------------------
-    (labels ((setf-deeper-max-level (fun)
+  ;; Ermitteln der max. statischen Aufruftiefe von Funktionen.  Die
+  ;; Berechnung erfolgt 'depth first', d.h. der Wert fuer eine Funktion
+  ;; haengt von den Werten der in dieser Funktion lokal definierten
+  ;; Funktionen ab. Bei lokalen Funktionen haengt max-level zudem noch von
+  ;; den auf gleichem Niveau aufgerufenen Funktionen ab.  Hier wird ein
+  ;; 'free-in' benutzt, das eine Funktion f auch dann angibt, wenn in ihr
+  ;; eine Funktion g nur indirekt frei vorkommt. Es wuerde reichen, nur
+  ;; die direkte Relation zu betrachten, die indirekte Relation schadet
+  ;; aber nicht.
+  ;;---------------------------------------------------------
+  (labels ((setf-deeper-max-level (fun)
 
-               ;; Das Maximum der max-level aus DEEPER-LEVEL-CALLS berechnen.
-               ;; Funktionen, die kein 'display' benoetigen, werden dabei
-               ;; nicht beruecksichtigt.
-               ;;----------------------------------------------------------
-               (setf (?max-level fun)
-                     (apply #'max 0
-                            (mapcar #'(lambda (deeper-level)
-                                        (if (needs-display deeper-level)
-                                            (1+ (?max-level deeper-level))
-                                            0))
-                                    (?deeper-level-calls fun)))))
+             ;; Das Maximum der max-level aus DEEPER-LEVEL-CALLS berechnen.
+             ;; Funktionen, die kein 'display' benoetigen, werden dabei
+             ;; nicht beruecksichtigt.
+             ;;----------------------------------------------------------
+             (setf (?max-level fun)
+                   (reduce #'(lambda (x deeper-level)
+                               (if (needs-display deeper-level)
+                                   (max x (1+ (?max-level deeper-level)))
+                                   x))
+                           (?deeper-level-calls fun)
+                           :initial-value 0)))
 
-             (process (funs)
-               (dolist (fun funs)
-                 (process (?local-funs fun)) ; depth first !
-                 (setf-deeper-max-level fun))
-               (let ((sorted (sort (collect-if #'needs-display funs)
-                                   #'>
-                                   :key #'?max-level)))
-                 (dolist (fun sorted)
-                   (dolist (free-in (?free-in fun))
-                     (when (and (= (?level fun) (?level free-in))
-                                (> (?max-level fun) (?max-level free-in)))
-                       (setf (?max-level free-in) (?max-level fun)))))))
+           (process (funs)
+             (dolist (fun funs)
+               (process (?local-funs fun)) ; depth first !
+               (setf-deeper-max-level fun))
+             (let ((sorted (sort (collect-if #'needs-display funs)
+                                 #'>
+                                 :key #'?max-level)))
+               (dolist (fun sorted)
+                 (dolist (free-in (?free-in fun))
+                   (when (and (= (?level fun) (?level free-in))
+                              (> (?max-level fun) (?max-level free-in)))
+                     (setf (?max-level free-in) (?max-level fun)))))))
 
-             (needs-display (local-fun)
-               (not (or (eq (?closure local-fun) :CLOSURE)
-                        (?as-global-fun local-fun)))))
+           (needs-display (local-fun)
+             (not (or (eq (?closure local-fun) :CLOSURE)
+                      (?as-global-fun local-fun)))))
 
-      ;; lokale Funktionen bearbeiten
-      ;;-----------------------------
-      (process (?local-funs fun))
+    ;; lokale Funktionen bearbeiten
+    ;;-----------------------------
+    (process (?local-funs fun))
 
-      ;; globale Funktionen bearbeiten
-      ;;------------------------------
-      (setf-deeper-max-level fun))))
+    ;; globale Funktionen bearbeiten
+    ;;------------------------------
+    (setf-deeper-max-level fun)))
 
 ;;------------------------------------------------------------------------------
 ;; Die Funktion f wird auf alle lokalen Funktionen von fun angewendet.
@@ -460,7 +477,7 @@
 ;; Funktionsaufruf
 ;;------------------------------------------------------------------------------
 (defmethod p3-form ((app app))
-  (when *MV-POSITION* (setf (?mv-used app) t))
+  (setf (?mv-used app) *MV-POSITION*)
   (p3-app (?form app) (?arg-list app) app))
 
 ;;------------------------------------------------------------------------------
@@ -822,7 +839,7 @@
 ;;------------------------------------------------------------------------------
 ;; PROGV-INTERNAL symbols values body
 ;;------------------------------------------------------------------------------
-(defun p3-progv-internal (args app)
+(defun p3-progv (args app)
   (let ((symbols (pop args))
         (values (pop args))
         (body (pop args)))
@@ -840,7 +857,7 @@
 ;;------------------------------------------------------------------------------
 ;; CATCH-INTERNAL tag body
 ;;------------------------------------------------------------------------------
-(defun p3-catch-internal (args app)
+(defun p3-catch (args app)
 
   ;; Da das CATCH durch ein THROW dynamisch verlassen werden kann,
   ;; ist die MV-Spezifikation unbekannt.
@@ -862,7 +879,7 @@
 ;;------------------------------------------------------------------------------
 ;; UNWIND-PROTECT-INTERNAL protected-form cleanup-form
 ;;------------------------------------------------------------------------------
-(defun p3-unwind-protect-internal (args app)
+(defun p3-unwind-protect (args app)
   (let ((protected-form (pop args))
         (cleanup-form (pop args))
         (*DOWNWARD-FUNARG*  T)

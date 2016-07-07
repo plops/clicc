@@ -5,8 +5,15 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : System-Funktionen (12. Numbers)                                
 ;;;
-;;; $Revision: 1.10 $
+;;; $Revision: 1.12 $
 ;;; $Log: num.lisp,v $
+;;; Revision 1.12  1994/01/21  14:47:20  ft
+;;; Erweiterung um die Funktionen scale-float, float-radix, float-sign,
+;;; float-precision und integer-decode-float.
+;;;
+;;; Revision 1.11  1994/01/05  12:41:20  sma
+;;; Namensänderung: rt::*-internal -> rt::*
+;;;
 ;;; Revision 1.10  1993/09/02  15:56:37  uho
 ;;; LOGTEST und LOGBITP definiert. Einige andere logische Funktionen
 ;;; verschoenert.
@@ -29,7 +36,7 @@
 ;;;
 ;;; Revision 1.5  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.10 $ eingefuegt
+;;; $Revision: 1.12 $ eingefuegt
 ;;;
 ;;; Revision 1.4  1993/01/13  15:07:13  ft
 ;;; Erweiterung um (ash ...)
@@ -48,8 +55,13 @@
 
 (export
  '(max min expt log isqrt abs float floor ceiling truncate round mod rem
+   scale-float float-radix float-sign float-precision integer-decode-float
    logior logxor logand logeqv lognand lognor logandc1 logandc2 logorc1 logorc2
    lognot logtest logbitp ash))
+
+(defparameter FLOAT-RADIX              (rt::calc-radix))
+(defparameter FLOAT-SIGNIFICAND-LENGTH (rt::calc-mant-dig))
+(defparameter I-D-F-FAKTOR (* FLOAT-RADIX FLOAT-SIGNIFICAND-LENGTH))
 
 ;;-----------------------------------------------------------------------------
 ;; 12.3. Comparisons on Numbers                                               
@@ -96,13 +108,13 @@
 ; -------------------------------------------------------------------
 ;				(contagion 1 base-number power-number)
 ;			))
-    (t (rt::expt-internal base-number power-number))))
+    (t (rt::expt base-number power-number))))
 
 ;;-----------------------------------------------------------------------------
 ;; LOG number &OPTIONAL base
 ;;-----------------------------------------------------------------------------
 (defun log (number &optional (base 2.7182818284590455))
-  (rt::log-internal number base))
+  (rt::log number base))
 
 ;;------------------------------------------------------------------------------
 ;;-ISQRT: Integer square root - isqrt(n)**2 <= n
@@ -146,31 +158,31 @@
 (defun float (number &optional other)
   (when (and other (not (floatp other)))
     (error "The value of OTHER, ~S, should be a FLOAT" other))
-  (rt::float-internal number))
+  (rt::float number))
 
 ;;-----------------------------------------------------------------------------
 ;; FLOOR number &OPTIONAL divisor
 ;;-----------------------------------------------------------------------------
 (defun floor (number &optional (divisor 1))
-  (rt::floor-internal number divisor))
+  (rt::floor number divisor))
 
 ;;-----------------------------------------------------------------------------
 ;; CEILING number &OPTIONAL divisor
 ;;-----------------------------------------------------------------------------
 (defun ceiling (number &optional (divisor 1))
-  (rt::ceiling-internal number divisor))
+  (rt::ceiling number divisor))
 
 ;;-----------------------------------------------------------------------------
 ;; TRUNCATE number &OPTIONAL divisor
 ;;-----------------------------------------------------------------------------
 (defun truncate (number &optional (divisor 1))
-  (rt::truncate-internal number divisor))
+  (rt::truncate number divisor))
 
 ;;-----------------------------------------------------------------------------
 ;; ROUND number &OPTIONAL divisor
 ;;-----------------------------------------------------------------------------
 (defun round (number &optional (divisor 1))
-  (rt::round-internal number divisor))
+  (rt::round number divisor))
 
 ;;-----------------------------------------------------------------------------
 ;; MOD number divisor
@@ -191,6 +203,61 @@
           (declare (ignore div))
           rem)
     (truncate number divisor)))
+
+;;------------------------------------------------------------------------------
+;; Die folgenden Funktionen basieren auf der Implementation von floats !!!
+;; Augenblicklich erfolgt diese durch C-Daten vom Typ double.
+;;------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+;; scale-float float integer
+;;------------------------------------------------------------------------------
+(defun scale-float (f k)
+  (* (the float f) (expt (float FLOAT-RADIX f) (the integer k))))
+
+;;------------------------------------------------------------------------------
+;; float-radix float
+;;------------------------------------------------------------------------------
+(defun float-radix (f)
+  (the float f)
+  FLOAT-RADIX)
+
+;;------------------------------------------------------------------------------
+;; float-sign float1 &OPTIONAL float2
+;;------------------------------------------------------------------------------
+(defun float-sign (float1 &optional (float2 1.0 supplied))
+  (when supplied
+    (setf float2 (abs (the float float2))))
+  (if (minusp (the float float1)) (- float2) float2))
+
+;;------------------------------------------------------------------------------
+;; float-digits float
+;;------------------------------------------------------------------------------
+;; Kann nicht implementiert werden, da man nur raten könnte, wieviele
+;; hidden-bits ein C-Compiler für float-Mantissen benutzt.
+
+;;------------------------------------------------------------------------------
+;; float-precision float
+;;------------------------------------------------------------------------------
+(defun float-precision (f)
+  (the float f)
+  FLOAT-SIGNIFICAND-LENGTH)
+
+;;------------------------------------------------------------------------------
+;; integer-decode-float float
+;; Multiple Werte: 1. Mantisse als integer
+;;                 2. Exponent 
+;;                 3. Vorzeichen ( -1.0 oder 1.0 )
+;; float = (* Vorzeichen (expt Mantisse (expt (float-radix float) Exponent)))
+;;------------------------------------------------------------------------------
+(defun integer-decode-float (f)
+  (multiple-value-bind
+        (float-sig float-exp float-sign)
+      (decode-float f)                  ;hier erfolgt auch der Typtest
+    (values
+     (floor (* I-D-F-FAKTOR float-sig))
+     (- float-exp FLOAT-SIGNIFICAND-LENGTH)
+     (floor float-sign))))
 
 ;;------------------------------------------------------------------------------
 ;; 12.7. Logical Operations on Numbers

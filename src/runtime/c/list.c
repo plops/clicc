@@ -5,8 +5,17 @@
  *            ------------------------------------------------------
  * Funktion : System-Funktionen: Lists
  *
- * $Revision: 1.9 $
+ * $Revision: 1.11 $
  * $Log: list.c,v $
+ * Revision 1.11  1994/04/28  09:49:49  sma
+ * Umgeschrieben, damit der Aufbau einer CONS-Zelle mehr abstrahiert
+ * wird. Außerdem Fappend optimiert.
+ *
+ * Revision 1.10  1994/01/05  12:51:03  sma
+ * STACK(base, x) -> ARG(x). raw-list-length und simple-assoc gelöscht.
+ * raw-list-length wird nicht mehr benötigt, simple-assoc ist (endgültig)
+ * in Lisp implementiert.
+ *
  * Revision 1.9  1993/09/19  18:13:22  sma
  * raw-list-length ist jetzt eine C-Funktion, und so deutlich schneller.
  * simple-assoc ist jetzt eine C-Funktion für (assoc item alist :test #'eq)
@@ -46,99 +55,62 @@
 
 char No_list[] = "~a is not a list";
 
-
 /*------------------------------------------------------------------------------
- * Voraussetzung: <lptr> ist ein Zeiger auf ein Listenelement                   
- * Rueckgabewert: Falls das Listenende erreicht wurde (Rest der Liste ist       
- *                NIL oder ein Atom) wird NULL zurueckgegeben.                  
- *                Sonst ein Zeiger auf das naechste Listenelement.              
+ * LIST &rest args                                                              
  *----------------------------------------------------------------------------*/
-CL_FORM *NEXT_CAR(lptr)
-CL_FORM *lptr;
-{
-   lptr = CDR(lptr);            /* Zeiger auf Zelle für CDR */
-   if (CL_CONSP(lptr))
-      return GET_CAR(lptr);
-   else
-      return (CL_FORM *)NULL;
-}
-
-/*#define NEXT_CAR(lptr) (CL_CONSP(CDR(lptr)) ? GET_CAR(CDR(lptr)) : NULL)*/
-
-/*------------------------------------------------------------------------------
- * Ermittelt die Länge einer Liste.                                            
- * Voraussetzung: <lptr> Zeiger -> CONS-Form                                    
- * Rueckgabewert: Laenge der Liste                                              
- *----------------------------------------------------------------------------*/
-long list_length(lptr)
-CL_FORM *lptr;
-{
-   long list_len = 0;
-
-   for (lptr = GET_CAR(lptr); lptr; lptr = NEXT_CAR(lptr))
-      list_len++;
-   return list_len;
-}
-
-/*------------------------------------------------------------------------------
- * list &rest args                                                              
- *----------------------------------------------------------------------------*/
-void Flist(base, nargs)
-CL_FORM *base;
-int nargs;
+LISP_FUN_NARGS(Flist)
 {
    if(nargs == 0)               /* (list) = () */
    {
-      LOAD_NIL(STACK(base, 0));
+      LOAD_NIL(ARG(0));
    }
    else
    {
       CL_FORM *lptr, *lp;
       int i;
 
-      lptr = form_alloc(STACK(base, nargs), nargs * 2);
+      lptr = form_alloc(ARG(nargs), nargs * CONS_SIZE);
       nargs--;
-      for(lp = lptr, i = 0; i < nargs; lp += 2, i++)
+      for(lp = lptr, i = 0; i < nargs; lp += CONS_SIZE, i++)
       {
-         COPY(STACK(base, i),CAR(lp));
-         LOAD_CONS(lp + 2, CDR(lp));
+         INIT_CONS(lp);
+         COPY(ARG(i),CAR(lp));
+         LOAD_CONS(lp + CONS_SIZE, CDR(lp));
       }
-      COPY(STACK(base, i), CAR(lp));
+      INIT_CONS(lp);
+      COPY(ARG(i), CAR(lp));
       LOAD_NIL(CDR(lp));
-      LOAD_CONS(lptr, STACK(base, 0));
+      LOAD_CONS(lptr, ARG(0));
    }
 }
 
 /*------------------------------------------------------------------------------
- * list* arg &rest others                                                       
+ * LIST* arg &rest others                                                       
  *----------------------------------------------------------------------------*/
-void FlistX(base, nargs)
-CL_FORM *base;
-int nargs;
+LISP_FUN_NARGS(FlistX)
 {
    CL_FORM *lptr, *lp;
    int i;
 
-   if(nargs == 1)              /* (list* x) = x */
+   if(nargs == 1)               /* (list* x) = x */
       return;
 
    nargs--;
-   lptr = form_alloc(STACK(base, nargs + 1),  nargs * 2);
-   for(lp = lptr, i = 0; i < nargs; lp += 2, i++)
+   lptr = form_alloc(ARG(nargs + 1),  nargs * CONS_SIZE);
+   for(lp = lptr, i = 0; i < nargs; lp += CONS_SIZE, i++)
    {
-      COPY(STACK(base, i), CAR(lp));
-      LOAD_CONS(lp + 2, CDR(lp));
+      INIT_CONS(lp);
+      COPY(ARG(i), CAR(lp));
+      LOAD_CONS(lp + CONS_SIZE, CDR(lp));
    }
-   COPY(STACK(base, i), CDR(lp - 2));
-   LOAD_CONS(lptr, STACK(base, 0));
+   COPY(ARG(i), CDR(lp - CONS_SIZE));
+   LOAD_CONS(lptr, ARG(0));
 }
 
 /*------------------------------------------------------------------------------
- * append &rest lists                                                           
+ * APPEND &rest lists                                                           
  *----------------------------------------------------------------------------*/
-void Fappend(base, nargs)
-CL_FORM *base;
-int nargs;
+LISP_FUN_NARGS(Fappend)
 {
    int i, list_len = 0;
    CL_FORM *lptr, *lp1, *lp2;
@@ -146,7 +118,7 @@ int nargs;
    switch(nargs)
    {
    case 0:                      /* (APPEND) = NIL */
-      LOAD_NIL(STACK(base, 0));
+      LOAD_NIL(ARG(0));
       return;
    case 1:                      /* (APPEND arg) = arg */
       return;
@@ -156,83 +128,41 @@ int nargs;
       nargs--;
       for(i = 0; i < nargs; i++) 
       {
-         if (CL_CONSP(STACK(base, i)))
-            list_len += list_length(STACK(base, i));
-         else if (!CL_NILP(STACK(base, i)))
-            Lerror(STACK(base, i), No_list);
+         if (CL_CONSP(ARG(i)))
+            for (lptr = ARG(i); CL_CONSP(lptr); lptr = GET_CDR(lptr))
+               list_len++;
+         else if (!CL_NILP(ARG(i)))
+            Lerror(ARG(i), No_list);
       }
       
       /* Liste leer, letztes Argument zurückgeben */
       /*------------------------------------------*/
       if(list_len == 0)
       {
-         COPY(STACK(base, nargs), STACK(base, 0));
+         COPY(ARG(nargs), ARG(0));
          return;
       }
 
       /* Kopieren der ersten N - 1 Listen */
       /*----------------------------------*/
-      lptr = form_alloc(STACK(base, nargs + 1), list_len * 2);
+      lptr = form_alloc(ARG(nargs + 1), list_len * CONS_SIZE);
 
       for (lp1 = lptr, i = 0; i < nargs; i++)
       {
-         if (CL_CONSP(STACK(base, i))) /* nur CONS oder NIL möglich */
+         if (CL_CONSP(ARG(i))) /* nur CONS oder NIL möglich */
          {
-            for (lp2 = GET_CAR(STACK(base, i)); lp2; lp2 = NEXT_CAR(lp2))
+            for (lp2 = ARG(i); CL_CONSP(lp2); lp2 = GET_CDR(lp2))
             {
-               COPY(lp2, CAR(lp1));
-               LOAD_CONS(lp1 + 2, CDR(lp1));
-               lp1 += 2;
+               INIT_CONS(lp1);
+               COPY(GET_CAR(lp2), CAR(lp1));
+               LOAD_CONS(lp1 + CONS_SIZE, CDR(lp1));
+               lp1 += CONS_SIZE;
             }
          }
       }
       /* Anhängen der Restliste */
       /*------------------------*/
-      COPY(STACK(base, i), CDR(lp1 - 2));
-      LOAD_CONS(lptr, STACK(base, 0));
+      COPY(ARG(i), CDR(lp1 - CONS_SIZE));
+      LOAD_CONS(lptr, ARG(0));
    }
-}
-
-/*------------------------------------------------------------------------------
- * raw-list-length list
- * Der Parameter "list" muß eine Liste <> der leeren List NIL sein!
- *----------------------------------------------------------------------------*/
-void raw_list_length(base)
-CL_FORM *base;
-{
-   CL_FORM *list = STACK(base, 0);
-   int i = 0;
-   do
-   {
-      i++;
-      list = CDR(GET_CAR(list));
-   }
-   while (CL_CONSP(list));
-   LOAD_FIXNUM(i, STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * simple-assoc item a-list
- *  entspricht (assoc item a-list :test #'eq)
- * Der Paramter "a-list" muß eine korrekte a-list sein!
- *----------------------------------------------------------------------------*/
-void simple_assoc(base)
-CL_FORM *base;
-{
-   CL_FORM *alist = STACK(base, 1);
-   
-   while (CL_CONSP(alist))
-   {
-      CL_FORM *car = GET_CAR(alist);
-      if (!CL_CONSP(car))
-         Labort("simple-assoc: corrupt a-list");
-      
-      if (EQ(GET_CAR(car), STACK(base, 0)))
-      {
-         COPY(car, STACK(base, 0));
-         return;
-      }
-      alist = GET_CDR(alist);
-   }
-   LOAD_NIL(STACK(base, 0));
 }

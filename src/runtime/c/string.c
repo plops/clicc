@@ -4,9 +4,19 @@
  * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
  *            ------------------------------------------------------
  * Funktion : System-Funktionen: Strings
-
- * $Revision: 1.8 $
+ *
+ * $Revision: 1.10 $
  * $Log: string.c,v $
+ * Revision 1.10  1994/01/05  12:54:56  sma
+ * make-string geändert. INIT_VEC_CHAR und LOAD_VEC_CHAR Makros
+ * eingefügt.
+ *
+ * Revision 1.9  1993/12/09  15:16:25  sma
+ * Aufgrund der neuen array-Repräsentation konnten alle string accessor
+ * Funktionen in Lisp programmiert werden und hier rausfliegen.
+ * get_c_string kann jetzt nur noch den C-String eines uebergebenen Lisp
+ * simple-strings ermitteln. STACK(base, xxx) -> ARG(xxx)
+ *
  * Revision 1.8  1993/10/13  18:16:01  sma
  * 1x TYPE_OF durch CL_STRINGP ersetzt und das Setzen von AR_SIZE in
  * make_string_internal korrigiert.
@@ -34,143 +44,35 @@
  * Initial revision
  *----------------------------------------------------------------------------*/
 
-#include <string.h>
-#include <ctype.h>
 #include <c_decl.h>
 #include "sys.h"
+#include <string.h>
 
-/*----------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
  * Ermittelt den 'eigentlichen' String eines LISP-Strings
  * Resultat: Zeiger auf den String
  *----------------------------------------------------------------------------*/
 char *get_c_string (lisp_string)
 CL_FORM *lisp_string;
 {
-   CL_FORM *header = GET_FORM (lisp_string);
-
-   if (CL_STRINGP(lisp_string) && DISPLACED_P (header))
-      return (get_c_string (DISPLACED_TO (header)));
-   else
-      return (GET_CHAR_PTR (AR_BASE (header))); 
+   return AR_STRING(GET_FORM(lisp_string));
 }
 
-/*----------------------------------------------------------------------------
- * Ermittelt den 'eigentl.' String eines Simple-LISP-Strings
- * Resultat: Zeiger auf den String
- *----------------------------------------------------------------------------*/
-char *sm_get_c_string (lisp_string)
-CL_FORM *lisp_string;
-{
-   CL_FORM *header = GET_FORM (lisp_string);
-
-   return (GET_CHAR_PTR (AR_BASE (header))); 
-}
-
-/*----------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
  * Erzeugt aus einem C-String einen LISP-String nach 'base'
  *----------------------------------------------------------------------------*/
-void make_string (base, string)
+void make_string(base, string)
 CL_FORM *base;
 char    *string;
 {
-   long     str_len = strlen (string);
+   long str_len = strlen(string);
    CL_FORM *header;
-   char    *chptr;
+   char *chptr;
 
-   header = form_alloc (STACK (base, 0), 2L);
-   chptr  = char_alloc (STACK (base, 0), str_len);
-   strncpy (chptr, string, str_len);
-   SET_AR_SIZE (str_len, header);
-   LOAD_CHAR_PTR (chptr, AR_BASE (header));
-   LOAD_SMSTR (header, STACK (base, 0));
-}
-
-/*----------------------------------------------------------------------------
- * 18.1. String Access
- *----------------------------------------------------------------------------*/
-
-/*----------------------------------------------------------------------------
- * CHAR-INTERNAL string index
- *----------------------------------------------------------------------------*/
-void char_internal (base)
-CL_FORM *base;
-{
-   char *string = get_c_string (STACK (base, 0));
-   int   index  = GET_FIXNUM   (STACK (base, 1));
-
-   /* Fill-Pointer werden nicht beruecksichtigt. */
-   /* ------------------------------------------ */
-   LOAD_CHAR (string[index], STACK (base, 0));
-}
-
-/*----------------------------------------------------------------------------
- * SET-CHAR-INTERNAL character string index
- *----------------------------------------------------------------------------*/
-void set_char_internal (base)
-CL_FORM *base;
-{
-   char *string = get_c_string (STACK (base, 1));
-   int   index  = GET_FIXNUM   (STACK (base, 2));
-
-   /* Fill-Pointer werden nicht beruecksichtigt. */
-   /* ------------------------------------------ */
-   string[index] = GET_CHAR (STACK (base, 0));
-}
-
-/*----------------------------------------------------------------------------
- * SCHAR-INTERNAL simple-string index
- *----------------------------------------------------------------------------*/
-void schar_internal (base)
-CL_FORM *base;
-{
-   char *string = sm_get_c_string (STACK (base, 0));
-   int   index  = GET_FIXNUM      (STACK (base, 1));
-
-   /* Fill-Pointer werden nicht beruecksichtigt. */
-   /* ------------------------------------------ */
-   LOAD_CHAR (string[index], STACK (base, 0));
-}
-
-/*----------------------------------------------------------------------------
- * SET-SCHAR-INTERNAL character simple-string index
- *----------------------------------------------------------------------------*/
-void set_schar_internal (base)
-CL_FORM *base;
-{
-   char *string = sm_get_c_string (STACK (base, 1));
-   int   index  = GET_FIXNUM      (STACK (base, 2));
-
-   /* Fill-Pointer werden nicht beruecksichtigt. */
-   /* ------------------------------------------ */
-   string[index] = GET_CHAR (STACK (base, 0));
-}
-
-/*----------------------------------------------------------------------------
- * 18.3. String Construction and Manipulation
- *----------------------------------------------------------------------------*/
-
-/*----------------------------------------------------------------------------
- * MAKE-STRING-INTERNAL size initial-element
- *----------------------------------------------------------------------------*/
-void make_string_internal (base)
-CL_FORM *base;
-{
-   long size      = GET_FIXNUM (STACK (base, 0));
-   char init_elem = GET_CHAR   (STACK (base, 1));
-   char *new_string;
-   int i;
-   CL_FORM *sm_string;
-
-   /* Neuen String allozieren und initialisieren */
-   /* ------------------------------------------ */
-   new_string = char_alloc (STACK (base, 2), size);
-   memset(new_string, init_elem, size);
-
-   /* Header fuer SIMPLE-STRING allozieren */
-   /* ------------------------------------ */
-   sm_string = form_alloc (STACK (base, 2), 2L);
-   SET_AR_SIZE(size, sm_string);
-   LOAD_CHAR_PTR (new_string, AR_BASE (sm_string));
-
-   LOAD_SMSTR (sm_string, STACK (base, 0));
+   chptr = char_alloc(ARG(0), str_len);
+   strncpy(chptr, string, str_len);
+   header = form_alloc(ARG(0), 2L);
+   LOAD_CHAR_PTR(chptr, AR_BASE(header));
+   INIT_VEC_CHAR(header, str_len);
+   LOAD_VEC_CHAR(header, ARG(0));
 }

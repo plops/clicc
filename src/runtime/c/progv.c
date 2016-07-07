@@ -6,8 +6,15 @@
  * Funktion : Laufzeitsystem
  *            - Special Form PROGV implementiert als Systemfunktion
  *
- * $Revision: 1.5 $
+ * $Revision: 1.7 $
  * $Log: progv.c,v $
+ * Revision 1.7  1994/04/23  17:01:02  sma
+ * STACK(base, x) -> ARG(x) sowie korrekte Prüfung auf konstante Symbole.
+ *
+ * Revision 1.6  1994/01/05  12:53:49  sma
+ * Namensänderung: rt-progv-internal mit dem Präfix rt_ versehen und den
+ * Postfix _internal entfernt. STACK(base,x) -> ARG(x)
+ *
  * Revision 1.5  1993/06/16  14:43:22  hk
  * Copyright Notiz eingefuegt.
  *
@@ -30,13 +37,13 @@
 char SYM_EXPECTED[] = "~a is not a symbol";
 char TRY_BIND_CONST[] = "can not bind ~a, which is a constant";
 
-/*-------------------------------------------------------------------------*/
-/* progv-internal symbol-list value-list body-function                     */
-/*-------------------------------------------------------------------------*/
-void progv_internal(base)
+/*------------------------------------------------------------------------------
+ * RT::PROGV symbol-list value-list body-function
+ *----------------------------------------------------------------------------*/
+void rt_progv(base)
 CL_FORM *base;
 {
-   CL_FORM *syms = STACK(base, 0), *vals = STACK(base, 1);
+   CL_FORM *syms = ARG(0), *vals = ARG(1);
    CL_FORM *saved_bind_top = bind_top; 
    
    while(CL_CONSP(syms))
@@ -44,13 +51,13 @@ CL_FORM *base;
       syms = GET_CAR(syms);
       if(!CL_SYMBOLP(syms))
       {
-         COPY(syms, STACK (base, 0)); 
-         Lerror(STACK (base, 0), SYM_EXPECTED);
+         COPY(syms, ARG(0)); 
+         Lerror(ARG(0), SYM_EXPECTED);
       }
-      else if(!CL_NILP(SYM_CONSTFLAG(syms)))
+      else if(SYM_IS_CONST(syms))
       {
-         COPY(syms, STACK (base, 0)); 
-         Lerror(STACK (base, 0), TRY_BIND_CONST);
+         COPY(syms, ARG(0)); 
+         Lerror(ARG(0), TRY_BIND_CONST);
       }
       else
       {
@@ -63,7 +70,7 @@ CL_FORM *base;
             /* --------------------- */
             vals = GET_CAR(vals);
             COPY(vals, SYM_VALUE(syms));
-            vals++;
+            vals = CDR(vals);
          }
          else
          {
@@ -71,14 +78,14 @@ CL_FORM *base;
             /* -------------------------------- */
             LOAD_UNBOUND(SYM_VALUE(syms));
          }
-         syms++;
+         syms = CDR(syms);
       }
-   }    
+   }
 
    /* Aufruf des Rumpfes */
    /* ------------------ */
-   COPY(STACK(base, 2), STACK(base, 0));
-   Ffuncall(STACK(base, 0), 1);
+   COPY(ARG(2), ARG(0));
+   Ffuncall(ARG(0), 1);
 
    /* dynamische Variablen restaurieren */
    /* --------------------------------- */

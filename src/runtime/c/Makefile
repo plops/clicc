@@ -6,7 +6,7 @@
 #            Uses Environment variable CLICCROOT.
 #
 # $Revision: 1.6 $
-# $Source: /home3/apply/public/clicc-0.6.2a/src/runtime/c/RCS/Makefile,v $
+# $Source: /home3/apply/public/clicc-0.6.4/src/runtime/c/RCS/Makefile,v $
 # $Author: uho $
 # $Date: 1993/06/04 16:50:19 $
 #------------------------------------------------------------------------------

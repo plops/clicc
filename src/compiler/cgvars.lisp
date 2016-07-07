@@ -10,8 +10,52 @@
 ;;;            - Restaurieren von Special Variablen
 ;;;            - SETQ
 ;;;
-;;; $Revision: 1.24 $
+;;; $Revision: 1.36 $
 ;;; $Log: cgvars.lisp,v $
+;;; Revision 1.36  1994/05/25  14:06:18  sma
+;;; Aufruf der Restlistenoptimierung aus cg-params herausgezogen.
+;;;
+;;; Revision 1.35  1994/05/24  09:34:43  sma
+;;; Berechnung der local-Variable bei closures korrigiert.
+;;;
+;;; Revision 1.34  1994/05/19  13:27:17  hk
+;;; Klammerfehler behoben.
+;;;
+;;; Revision 1.33  1994/05/19  13:13:26  sma
+;;; Closures-Argument bei Closures im Zusammenhang mit Restlisten wird
+;;; nicht mehr von Restargument verdeckt.
+;;;
+;;; Revision 1.32  1994/04/14  17:01:44  sma
+;;; Fehler in gc-form Methode für let*-form beim gemischten Vorkommen von
+;;; Rest-Variablen und normalen Variablen behoben.
+;;;
+;;; Revision 1.31  1994/04/11  12:44:38  sma
+;;; Korrektur für rest-variablen, die auf Prädikatsposition stehen.
+;;;
+;;; Revision 1.30  1994/03/03  13:47:14  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.29  1994/02/10  16:00:30  sma
+;;; Korrektur für closures; cdr-rest-funcall-p -> rlo-rest-form;
+;;; Erweiterung für (setq rest-var (let () ... (progn restform))).
+;;;
+;;; Revision 1.28  1994/02/08  15:39:24  sma
+;;; Statistik verändert und Test auf Benutzung der rest-Variable in
+;;; rest-optimization-p verschoben.
+;;;
+;;; Revision 1.27  1994/02/08  13:58:55  sma
+;;; Diverse Änderungen für rest-Parameter-Optimierungen.
+;;;
+;;; Revision 1.26  1994/02/03  17:33:50  sma
+;;; Änderungen für Optimierung von &rest-Paramtern. Wenn möglich, wird das
+;;; Erzeugen einer Restliste mittels Flist unterdrückt und die Restliste
+;;; direkt auf dem LISP-Stack verwaltet.
+;;;
+;;; Revision 1.25  1994/01/07  12:51:06  hk
+;;; Unbenutzte local-static haben die Annotation write = 1, wenn sie nicht
+;;; benutzt werden. Das wird nun berücksichtigt, um unbenutzte &rest
+;;; Parameter zu erkennen.
+;;;
 ;;; Revision 1.24  1993/09/10  15:33:24  hk
 ;;; Fehler in cg-form (var-ref) behoben
 ;;;
@@ -109,10 +153,34 @@
 ;;------------------------------------------------------------------------------
 ;; EINSCHRAENKUNG: kein Identifikator darf in einer Lambda-Liste mehrfach
 ;; gebunden werden.
-;; ACHTUNG: Der 1. Parameter liegt nicht unbedingt an der Position 0 im
-;; Aktivation Record
+;; ACHTUNG: Bei Closures beginnt der 1. Parameter nicht an der Position 0 im
+;; Aktivation Record, sondern dort befindet sich Zeiger auf die Closure.
 ;;------------------------------------------------------------------------------
-(defun cg-params (params known-number-of-args)
+;; Bedeutung von Offset bei Parametern und lokalen Variablen (local-statics)
+;; bei Rest-Optimierung: In Offset wird ein Typ kodiert, der theoretisch auch
+;; explizit in jede local-static eingetragen werden könnte.
+;;   .----------------------.
+;;   | Typ | Level | Offset |
+;;   `----------------------'
+;;      |     n>=0    n>=0 
+;;      V
+;;    ARG      Argumente der Funktion
+;;    LOCAL    Lokale Variablen/Zwischenergebnisse (nur bei rest-optimierung)
+;;    REST     Rest-Variablen
+;;    FRESULT  Funktionsergebnis
+;;
+;; + Das Funktionsergebnis ist immer an Position 0 (Konvention).
+;; + Hat die Funktion mindestens ein Argument, welches keine restvariable ist,
+;;   fällt das Funktionsergebnis mit diesem Argument zusammen.
+;;
+;; Folgende Kodierung wird eingesetzt:
+;;   rest_opt := MAX(1, nsimpopts)
+;;   ARG      >= 0 & < rest_opt
+;;   LOCAL    >= rest_opt
+;;   REST     < 0
+;;   FRESULT  = 0
+;;------------------------------------------------------------------------------
+(defun cg-params (params known-number-of-args rlo)
   (let* ((nsimple       (length (?var-list params)))
          (nopt          (length (?opt-list params)))
          (nkey          (length (?key-list params)))
@@ -121,11 +189,21 @@
          nopt-supplied
          suppl-index
          first-key 
-         C-stacktop)
+         C-stacktop
+         (closure-offset *stack-top*))
 
+    ;; Während der Parametererstellung ausschalten
+    ;;--------------------------------------------
+    (setq *rest-optimization* nil)
+    (when rlo
+      (setq *rest-var-count* 0)
+      (cg-var-bind rest (decf *rest-var-count*))
+      (C-PtrDecl "CL_FORM" (CC-restvar (?offset rest)))
+      (C-PtrDecl "CL_FORM" C-local))
+    
     (setq C-stacktop
           (CC-Stack (if (not known-number-of-args)
-
+                        
                         ;; Stack-Top wird erst zur Laufzeit bekannt, 
                         ;;------------------------------------------
                         (CC-op+ *stack-top* C-nargs)
@@ -301,7 +379,7 @@
       (dolist (key-spec (?key-list params))
         (C-init (CC-symbol (?sym key-spec))))
       (C-initend)
-
+      
       ;; verschiebt Rest-Liste im Stack, so dass genuegend Platz fuer die
       ;; Key-Werte entsteht und sortiert die Key-Werte in die entstandene
       ;; Luecke. Nicht angegebene Key-Werte werden mit NIL belegt.
@@ -310,25 +388,35 @@
               nkey C-keylist C-supl_flags (CC-bool (?allow-other-keys params)))
       (setq first-key *stack-top*)
       (incf *stack-top* nkey))
-      
+    
     ;; Pruefen, ob die Rest-Variable nur angegeben wurde, damit beliebig viele
     ;; Argumente angegeben werden koennen, ohne dass die Rest-Variable selbst
     ;; verwendet wird.
     ;;----------------
-    (when (and rest (or (plusp (?write rest)) (plusp (?read rest))))
+    (if rlo
+        (when (plusp (?read rest))
+          (C-Assign (CC-restvar (?offset rest)) 
+                    (CC-stack (+ nsimpopt closure-offset)))
+          (incf *rlo-statistics-rest-funs*)
+          (incf *rlo-statistics-rest-opt*)
+          (when (= nsimpopt 0)
+            (incf nsimpopt) (incf *stack-top*)))
 
-      ;; Erzeugt die Rest-Liste im Heap, Zeiger auf diese Liste wird hinter
-      ;; den Key-Parametern abgelegt.
-      ;;----------------------------------------------
-      (C-Lispcall "Flist" (CC-StackTop) (CC-op- C-nargs nsimpopt))
-      (cg-var-bind rest *stack-top*)
-      (incf *stack-top*))
+        ;; Erzeugt die Rest-Liste im Heap, Zeiger auf diese Liste wird hinter
+        ;; den Key-Parametern abgelegt.
+        ;;-----------------------------
+        (when (and rest (or (> (?write rest) 1) (plusp (?read rest))))
+          (when (plusp (?read rest))
+            (C-Lispcall "Flist" (CC-StackTop) (CC-op- C-nargs nsimpopt)))
+          (incf *rlo-statistics-rest-funs*)
+          (cg-var-bind rest *stack-top*)
+          (incf *stack-top*)))
 
     (when (> nkey 0)
       (let ((*result-spec* (stack-location first-key *level*))
             (i 0))
         (dolist (key-spec (?key-list params))
-
+          
           ;; nur etwas zu tun, wenn Supplied-Variable gesetzt
           ;; oder Keyword-Parameter mit Wert != NIL initialisiert wird.
           ;;--------------------------------------------------------------
@@ -372,10 +460,20 @@
           (cg-var-bind (?var key-spec) (?offset *result-spec*) (CC-StackTop))
           (incf (?offset *result-spec*))
           (incf i)))
-
+      
       ;; den C-Block schliessen, in dem supl_flags definiert wurde.
       ;;-----------------------------------------------------------
-      (C-blockend))))
+      (C-blockend))
+
+    ;; Restlistenoptimierung einschalten?
+    ;;-----------------------------------
+    (setq *rest-optimization* 
+          (when rlo 
+            (C-Assign C-local 
+                      (CC-stack (if (plusp closure-offset)
+                                    (CC-op+ C-nargs closure-offset)
+                                    C-nargs)))
+            (+ nsimpopt closure-offset)))))
 
 ;;------------------------------------------------------------------------------
 ;; let*
@@ -386,14 +484,26 @@
         (vars (?var-list form))
         (forms (?init-list form)))
 
-    (let ((*result-spec* (stacktop-result-location)))
-      (loop (unless vars (return))
-       (cg-form (pop forms))
-       (cg-var-bind (pop vars) *stack-top*)
-       (incf (?offset *result-spec*))
-       (incf *stack-top*)))
-
+    ;; spezielle `rest'-Variablen deklarieren
+    (when *rest-optimization*
+      (C-blockstart)
+      (dolist (var vars)
+        (when (rest-p var)
+          (cg-var-bind var (decf *rest-var-count*))
+          (C-PtrDecl "CL_FORM" (CC-restvar (?offset var))))))
+    
+    (dolist (var vars)
+      (if (and *rest-optimization* (rest-p var))
+          (let ((*result-spec* var))
+            (cg-form (pop forms)))
+          (let ((*result-spec* (stacktop-result-location)))
+            (cg-form (pop forms))
+            (cg-var-bind var *stack-top*)
+            (incf *stack-top*))))
+    
     (cg-form (?body form))
+    (when *rest-optimization*
+      (C-blockend))
     (setq *stack-top* old-stack)
     (C-restore-special old-special)))
 
@@ -418,28 +528,42 @@
                     (eql (?offset var) (1- *stack-top*))
                     (eql (?level var) *level*)
                     (not (?closure var)))
-
-             ;; Zuweisung an eine lokale Variable, die direkt unterhalb von
-             ;; *stacktop* liegt; (nicht im Heap !)
-             ;;------------------------------------
-             (stacktop-result-location (?offset var))
-             var)))
-        
+               
+               ;; Zuweisung an eine lokale Variable, die direkt unterhalb
+               ;; von *stacktop* liegt; (nicht im Heap !)
+               ;;----------------------------------------
+               (stacktop-result-location (?offset var))
+               var)))
+      
       (cg-form (?form form)))
     (to-result-loc var)))
 
 ;;------------------------------------------------------------------------------
 ;; Named Constant
 ;;------------------------------------------------------------------------------
-(defmethod cg-form ((form named-const))
+(defmethod cg-form ((form defined-named-const))
   (let ((value (?value form)))
     (if (eq :unknown value)
         (internal-error
          'cg-form
-         "Named constants with unknown values are nor implemented: ~s"
+         "Named constants with unknown values are not implemented: ~s"
          (?symbol form))
         (etypecase value
           ((or simple-literal sym structured-literal) (cg-form value))))))
+
+(defmethod cg-form ((form imported-named-const))
+  (case *result-spec*
+    ((nil))
+    (C-BOOL (setq *C-bool* C-TRUE))
+    (t (C-MacroCall (CC-NameConc "LOAD_"
+                                 (case (?value-zs-type form)
+                                   (:cons "CONS")
+                                   (:string "SMSTR")
+                                   (:vector "SMVEC_T")
+                                   (:array "SMAR_T")
+                                   (:literal-instance "STRUCT")))
+                    (CC-cast "CL_FORM *" (?adr form))
+                    (CC-dest *result-spec*)))))
 
 ;;------------------------------------------------------------------------------
 ;; Bindet die Variable 'var' neu. 'var' wird im Stack oder im Heap oder in
@@ -543,12 +667,12 @@
 ;;------------------------------------------------------------------------------
 (defun CC-frame-access (offset level)
   (if (= *level* level)
-
-    ;; liegt im aktuellen Activation Record.
-    ;;--------------------------------------
-    (CC-Stack offset)
-
-    (CC-arrayptr (CC-arraykomp C-display (- level *cl-level*)) offset)))
+      
+      ;; liegt im aktuellen Activation Record.
+      ;;--------------------------------------
+      (CC-Stack offset)
+      
+      (CC-arrayptr (CC-arraykomp C-display (- level *cl-level*)) offset)))
 
 ;;------------------------------------------------------------------------------
 (defun CC-StackTop ()
@@ -618,7 +742,10 @@
     
     ;; Boolesches Resultat gewuenscht
     ;;-------------------------------
-    (C-BOOL (setq *C-bool* (CC-make-bool (CC-dest loc))))
+    (C-BOOL 
+     (setq *C-bool* (if (rest-p loc)
+                        (CC-MacroCall "REST_NOT_EMPTY" (CC-dest loc))
+                        (CC-make-bool (CC-dest loc)))))
 
     ;; Normales Resultat erzeugen
     ;;---------------------------
@@ -651,8 +778,198 @@
               (and *copy-source*
                    (equal-loc source *copy-dest*)
                    (equal-loc dest *copy-source*)))
-    (C-copy (CC-dest source) (CC-dest dest))
+    (if (and (rest-p source) (rest-p dest))
+        (C-Assign (CC-dest dest) (CC-dest source))
+        (C-copy (CC-dest source) (CC-dest dest)))
     (setq *copy-source* source *copy-dest* dest)))
+
+;;------------------------------------------------------------------------------
+(defun rest-p (loc)
+  (and (local-static-p loc) (minusp (?offset loc))))
+
+;;------------------------------------------------------------------------------
+;; Test, ob &rest-Liste optimiert werden kann. Dazu muß eine &rest-Variable
+;; aber keine &key-Variablen existieren. Außerdem muß die &rest-Variable
+;; überhaupt benutzt werden.  `rest' darf nur in bestimmten
+;; Funktionensaufrufen und Zuweisungen vorkommen und nicht frei in den lokalen
+;; Funktionen von "fun".
+;;------------------------------------------------------------------------------
+(defun rest-optimization-p (params body local-funs)
+  (when (and *optimize*
+             (local-static-p (?rest params))
+             (or (> (?write (?rest params)) 1) (plusp (?read (?rest params))))
+             (not (?key-list params)))
+    ;; Restvariable kennzeichnen
+    ;;--------------------------
+    (dolist (v (?all-vars params)) (setf (?offset v) 0))
+    (setf (?offset (?rest params)) -1)
+    
+    ;; Rumpf überprüfen und freie Variablen auf Rest-Variablen überprüfen.
+    ;;--------------------------------------------------------------------
+    (and (rlo-form body)
+         (notany #'(lambda (lfun) 
+                     (some #'(lambda (var) (minusp (?offset var)))
+                           (?free-lex-vars lfun)))
+                 local-funs))))
+
+;;------------------------------------------------------------------------------
+;; Entspricht `form' einem "var-ref" auf eine &rest-Variable?
+;;------------------------------------------------------------------------------
+(defun rest-var-p (form)
+  (and (var-ref-p form) 
+       (local-static-p (?var form)) 
+       (minusp (?offset (?var form)))))
+
+;;------------------------------------------------------------------------------
+;; Entspricht `form' einem Zugriff auf `rest' oder (L::CDR form), wobei `form'
+;; wieder von der gleichen Art sein muß ?
+;;------------------------------------------------------------------------------
+(defun rlo-rest-form (form)
+  (or (rest-var-p form)
+      (and (app-p form) (fun-p (?form form))
+           (eq (?my-last-arg-may-be-rest-var (?form form)) :cdr)
+           (rlo-rest-form (car (?arg-list form))))
+      (and (let*-form-p form)
+           (every #'(lambda (v i)       ;Variablen binden
+                      (if (local-static-p v)
+                          (if (rlo-rest-form i)
+                              (setf (?offset v) -1)
+                              (if (rlo-form i)
+                                  (setf (?offset v) 0)
+                                  nil))
+                          (rlo-form i)))
+                  (?var-list form)
+                  (?init-list form))
+           (or (rlo-rest-form (?body form))
+               (and (progn-form-p (?body form))
+                    (rlo-form-list (butlast (?form-list (?body form))))
+                    (rlo-rest-form 
+                     (car (last (?form-list (?body form))))))))))
+
+;;------------------------------------------------------------------------------
+;; Untersuche eine Liste von "form"s.
+;;------------------------------------------------------------------------------
+(defun rlo-form-list (form-list)
+  (every #'rlo-form form-list))
+
+;;------------------------------------------------------------------------------
+;; APP: Wenn `rest' als Argument in einer Funktion vorkommt, die entweder
+;; erst zur Laufzeit evaluiert wird oder keine der speziell zu behandelnden
+;; Funktionen ist -> verloren.
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((an-app app))
+  (if (and (fun-p (?form an-app))
+           (?my-last-arg-may-be-rest-var (?form an-app))
+           (rlo-rest-form (car (last (?arg-list an-app)))))
+      (case (?my-last-arg-may-be-rest-var (?form an-app))
+        ((:length
+          :car
+          :apply
+          :atom
+          :consp) (rlo-form-list (butlast (?arg-list an-app))))
+        (T nil))
+      (and (rlo-form (?form an-app))
+           (rlo-form-list (?arg-list an-app)))))
+
+;;------------------------------------------------------------------------------
+;; SETQ-FORM: Zuweisung an `rest', die nicht (L::CDR rest) ist -> verloren
+;; Sonst untersuche "form".
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-setq-form setq-form))
+  (if (rest-var-p (?location a-setq-form))
+      (rlo-rest-form (?form a-setq-form))
+      (rlo-form (?form a-setq-form))))
+
+;;------------------------------------------------------------------------------
+;; PROGN-FORM: Untersuche "form-list".
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-progn-form progn-form))
+  (rlo-form-list (?form-list a-progn-form)))
+
+;;------------------------------------------------------------------------------
+;; IF-FORM: Untersuche "pred", "then" und "else".
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((an-if-form if-form))
+  (and (or (rlo-rest-form (?pred an-if-form))
+           (rlo-form (?pred an-if-form)))
+       (rlo-form (?then an-if-form))
+       (rlo-form (?else an-if-form))))
+
+;;------------------------------------------------------------------------------
+;; SWITCH-FORM: Untersuche "form" und alle "cases".
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-switch-form switch-form))
+  (and (rlo-form (?form a-switch-form))
+       (rlo-form-list (?case-list a-switch-form))
+       (rlo-form (?otherwise a-switch-form))))
+
+;;------------------------------------------------------------------------------
+;; LABELED-FORM: Untersuche "form".
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-labeled-form labeled-form))
+  (rlo-form (?form a-labeled-form)))
+
+;;------------------------------------------------------------------------------
+;; LET*-FORM: Prüfe, ob neue &rest-Variablen gebunden werden sollen.
+;; Untersuche "init-list" und "body". 
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-let*-form let*-form))
+  (and (every #'(lambda (v i)
+                  (if (local-static-p v)
+                      (if (rlo-rest-form i)
+                          (setf (?offset v) -1)
+                          (if (rlo-form i)
+                              (setf (?offset v) 0)
+                              nil))
+                      (rlo-form i)))
+              (?var-list a-let*-form)
+              (?init-list a-let*-form))
+       (rlo-form (?body a-let*-form))))
+
+;;------------------------------------------------------------------------------
+;; LABELS-FORM: Untersuche "fun-list" und "body".
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-labels-form labels-form))
+  (and (rlo-form-list (?fun-list a-labels-form))
+       (rlo-form (?body a-labels-form))))
+
+;;------------------------------------------------------------------------------
+;; LET/CC-FORM: Untersuche "body".
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-let/cc-form let/cc-form))
+  (rlo-form (?body a-let/cc-form)))
+
+;;------------------------------------------------------------------------------
+;; TAGBODY-FORM: Untersuche "first-form" und "tagged-form-list".
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-tagbody-form tagbody-form))
+  (and (rlo-form (?first-form a-tagbody-form))
+       (every #'(lambda (a-tagged-form) (rlo-form (?form a-tagged-form)))
+              (?tagged-form-list a-tagbody-form))))
+
+;;------------------------------------------------------------------------------
+;; MV-LAMBDA: Wenn ebenfalls `rest'-Parameter vorhanden -> verloren.
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-mv-lambda mv-lambda))
+  (unless (plusp (?read (?rest (?params a-mv-lambda))))
+    (and (rlo-form (?body a-mv-lambda))
+         (rlo-form (?arg a-mv-lambda)))))
+
+;;------------------------------------------------------------------------------
+;; VAR-REF: Zugriff auf `rest' -> verloren.  Die Benutzung von `rest' innerhalb
+;; der erlaubten Applikationen wird bereits in der Methode für "app" überprüft. 
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-var-ref var-ref))
+  (not (rest-var-p a-var-ref)))
+
+;;------------------------------------------------------------------------------
+;; DEFAULT: nix zu tun. Alles ok.
+;;------------------------------------------------------------------------------
+(defmethod rlo-form ((a-form form))
+  T)
+
+(defmethod rlo-form ((a-cont cont))
+  T)
 
 ;;------------------------------------------------------------------------------
 (provide "cgvars")

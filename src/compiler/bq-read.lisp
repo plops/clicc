@@ -5,8 +5,11 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Laufzeitsystem:  Backquote-Reader + Simplifier
 ;;;
-;;; $Revision: 1.8 $
+;;; $Revision: 1.9 $
 ;;; $Log: bq-read.lisp,v $
+;;; Revision 1.9  1994/01/11  16:12:37  hk
+;;; Fehler in bq-attach-append bei `( ..... . const) behoben.
+;;;
 ;;; Revision 1.8  1993/06/17  08:00:09  hk
 ;;; Copright Notiz eingefuegt
 ;;;
@@ -213,10 +216,10 @@
 
 ;;------------------------------------------------------------------------------
 (defun bq-attach-append (op item result)
-  (cond ((and (null-or-quoted item) (null-or-quoted result))
-         (list *bq-quote* (append (cadr item) (cadr result))))
-        ((or (null result) (equal result *bq-quote-nil*))
+  (cond ((or (null result) (equal result *bq-quote-nil*))
          (if (bq-splicing-frob item) (list op item) item))
+        ((and (null-or-quoted item) (null-or-quoted result))
+         (list *bq-quote* (append (cadr item) (cadr result))))
         ((and (consp result) (eq (car result) op))
          (list* (car result) item (cdr result)))
         (t (list op item result))))

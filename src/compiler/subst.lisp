@@ -5,8 +5,14 @@
 ;;;            ------------------------------------------------------
 ;;; Inhalt   : Ersetzung von Konstanten und Variablen durch ihre Werte.
 ;;;
-;;; $Revision: 1.5 $
+;;; $Revision: 1.7 $
 ;;; $Log: subst.lisp,v $
+;;; Revision 1.7  1994/03/03  13:53:44  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.6  1994/02/08  14:48:14  hk
+;;; used Slot nur in defined-fun/sym/class erhöhen.
+;;;
 ;;; Revision 1.5  1993/09/21  12:52:14  jh
 ;;; Voreilig eingecheckten Fehler beseitigt.
 ;;;
@@ -64,7 +70,7 @@
 (defun inc-uses (x)
   (if (cont-p x)
       (incf (?read x))
-      (when (or (sym-p x) (fun-p x) (class-def-p x))
+      (when (or (defined-sym-p x) (defined-fun-p x) (defined-class-p x))
         (incf (?used x)))))
 
 ;;------------------------------------------------------------------------------
@@ -109,14 +115,14 @@
 ;;------------------------------------------------------------------------------
 ;; angewandtes Vorkommen von named-const
 ;;------------------------------------------------------------------------------
-(defmethod subst-1form ((a-named-const named-const))
-  (let ((value (?value a-named-const)))
+(defmethod subst-1form ((a-defined-named-const defined-named-const))
+  (let ((value (?value a-defined-named-const)))
     (if (copy-is-eq-p value)
         (progn
-          (decf (?read a-named-const))
+          (decf (?read a-defined-named-const))
           (inc-uses value)
           value)
-        a-named-const)))
+        a-defined-named-const)))
 
 ;;------------------------------------------------------------------------------
 ;; setq

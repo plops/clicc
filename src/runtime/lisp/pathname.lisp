@@ -5,8 +5,14 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Systemunabhaengige Pathname Funktionen
 ;;;
-;;; $Revision: 1.8 $
+;;; $Revision: 1.10 $
 ;;; $Log: pathname.lisp,v $
+;;; Revision 1.10  1994/06/02  13:15:53  hk
+;;; Print-Funktion f"ur pathname-Struktur definiert.
+;;;
+;;; Revision 1.9  1994/05/05  14:15:31  hk
+;;; Constructor f"ur pattern wieder mit BOA versehen.
+;;;
 ;;; Revision 1.8  1993/07/06  10:40:02  hk
 ;;; Queue Funktionen nach seq.lisp
 ;;;
@@ -28,7 +34,7 @@
 ;;;
 ;;; Revision 1.3  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.8 $ eingefuegt
+;;; $Revision: 1.10 $ eingefuegt
 ;;;
 ;;; Revision 1.2  1993/01/20  11:09:03  uho
 ;;; Aufrufe von %make-pathname mit keywords versehen.
@@ -67,7 +73,7 @@
 
 ;;;; Patterns
 (defstruct (pattern
-	    (:constructor make-pattern)
+	    (:constructor make-pattern (pieces))
             (:copier nil))
   (pieces nil :type list))
 
@@ -127,6 +133,12 @@
   (name nil :type (or simple-string pattern null))
   (type nil :type (or simple-string pattern null (member :unspecific)))
   (version nil :type (or integer null (member :newest :wild))))
+
+(defun %print-pathname (pathname stream depth)
+  (declare (ignore depth))
+     (write-string "#P\"" stream)
+     (write-string (namestring pathname) stream)
+     (write-char #\" stream))
 
 (defstruct (host
              (:copier nil)

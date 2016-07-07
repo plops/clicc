@@ -6,8 +6,18 @@
 ;;; Funktion : Methoden fuer Print-Object, spezialisiert fuer die Lisp nahe
 ;;;            Zwischensprache
 ;;;
-;;; $Revision: 1.23 $
+;;; $Revision: 1.26 $
 ;;; $Log: printzs.lisp,v $
+;;; Revision 1.26  1994/03/03  13:52:36  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.25  1994/02/21  09:55:07  ft
+;;; Anpassung von PO-STANDARD an die Änderungen an Klassen und ge.
+;;; Funktionen.
+;;;
+;;; Revision 1.24  1994/01/05  10:13:02  kl
+;;; Funktionen types-on und types-off aus timain.lisp nach hier verlegt.
+;;;
 ;;; Revision 1.23  1993/12/22  09:21:00  hk
 ;;; Verwendung des xp Package gestrichen, um Probleme mit vordefinieren
 ;;; Pretty-Printern zu vermeiden.
@@ -179,9 +189,9 @@
                            (dynamic . (sym))
                            (form)
                            (var-ref . (var))
-                           (named-const . (symbol exported value))
-                           (defined-named-const)
-                           (imported-named-const)
+                           (named-const . (symbol))
+                           (defined-named-const . (exported value))
+                           (imported-named-const . (value-zs-type))
                            (literal)
                            (sym . (symbol exported))
                            (defined-sym . (name package))
@@ -194,7 +204,7 @@
                            (class-def . (symbol 
                                          super-list 
                                          slot-descr-list))
-                           (defined-class)
+                           (defined-class . (exported))
                            (imported-class)
                            (built-in-class-def . (symbol 
                                                   super-list 
@@ -218,9 +228,8 @@
                            (generic-fun . (method-list
                                            argument-precedence-order
                                            method-combination))
-                           (defined-generic-fun . ())
-                           (global-generic-fun . (exported))
-                           (imported-generic-fun . (exported))
+                           (defined-generic-fun . (exported))
+                           (imported-generic-fun . ())
                            (method-def . (fun specializer-list qualifier-list))
                            (app . (form arg-list))
                            (setq-form . (location form))
@@ -241,6 +250,24 @@
 ;; Weitere vorgegebene m"ogliche Belegungen f"ur *po-slot-list*
 ;;------------------------------------------------------------------------------
 (setf *po-slot-list* PO-STANDARD)
+
+
+;;------------------------------------------------------------------------------
+;; Funktionen zum Ein- und Ausschalten der Anzeige des Typslots der ZS-Elemente.
+;;------------------------------------------------------------------------------
+(defmacro find-po-slot-list-element (a-zs-class-name)
+  `(rest (assoc ',a-zs-class-name *po-slot-list*)))
+
+(defun types-off ()
+  (setf (find-po-slot-list-element form) 
+        (remove 'type (find-po-slot-list-element form)))
+  (setf (find-po-slot-list-element var) 
+        (remove 'type (find-po-slot-list-element var))))
+
+(defun types-on ()
+  (push 'type (find-po-slot-list-element form))
+  (push 'type (find-po-slot-list-element var)))
+
 
 ;;------------------------------------------------------------------------------
 (provide "printzs")

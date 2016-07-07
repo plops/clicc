@@ -5,8 +5,12 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Laufzeitsystem, Initialisierung
 ;;;
-;;; $Revision: 1.11 $
+;;; $Revision: 1.12 $
 ;;; $Log: startup.lisp,v $
+;;; Revision 1.12  1993/12/09  17:14:26  sma
+;;; *package-array* und *keyword-package* werden jetzt in packg.lisp
+;;; definiert.
+;;;
 ;;; Revision 1.11  1993/06/16  15:20:38  hk
 ;;;  Copyright Notiz eingefuegt.
 ;;;
@@ -20,7 +24,7 @@
 ;;;
 ;;; Revision 1.8  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.11 $ eingefuegt
+;;; $Revision: 1.12 $ eingefuegt
 ;;;
 ;;; Revision 1.7  1993/01/19  16:09:10  hk
 ;;; filesys-init
@@ -54,8 +58,6 @@
 (defun rt:startup ()
   (rt::init-keysort ':ALLOW-OTHER-KEYS)
 
-  (setq *package-array* (make-array 6 :fill-pointer 0 :adjustable t))
-  (setq *keyword-package* (make-package "KEYWORD" :nicknames '("") :use ()))
   (catch 'ERROR-CATCHER
     (rt::init-main)
     0))

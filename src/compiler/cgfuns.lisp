@@ -8,8 +8,80 @@
 ;;;            - Closures, Downfuns
 ;;;            - Aufrufe von importierten und definierten Funktionen
 ;;;
-;;; $Revision: 1.43 $
+;;; $Revision: 1.58 $
 ;;; $Log: cgfuns.lisp,v $
+;;; Revision 1.58  1994/06/08  09:54:33  hk
+;;; opt-args: Bei Rest-Listen-Optimierung kann das Problem auftreten, da"s
+;;; eine Variable LOCAL(x) den gleichen Offset hat als die
+;;; Argument-Position eines Arguments an ARG(x).  Eine COPY-Anweisung
+;;; zwischen diesen Positionen w"urde f"alschlich wegoptimiert werden.
+;;;
+;;; Revision 1.57  1994/06/07  16:15:24  hk
+;;; Bug in CMU17 umgangen. Wieder vern"unftig einger"uckt.
+;;;
+;;; Revision 1.56  1994/05/25  14:05:17  sma
+;;; Aufruf der Restlistenoptimierung aus cg-params herausgezogen.
+;;;
+;;; Revision 1.55  1994/05/02  14:20:55  sma
+;;; opt-args korrigiert: Keine Optimierung, wenn ein Parameter eine
+;;; Restvariable ist.
+;;;
+;;; Revision 1.54  1994/04/28  09:59:52  sma
+;;; Erzeugung eines DOWN_FUNARGS durch Makroaufruf abstrahiert.
+;;;
+;;; Revision 1.53  1994/04/14  17:05:36  sma
+;;; REST_NOT_EMPTY Makro wird statt (rest_X != local) benutzt.
+;;;
+;;; Revision 1.52  1994/02/16  16:45:29  hk
+;;; *if-counter* *cont-counter* *tagbody-counter* werden f"ur jede
+;;; Funktion neu mit 0 initialisiert.
+;;;
+;;; Revision 1.51  1994/02/10  16:01:00  sma
+;;; cdr-rest-funcall-p -> rlo-rest-form.
+;;;
+;;; Revision 1.50  1994/02/08  13:56:53  sma
+;;; Diverse Änderungen für rest-Parameter-Optimierungen.
+;;;
+;;; Revision 1.49  1994/02/03  17:31:23  sma
+;;; Änderungen für Optimierung von &rest-Paramtern.
+;;;
+;;; Revision 1.48  1994/01/07  15:17:42  hk
+;;; Nach der letzten Änderung wird opt-args in mehr Fällen aufgerufen, so
+;;; daß ein Fehler bei der Ausnutzung von ?need-no-stack auftreten kann:
+;;; man darf eine Funktion nur direkt auf die Variablenposition anwenden,
+;;; wenn diese stackalloziert ist und im aktuellen Activation Record
+;;; liegt.
+;;;
+;;; Revision 1.47  1994/01/07  13:40:06  hk
+;;; In opt-args die Abschätzung für den Fall verbessert, daß die aktuelle
+;;; Funktion lokale Funktionen hat.
+;;;
+;;; Revision 1.46  1994/01/07  10:18:52  hk
+;;; closure-result-p entfernt, weil Daten vom Typ closure-result
+;;; nicht mehr vorkommen.
+;;;
+;;; Revision 1.45  1994/01/06  17:28:34  sma
+;;; opt-args verbessert, um mehr COPY-Befehle einzusparen. Die
+;;; imported-funs aus sys.def haben eine neue Annotation need-no-stack
+;;; bekommen, die den Wert T enthält, wenn die Funktion einstellig ist und
+;;; keinen weiteren LISP-Stack benötigt. So kann die optimierung, daß das
+;;; Funktionsergebnis eines Funktionsaufrufs an der Stelle erzeugt wird,
+;;; wo es benötigt wird, öfter greifen.
+;;; Wurde bei
+;;; 	(let (a b)
+;;; 	  (setq a (1+ a)))
+;;; vorher
+;;; 	COPY(ARG(0),ARG(2));
+;;; 	F1plus(ARG(2));
+;;; 	COPY(ARG(2),ARG(0));
+;;; erzeugt, ist es jetzt nur
+;;; 	F1plus(ARG(0));
+;;;
+;;; Revision 1.44  1994/01/05  12:28:24  sma
+;;; cg-set-C-name so geändert, daß bei Funktionen aus dem rt-package ein
+;;; Präfix "rt_" generiert wird, wenn die Funktionsnamen weder mit "c_"
+;;; noch mit "unix_" beginnen.
+;;;
 ;;; Revision 1.43  1993/12/23  12:02:25  hk
 ;;; Fehler in opt-args behoben.
 ;;;
@@ -205,6 +277,7 @@
                           ((eq :JUMP (?mv-spec fun)) nil)
                           (closure (stacktop-location))
                           (t (stacktop-result-location)))))
+    (setq *if-counter* (setq *cont-counter* (setq *tagbody-counter* 0)))
     (flet 
         ((gen-fun ()
            (when (?local-funs fun)
@@ -237,7 +310,9 @@
              ;;-----------------------------------------------------
              (incf *stack-top*))
 
-           (cg-params (?params fun) (>= (?par-spec fun) 0))
+           (cg-params (?params fun) (>= (?par-spec fun) 0)
+                      (rest-optimization-p (?params fun) (?body fun)
+                                           (?local-funs fun)))
 
            ;; Initialisiserungsfunktionen dürfen nur einmal aufgerufen werden.
            ;;-----------------------------------------------------------------
@@ -257,7 +332,7 @@
            ;; Die im Rumpf definierten lokalen Funktionen uebersetzen
            ;;--------------------------------------------------------
            (dolist (local (?local-funs fun))
-               (cg-fun-def local))))
+             (cg-fun-def local))))
      
       (cond
         (closure (let ((*closure* fun)
@@ -345,7 +420,9 @@
 ;; Die Konvertierung ist nicht injektiv, daher wird dem generierten String im
 ;; allgemeinen ein eindeutiger Prefix vorangestellt.  Fuer Symbole des Lisp
 ;; und Runtime Package wird sichergestellt, dass keine 'weiteren Zeichen' in
-;; den Symbolen vorkommen und deshalb kann auf ein Praefix verzichtet werden.
+;; den Symbolen vorkommen. Allen Funktionen, die weder mit "c-" noch mit 
+;; "unix-" beginnen, wird der Praefix "rt_" vorangestellt, so dass aus
+;; (rt::make_string) ein rt_make_string wird.
 ;; Die Indentifikatoren fuer Symbole des Lisp-Package werden nur deshalb mit
 ;; dem Praefix "F" versehen, um sie sofort als Standard-Lisp-Funktionen
 ;; identifizieren zu k"onnen.  Symbole des User-package werden nur dann mit
@@ -357,7 +434,14 @@
   (labels ((unique-name (symbol)
              (unique-prefix (symbol2ident symbol :allow-illegal t)))
            (symbol2ident (symbol &key (allow-illegal nil))
-             (C-ify (string symbol) :allow-illegal allow-illegal)))
+             (C-ify (string symbol) :allow-illegal allow-illegal))
+           (rt-symbol2ident (symbol)
+             (let ((str (symbol2ident symbol)))
+               (if (and (> (length str) 5)
+                        (or (string= (subseq str 0 2) "c_")
+                            (string= (subseq str 0 5) "unix_")))
+                   str
+                   (concatenate 'string "rt_" str)))))
     
     (setf (?adr fun)
           (let ((symbol (?symbol fun)))
@@ -369,7 +453,8 @@
                                            "SET-" (string real-symbol))))
                  (cond
                    ((local-fun-p fun) (unique-name string))
-                   ((eq package *runtime-package*) (symbol2ident string))
+                   ((eq package *runtime-package*) 
+                    (rt-symbol2ident string))
                    ((eq package *ffi-package*)
                     (concatenate 'string "FFI_" (symbol2ident string)))
                    (T (multiple-value-bind (s status)
@@ -383,7 +468,8 @@
                (let ((package (symbol-package symbol)))
                  (cond
                    ((local-fun-p fun) (unique-name symbol))
-                   ((eq package *runtime-package*) (symbol2ident symbol))
+                   ((eq package *runtime-package*) 
+                    (rt-symbol2ident symbol))
                    ((eq package *ffi-package*)
                     (concatenate 'string "FFI_" (symbol2ident symbol)))
                    ((eq package *user-package*)
@@ -526,8 +612,8 @@
       ;; dann wird zunaechst NIL eingetragen.
       ;;--------------------------------------
       (if (slot-boundp fun 'closure-offset)
-        (C-copy (CC-closure fun) (CC-arrayptr C-array i))
-        (C-nil (CC-arrayptr C-array i)))
+          (C-copy (CC-closure fun) (CC-arrayptr C-array i))
+          (C-nil (CC-arrayptr C-array i)))
       (incf i))
     (C-MacroCall "LOAD_CLOSURE" C-array dest)
     (C-blockend)))
@@ -589,27 +675,27 @@
 
 ;;------------------------------------------------------------------------------
 (defmethod cg-form ((fun defined-fun))
-   (case *result-spec*
+  (case *result-spec*
     ((NIL))
     (C-BOOL (setq *C-bool* C-TRUE))
     (T (let ((dest (CC-dest *result-spec*)))
          (if (or (global-fun-p fun)
                  (?as-global-fun fun))
                
-           ;; Closure wurde einmal beim Laden des Programms erzeugt.
-           ;;-------------------------------------------------------
-           (C-MacroCall "LOAD_GLOBFUN"
-                        (CC-Address (CC-NameConc "C" (?adr fun)))
-                        dest)
+             ;; Closure wurde einmal beim Laden des Programms erzeugt.
+             ;;-------------------------------------------------------
+             (C-MacroCall "LOAD_GLOBFUN"
+                          (CC-Address (CC-NameConc "C" (?adr fun)))
+                          dest)
 
-           (case (?closure fun)
-             (:closure (C-copy (CC-closure fun) dest))
-             (:downfun
-              (C-MacroCall "LOAD_DOWNFUN"
-                           (CC-Address (CC-NameConc "downfun"
-                                                    (incf *downfun-count*)))
-                           dest))
-             (T (error "illegal closure-type ~A" (?closure fun)))))))))
+             (case (?closure fun)
+               (:closure (C-copy (CC-closure fun) dest))
+               (:downfun
+                (C-MacroCall "LOAD_DOWNFUN"
+                             (CC-Address (CC-NameConc "downfun"
+                                                      (incf *downfun-count*)))
+                             dest))
+               (T (error "illegal closure-type ~A" (?closure fun)))))))))
 
 ;;------------------------------------------------------------------------------
 ;; Optimierung:
@@ -627,20 +713,42 @@
 ;; (f 1 (let ((x 1)) (+ x x)) 3)
 ;;------------------------------------------------------------------------------
 (defun opt-args (args &optional fun)
-  (when  (stacktop-result-p *result-spec*)
+  (when (or (stacktop-result-p *result-spec*)
+            (and (imported-fun-p fun)
+                 (?need-no-stack fun)
+                 (local-static-p *result-spec*)
+                 (eql (?level *result-spec*) *level*)
+                 (not (?closure *result-spec*))))
     (let* ((new-stack-top (?offset *result-spec*))
            (deleted-stack (1- new-stack-top)))
       (when
           (and
            (> *stack-top* new-stack-top)
 
-           ;; Wenn die aktuelle Funktion lokale Funktionsdefinitionen enthält,
-           ;; dann dürfen keine lokalen Variablen überschrieben werden.  Die
-           ;; zur Zeit vorgenommene Abschätzung ist sehr ungenau. Man bräuchte
-           ;; nur Downfuns zu betrachten oder lokale Funktionen, die
-           ;; Continuations der aktuellen Funktion frei enthalten.
+           ;; Bei Rest-Listen-Optimierung kann das Problem auftreten, da"s
+           ;; eine Variable LOCAL(x) den gleichen Offset hat als die
+           ;; Argument-Position eines Arguments an ARG(x).
+           ;; Eine COPY-Anweisung zwischen diesen Positionen w"urde
+           ;; f"alschlich wegoptimiert werden.
+           ;;---------------------------------
+           (or (not *rest-optimization*) (>= new-stack-top *rest-optimization*))
+
+           ;; Prüfen, ob die aktuelle Funktion lokale Funktionsdefinitionen
+           ;; enthält. Wenn diese Funktionen freie Variablen der aktuellen
+           ;; Funktion enthalten und diese im Stack liegen, was nur der Fall
+           ;; ist, wenn es Downward Functions sind, und wenn sie eine
+           ;; Continuation der aktuellen Funktion frei enthalten, dann können
+           ;; sie evtl. noch auf Variablen im zu optimierenden Stackabschnitt
+           ;; zugreifen. Die Optimierung muß dann unterbleiben.
            ;;-----------------------------------------------------
-           (not (?local-funs *current-fun*))
+           (not (find-if #'(lambda (local-fun)
+                             (and (eq :DOWNFUN (?closure local-fun))
+                                  
+                                  ;; Abschätzung: Continuation ODER Variable
+                                  ;;----------------------------------------
+                                  (find *level* (?free-lex-vars local-fun)
+                                        :key #'?level)))
+                         (?local-funs *current-fun*)))
 
            ;; pruefen, ob die ueberschriebenen Parameter und lokalen Variablen
            ;; als Argumente der aufzurufenden Funktion benutzt werden.
@@ -654,10 +762,15 @@
                        (setq arg (?var arg))
                        (cond
                          ((static-p arg)
-                          (when (and (eql *level* (?level arg))
+                          ;; Wenn Variablen-Referenz eine Rest-Variable in
+                          ;; einer Funktion mit Restlisten-Optimierung ist
+                          ;; oder wenn Variable in dem überschriebenen 
+                          ;; Bereich liegt...
+                          (when (or (minusp (?offset arg))
+                                    (and (eql *level* (?level arg))
                                      (<= new-stack-top
                                          (?offset arg)
-                                         deleted-stack))
+                                         deleted-stack)))
                             (return nil)))
                          ((dynamic-p arg))
                          (t (return nil))))
@@ -755,12 +868,16 @@
 
 ;;------------------------------------------------------------------------------
 (defmethod cg-app ((fun special-sys-fun) args app)
-  (declare (ignore app))
-  (if (?c-inline fun)
-       (let ((*stack-top* *stack-top*))
-         (apply (?c-inline fun) args))
-      (call-next-method)))
-
+  (if (and *rest-optimization* 
+           (?my-last-arg-may-be-rest-var fun)
+           (rlo-rest-form (car (last args))))
+      (rlo-dispatch fun args app)
+      ;;else
+      (if (?c-inline fun)
+          (let ((*stack-top* *stack-top*))
+            (apply (?c-inline fun) args))
+          (call-next-method))))
+  
 ;;------------------------------------------------------------------------------
 ;; Traegt die Basisadresse des aktuellen Activation-Records in den fuer
 ;; die aktuelle Funktion bereitgestellten Eintrag im Display-Array ein.
@@ -770,129 +887,139 @@
 
 ;;------------------------------------------------------------------------------
 (defmethod cg-app ((fun imported-fun) args app)
-  (let* (nargs
-         new-base
-         (old-stack *stack-top*)
-         (*downfun-count* 0)
-         (save-base (cg-downfuns app)))
-
-    (opt-args args)                     ; veraendert *stack-top* !
-    (setq new-base (CC-StackTop))
-    (setq nargs (cg-args args (?par-spec fun)))
-    (when save-base (C-save-base))
-
-    ;; Aufruf einer globalen Funktion.
-    ;;--------------------------------
-    (C-Lispcall (?adr fun) new-base nargs) 
-    
-    (unless (eq (?mv-spec fun) :JUMP)
-
-      ;; mv_count auf 1 ruecksetzen, falls die Funktion nicht benoetigte
-      ;; Values erzeugt.
-      ;;---------------------------------
-      (unless (or (eql (?mv-spec fun) 1) (?mv-used app))
-        (C-ResetMV))
-
-      (stacktop-to-result-loc))
-
-    (setq *stack-top* old-stack)
-
-    (when (> *downfun-count* 0)
-      (C-blockend))))
-                   
+  (if (and *rest-optimization* 
+           (?my-last-arg-may-be-rest-var fun)
+           (rlo-rest-form (car (last args))))
+      (rlo-dispatch fun args app)
+      ;;else
+      (let* (nargs
+             new-base
+             (old-stack *stack-top*)
+             (*downfun-count* 0)
+             (save-base (cg-downfuns app)))
+        
+        (opt-args args fun)             ; veraendert *stack-top* !
+        (setq new-base (CC-StackTop))
+        (setq nargs (cg-args args (?par-spec fun)))
+        (when save-base (C-save-base))
+        
+        ;; Aufruf einer globalen Funktion.
+        ;;--------------------------------
+        (C-Lispcall (?adr fun) new-base nargs) 
+        
+        (unless (eq (?mv-spec fun) :JUMP)
+          
+          ;; mv_count auf 1 ruecksetzen, falls die Funktion nicht benoetigte
+          ;; Values erzeugt.
+          ;;---------------------------------
+          (unless (or (eql (?mv-spec fun) 1) (?mv-used app))
+            (C-ResetMV))
+          
+          (stacktop-to-result-loc))
+        
+        (setq *stack-top* old-stack)
+        
+        (when (> *downfun-count* 0)
+          (C-blockend)))))
 
 ;;------------------------------------------------------------------------------
 (defmethod cg-app ((fun defined-fun) args app)
-  (let* (nargs
-         new-base
-         level
-         (adr (?adr fun))
-         (old-stack *stack-top*)
-         (closure (and (local-fun-p fun)
-                       (eq :CLOSURE (?closure fun))
-                       (not (?as-global-fun fun))))
-         (*downfun-count* 0)
-         (save-base (cg-downfuns app)))
-
-    (opt-args args fun)                 ; veraendert evtl. *stack-top* !
-    (setq new-base (CC-StackTop))
-    
-    (when closure
-
-      ;; Aufruf einer Closure.
-      ;; Closure-Datensruktur wird als 1. Parameter uebergeben
-      ;;------------------------------------------------------
-      (C-Copy (CC-closure fun) (CC-StackTop))
-      (incf *stack-top*))
-    
-    (setq nargs (cg-args args (?par-spec fun)))
-    (when save-base (C-save-base))
-
-    (cond
-      
-      ;; Aufruf einer globalen Funktion oder einer Closure.
-      ;;---------------------------------------------------
-      ((or (not (local-fun-p fun))
-           (?as-global-fun fun)
-           closure)
-
-       (C-Lispcall adr new-base nargs) 
-
-       (when closure
-         (decf *stack-top*)))
-
-      ;; Aufruf einer im Rumpf der aktuellen Funktion lokal definierten
-      ;; Funktion, vorher Display um aktuelle Basisadresse erweitern.
-      ;;-------------------------------------------------------------------
-      ((> (setq level (?level fun)) *level*)
-       (C-save-base)
-       (C-Lispcall adr new-base nargs C-display))
-
-      ;; Aufruf einer lokalen Funktion mit gleichem statischen Niveau
-      ;; oder einer lokalen Funktion f, mit niedrigerem statischen Niveau,
-      ;; wenn gilt maxlevel(f) = 0.
-      ;;------------------------------------------------------------------
-      ((or (= level *level*)
-           (and (eql 0 (?max-level fun)) (< level *level*)))
-       (C-Lispcall adr new-base nargs C-display))
-
-      ;; Aufruf einer lokalen Funktion f mit niedrigerem statischen Niveau.
-      ;; Vorher neues Display anlegen und dorthin alle Eintraege kopieren,
-      ;; die die aufgerufene Funktion benoetigt.
-      ;;-------------------------------------------------------------------
-      ((< level *level*)
-       (C-blockstart)
-       (C-PtrArrayDecl "CL_FORM" C-new_display (+ (- level *cl-level*)
-                                                  (?max-level fun)))
-       (dotimes (i (- level *cl-level*))
-         (C-Assign (CC-arraykomp C-new_display i) (CC-arraykomp C-display i)))
-       (C-Lispcall adr new-base nargs C-new_display)
-       (C-blockend)))
-
-    (unless (eq (?mv-spec fun) :JUMP)
-
-         ;; mv_count auf 1 ruecksetzen, falls die Funktion nicht benoetigte
-         ;; Values erzeugt.
-         ;;---------------------------------
-         (unless (or (eql (?mv-spec fun) 1) (?mv-used app))
-           (C-ResetMV))
-
-         (stacktop-to-result-loc))
-
-    (setq *stack-top* old-stack)
-
-    (when (> *downfun-count* 0)
-      (C-blockend))))
+  (if (and *rest-optimization* 
+           (?my-last-arg-may-be-rest-var fun)
+           (rlo-rest-form (car (last args))))
+      (rlo-dispatch fun args app)
+      ;;else
+      (let* (nargs
+             new-base
+             level
+             (adr (?adr fun))
+             (old-stack *stack-top*)
+             (closure (and (local-fun-p fun)
+                           (eq :CLOSURE (?closure fun))
+                           (not (?as-global-fun fun))))
+             (*downfun-count* 0)
+             (save-base (cg-downfuns app)))
+        
+        (opt-args args fun)             ; veraendert evtl. *stack-top* !
+        (setq new-base (CC-StackTop))
+        
+        (when closure
+          
+          ;; Aufruf einer Closure.
+          ;; Closure-Datensruktur wird als 1. Parameter uebergeben
+          ;;------------------------------------------------------
+          (C-Copy (CC-closure fun) (CC-StackTop))
+          (incf *stack-top*))
+        
+        (setq nargs (cg-args args (?par-spec fun)))
+        (when save-base (C-save-base))
+        
+        (cond
+          
+          ;; Aufruf einer globalen Funktion oder einer Closure.
+          ;;---------------------------------------------------
+          ((or (not (local-fun-p fun))
+               (?as-global-fun fun)
+               closure)
+           
+           (C-Lispcall adr new-base nargs) 
+           
+           (when closure
+             (decf *stack-top*)))
+          
+          ;; Aufruf einer im Rumpf der aktuellen Funktion lokal definierten
+          ;; Funktion, vorher Display um aktuelle Basisadresse erweitern.
+          ;;-------------------------------------------------------------------
+          ((> (setq level (?level fun)) *level*)
+           (C-save-base)
+           (C-Lispcall adr new-base nargs C-display))
+          
+          ;; Aufruf einer lokalen Funktion mit gleichem statischen Niveau
+          ;; oder einer lokalen Funktion f, mit niedrigerem statischen Niveau,
+          ;; wenn gilt maxlevel(f) = 0.
+          ;;------------------------------------------------------------------
+          ((or (= level *level*)
+               (and (eql 0 (?max-level fun)) (< level *level*)))
+           (C-Lispcall adr new-base nargs C-display))
+          
+          ;; Aufruf einer lokalen Funktion f mit niedrigerem statischen Niveau.
+          ;; Vorher neues Display anlegen und dorthin alle Eintraege kopieren,
+          ;; die die aufgerufene Funktion benoetigt.
+          ;;-------------------------------------------------------------------
+          ((< level *level*)
+           (C-blockstart)
+           (C-PtrArrayDecl "CL_FORM" C-new_display (+ (- level *cl-level*)
+                                                      (?max-level fun)))
+           (dotimes (i (- level *cl-level*))
+             (C-Assign (CC-arraykomp C-new_display i) 
+                       (CC-arraykomp C-display i)))
+           (C-Lispcall adr new-base nargs C-new_display)
+           (C-blockend)))
+        
+        (unless (eq (?mv-spec fun) :JUMP)
+          
+          ;; mv_count auf 1 ruecksetzen, falls die Funktion nicht benoetigte
+          ;; Values erzeugt.
+          ;;---------------------------------
+          (unless (or (eql (?mv-spec fun) 1) (?mv-used app))
+            (C-ResetMV))
+          
+          (stacktop-to-result-loc))
+        
+        (setq *stack-top* old-stack)
+        
+        (when (> *downfun-count* 0)
+          (C-blockend)))))
 
 ;;------------------------------------------------------------------------------
 ;; Funktion wird erst zur Laufzeit berechnet.
 ;;------------------------------------------------------------------------------
 (defmethod cg-app (exp args app)
   (let* (nargs
-        new-base
-        (old-stack *stack-top*)
-        (*downfun-count* 0)
-        (save-base (cg-downfuns app)))
+         new-base
+         (old-stack *stack-top*)
+         (*downfun-count* 0)
+         (save-base (cg-downfuns app)))
 
     (push exp args)
     (opt-args args)
@@ -973,35 +1100,97 @@
                      (eq :DOWNFUN (?closure downfun)))
             (let ((level (?level downfun))
                   (df-name (CC-NameConc "downfun" (incf *downfun-count*))))
-              (C-Assign (CC-structkomp df-name "fun") (?adr downfun))
-              (C-Assign (CC-structkomp df-name "par_spec") (?par-spec downfun))
-              (cond
+              (C-MacroCall 
+               "INIT_DOWN_FUNARG" df-name
+               (?adr downfun)
+               (?par-spec downfun)
+               (cond
+                   
+                 ;; vor Aufruf 'base' in 'display' sichern
+                 ;;---------------------------------------
+                 ((> level *level*)
+                  (setq save-base t)
+                  C-display)
+                   
+                 ;; 'display' kann direkt fuer das Downward-Funarg
+                 ;; verwendet werden.
+                 ;;------------------
+                 ((or (= level *level*)
+                      (and (eql 0 (?max-level downfun))
+                           (< level *level*)))
+                  C-display)
                   
-                ;; vor Aufruf 'base' in 'display' sichern
-                ;;---------------------------------------
-                ((> level *level*)
-                 (C-Assign (CC-structkomp df-name C-display) C-display)
-                 (setq save-base t))
-
-                ;; 'display' kann direkt fuer das Downward-Funarg
-                ;; verwendet werden.
-                ;;------------------
-                ((or (= level *level*)
-                     (and (eql 0 (?max-level downfun))
-                          (< level *level*)))
-                 (C-Assign (CC-structkomp df-name C-display) C-display))
-                  
-                ;; 'display' muss kopiert werden.
-                ;;-------------------------------
-                ((< level *level*)
-                 (dotimes (i (- level *cl-level*))
-                   (C-Assign
-                    (CC-arraykomp (CC-NameConc C-new_display *downfun-count*) i)
-                    (CC-arraykomp C-display i)))
-                 (C-Assign (CC-structkomp df-name C-display) C-new_display))))))
+                 ;; 'display' muss kopiert werden.
+                 ;;-------------------------------
+                 ((< level *level*)
+                  (dotimes (i (- level *cl-level*))
+                    (C-Assign
+                     (CC-arraykomp (CC-NameConc C-new_display 
+                                                *downfun-count*) i)
+                     (CC-arraykomp C-display i)))
+                  C-new_display))))))
 
         (setq *downfun-count* 0)))
     save-base ))
 
 ;;------------------------------------------------------------------------------
+;; Erzeugt C-Code für `rest', `(L:CDR rest)' oder `(L::CDR (L:CDR .. rest)..)'
+;;------------------------------------------------------------------------------
+(defun cg-rest-cdr (form)
+  #+CMU17(declare (notinline C-PtrDecl)) ; by-pass a bug
+  (labels
+      ((rest-cdr (form)
+         (if (var-ref-p form)
+             (CC-restvar (?offset (?var form)))
+             (progn 
+               (C-Assign C-rest (CC-MacroCall 
+                                 "REST_CDR" 
+                                 (rest-cdr (car (?arg-list form)))))
+               C-rest))))
+    (unless (var-ref-p form)
+      (C-blockstart)
+      (C-PtrDecl "CL_FORM" C-rest))
+    (rest-cdr form)))
+
+;;------------------------------------------------------------------------------
+;; Generiert Code für speziell zu behandelnde Funktionen bei rest-optimierung
+;;------------------------------------------------------------------------------
+(defun rlo-dispatch (fun args app)
+  (let ((rest (cg-rest-cdr (car (last args)))))
+    (incf *rlo-statistics-rest-usage*)
+    (ecase (?my-last-arg-may-be-rest-var fun)
+      (:length
+       (case *result-spec*
+         ((NIL))
+         (C-bool (setq *C-bool* C-TRUE))
+         (T (C-MacroCall "REST_LENGTH" rest (CC-dest *result-spec*)))))
+      (:car
+       (case *result-spec*
+         ((NIL))
+         (C-bool (setq *C-bool* (CC-op&& (CC-op!= rest C-local) 
+                                         (CC-make-bool rest))))
+         (T (C-MacroCall "REST_CAR" rest (CC-dest *result-spec*)))))
+      (:cdr
+       (case *result-spec*
+         ((NIL))
+         (C-bool (setq *C-bool* (CC-op!= (CC-MacroCall "REST_CDR" rest) 
+                                         C-local)))
+         (T (C-Assign (CC-dest *result-spec*)
+                      (CC-MacroCall "REST_CDR" rest)))))
+      (:apply
+       (let* ((new-base (CC-StackTop))
+              (nargs (cg-args (butlast (?arg-list app)) (?par-spec fun))))
+         (C-MacroCall "REST_APPLY" new-base nargs rest)
+         (unless (eq (?mv-spec fun) :JUMP)
+           (unless (or (eql (?mv-spec fun) 1) (?mv-used app))
+             (C-ResetMV))
+           (stacktop-to-result-loc))))
+      (:atom (pred-result (CC-MacroCall 
+                           "NOT" (CC-MacroCall "REST_NOT_EMPTY" rest))))
+      (:consp (pred-result (CC-MacroCall "REST_NOT_EMPTY" rest)))))
+  (unless (var-ref-p (car (last args)))
+    (C-blockend)))
+
+;;------------------------------------------------------------------------------
 (provide "cgfuns")
+

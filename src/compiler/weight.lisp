@@ -5,8 +5,35 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Abschaetzung der zu erwartenden Codelaenge
 ;;;
-;;; $Revision: 1.5 $
+;;; $Revision: 1.13 $
 ;;; $Log: weight.lisp,v $
+;;; Revision 1.13  1994/06/22  07:47:38  hk
+;;; Fehler in weight-eq und weight-eql behoben.
+;;;
+;;; Revision 1.12  1994/06/12  19:12:32  hk
+;;; Fehler in weight-gen-classes behoben: vertauschte Zweige in einem
+;;; if-Ausdruck bewirkten, da"s ein unzul"assiges strukturiertes Literal
+;;; mit value = NIL entstand.
+;;;
+;;; Revision 1.11  1994/06/10  12:34:43  jh
+;;; Für einfache Literale und Symbole wird jetzt auch auf die
+;;; let-Optimierung vertraut.
+;;;
+;;; Revision 1.10  1994/06/09  16:02:09  jh
+;;; Abschätzung, die auf die let-Optimierung hofft, eingebaut.
+;;;
+;;; Revision 1.9  1994/06/09  10:36:20  hk
+;;; Anpassungen an cginline vorgenommen
+;;;
+;;; Revision 1.8  1994/04/05  15:13:01  jh
+;;; Funktion export-weight definiert.
+;;;
+;;; Revision 1.7  1994/03/03  13:55:33  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.6  1994/01/06  17:29:35  sma
+;;; Aufruf von opt-args um den Paramter fun ergänzt.
+;;;
 ;;; Revision 1.5  1993/12/23  12:03:03  hk
 ;;; Variable *current-fun* wird gebunden wegen einer Änderung in opt-args.
 ;;;
@@ -49,6 +76,12 @@
   (let* ((*weight-for-inlining* t)
          (inline-fun (?form app))
          (nargs (length (?arg-list app)))
+         (simple-args (count-if #'(lambda (arg)
+                                    (or (simple-literal-p arg)
+                                        (sym-p arg)
+                                        (and (var-ref-p arg)
+                                             (local-static-p (?var arg)))))
+                            (?arg-list app)))
          (params (?params inline-fun))
          (rest (?rest params))
          (nvars (length (?var-list params)))
@@ -67,7 +100,9 @@
              (t 0)))
          0)
      (- (* 4 (- nparams (if rest 1 0))) ; Parameter im neuen let binden
-        (* 4 nargs))                    ; Argumente auf den Stack vorm Aufruf
+        (* 4 nargs)                     ; Argumente auf den Stack vorm Aufruf
+        (* 4 (min simple-args (+ nopt nvars)))) ; Statische Variablen können
+                                        ; meist aus dem let entfernt werden.
      (* 28 nspecial)                    ; Specialvars binden und restaurieren
      -3                                 ; Aufruf
      (let* ((global (or (global-fun-p fun)
@@ -78,6 +113,7 @@
             (*level* (if (local-fun-p fun) (?level fun) 0))
             (*special-count* 0)
             (*result-spec* (stacktop-result-location)))
+       (weight-params params 0)
        (flet ((weight-gen-fun ()
                 (let ((weight 0))
                   (incf weight (weight-form (?body inline-fun)))
@@ -91,6 +127,28 @@
            (global (let ((*cl-level* *level*))
                      (weight-gen-fun)))
            (t (weight-gen-fun))))))))
+
+(defun export-weight (fun)
+  (let* ((*current-fun* fun)
+         (*weight-for-inlining* t)
+         (params (?params fun))
+         (nspecial (count-if #'dynamic-p (?all-vars params)))
+         (*stack-top* (length (?all-vars params)))
+         (*level* 0)
+         (*special-count* 0)
+         (*result-spec* (stacktop-result-location))
+         (*cl-level* 0))
+    (reset-weight-vars)
+    (+
+     (* 28 nspecial)                    ; Specialvars binden und restaurieren
+     -3                                 ; Aufruf
+     (- (* 4 (length (?var-list params))))
+     (let ((weight 0))
+       (weight-params params 0)
+       (incf weight (weight-form (?body fun)))
+       (dolist (local-fun (?local-funs fun))
+         (incf weight (weight-fun-def local-fun)))
+       weight))))
 
 ;;------------------------------------------------------------------------------
 ;; weight-Funktionen und -Konstanten fuer cgmain
@@ -245,11 +303,12 @@
     (incf weight (weight-form (?then form)))
     (when (eq *result-spec* 'C-bool)
       (incf weight (weight-to-bool-result)))
-    (unless (and (null *result-spec*) (null-form-p (?else form)))
-      (incf weight (weight-C-else))
-      (incf weight (weight-form (?else form)))
-      (when (eq *result-spec* 'C-bool)
-        (incf weight (weight-to-bool-result))))
+    (unless (and (null *result-spec*)
+                 (or (null-form-p (?then form)) (null-form-p (?else form))))
+      (incf weight (weight-C-else)))
+    (incf weight (weight-form (?else form)))
+    (when (eq *result-spec* 'C-bool)
+      (incf weight (weight-to-bool-result)))
     (setq *C-bool* C-bool_result)
     weight))
     
@@ -480,13 +539,13 @@
    (weight-gen-literals
     (mapcan #'(lambda (class)
                 (if (?slot-descr-list class)
-                    `(,(?class-precedence-list class))
                     `(,(?class-precedence-list class)
                       ,(make-instance 'structured-literal
                         :value (mapcar #'get-rt-slot-info
                                 (?slot-descr-list class))
                         :needs-fixnum-array nil
-                        :needs-float-array nil))))
+                        :needs-float-array nil))
+                    `(,(?class-precedence-list class))))
             (?class-def-list *module*)))
    ;; Eine Klassenbeschreibung ist besteht aus 6 CL_FORM, also 12 Worten.
    (* 12 (length (?class-def-list *module*)))))
@@ -660,7 +719,7 @@
        (weight-form (?form form)))
      (weight-to-result-loc var))))
 
-(defmethod weight-form ((form named-const))
+(defmethod weight-form ((form defined-named-const))
   (let ((value (?value form)))
     (if (eq :unknown value)
         (progn
@@ -674,6 +733,15 @@
             (structured-literal-p value))
             (weight-form value)
             0))))
+
+(defmethod weight-form ((form imported-named-const))
+  (case *result-spec*
+    ((nil) 0)
+    (C-BOOL (setq *C-bool* nil) 0)
+    ;; LOAD_CONS/SMSTR/SMVEC_T/SMAR_T/STRUCT sind Zugriffe auf eine
+    ;; Konstantentabelle und somit von der gleichen Qualitaet wie ein
+    ;; Zugriff auf eine Symboltabelle LOAD_SYMBOL.
+    (t (+ 4 (weight-CC-dest *result-spec*)))))
 
 (defmethod weight-var-bind ((var local-static) offset
                             &optional (w-C-stacktop 0))
@@ -960,7 +1028,7 @@
          (*downfun-count* 0))
     (multiple-value-bind (w-downfuns save-base) (weight-downfuns app)
       (incf weight w-downfuns)
-      (opt-args args)                   ; veraendert *stack-top* !
+      (opt-args args fun)               ; veraendert *stack-top* !
       (multiple-value-setq (w-args nargs) (weight-args args (?par-spec fun)))
       (incf weight w-args)
       (when save-base
@@ -1223,41 +1291,50 @@
  (?weight-c-inline "WEIGHT")
  clicc-lisp::eq
  clicc-lisp::eql
- clicc-lisp::not
  clicc-lisp::integerp
  rt::fixnum-low-p
  rt::fixnum-high-p
  clicc-lisp::consp
  clicc-lisp::characterp
+ rt::plain-vector-p
+ clicc-lisp::simple-vector-p
  clicc-lisp::simple-string-p
+ clicc-lisp::simple-bit-vector-p
  clicc-lisp::floatp
  clicc-lisp::atom
  clicc-lisp::symbolp
+ rt::symp
  clicc-lisp::listp
- clicc-lisp::stringp
  clicc-lisp::numberp
  clicc-lisp::functionp
- clicc-lisp::vectorp
- clicc-lisp::simple-vector-p
- clicc-lisp::arrayp
- rt::simple-array-p
- rt::instancep
  clicc-lisp::values
  clicc-lisp::cons
  rt::%car
  rt::%cdr
  rt::%rplaca
  rt::%rplacd
- rt::%vector-length
  rt::%logior
  rt::%logxor
  rt::%logand
  rt::%lognot
  rt::%shift-right
  rt::%shift-left
+ rt::instancep
  rt::instance-ref
  rt::instance-set
- rt::set-slot-unbound)
+ rt::plain-vector-length
+ rt::svref-internal
+ rt::set-svref-internal
+ rt::symbol-value
+ rt::symbol-plist
+ rt::symbol-package
+ (L::setf rt::symbol-value)
+ (L::setf rt::symbol-plist)
+ (L::setf rt::symbol-package)
+ rt::structp
+ rt::struct-size
+ rt::structure-ref
+ (L::setf rt::structure-ref))
 
 (defun weight-get-arg-loc (form)
   (if (var-ref-p form)
@@ -1300,12 +1377,15 @@
      (case const-arg
        ((1 2) (when (= const-arg 2)
                 (rotatef form1 form2))
+        (unless (numberp form2)
+          (setq form2 (weight-form form2)))
         (typecase form1
           (null-form form2)
           (int (+ 4 form2))
           (character-form (+ 4 form2))
           (sym (+ 6 form2))
           (t 0)))
+       (3 0)
        (t (+ 5 form1 form2))))))
 
 (defun weight-eql (form1 form2)
@@ -1323,12 +1403,9 @@
        (3 0)
        (t (when (= floatconst 2)
             (rotatef form1 form2))
+          (unless (numberp form2)
+            (setq form2 (weight-form form2)))
           (+ 8 form2))))))
-
-(defun weight-not (form)
-  (weight-pred-result
-   (let ((*result-spec* (when *result-spec* 'C-bool)))
-     (weight-form form))))
 
 (defun weight-integerp (x-loc)
   (weight-pred-result (weight-CC-get-arg x-loc)))
@@ -1349,7 +1426,16 @@
 (defun weight-characterp (x-loc)
   (weight-pred-result (weight-CC-get-arg x-loc)))
 
+(defun weight-plain-vector-p (x-loc)
+  (weight-pred-result (weight-CC-get-arg x-loc)))
+
+(defun weight-simple-vector-p (x-loc)
+  (weight-pred-result (weight-CC-get-arg x-loc)))
+
 (defun weight-simple-string-p (x-loc)
+  (weight-pred-result (weight-CC-get-arg x-loc)))
+
+(defun weight-simple-bit-vector-p (x-loc)
   (weight-pred-result (weight-CC-get-arg x-loc)))
 
 (defun weight-floatp (x-loc)
@@ -1362,13 +1448,12 @@
   (setq x-loc (weight-CC-get-arg x-loc))
   (weight-pred-result (+ 5 x-loc)))
 
+(defun weight-symp (x-loc)
+  (weight-pred-result (weight-CC-get-arg x-loc)))
+
 (defun weight-listp (x-loc)
   (setq x-loc (weight-CC-get-arg x-loc))
   (weight-pred-result (+ 5 x-loc)))
-
-(defun weight-stringp (x-loc)
-  (setq x-loc (weight-CC-get-arg x-loc))
-  (weight-pred-result (+ 2 x-loc)))
 
 (defun weight-numberp (x-loc)
   (setq x-loc (weight-CC-get-arg x-loc))
@@ -1377,24 +1462,6 @@
 (defun weight-functionp (x-loc)
   (setq x-loc (weight-CC-get-arg x-loc))
   (weight-pred-result (+ 8 x-loc)))
-
-(defun weight-vectorp (x-loc)
-  (setq x-loc (weight-CC-get-arg x-loc))
-  (weight-pred-result (+ 5 x-loc)))
-
-(defun weight-simple-vector-p (x-loc)
-  (weight-pred-result (weight-CC-get-arg x-loc)))
-
-(defun weight-arrayp (x-loc)
-  (setq x-loc (weight-CC-get-arg x-loc))
-  (weight-pred-result (+ 5 x-loc)))
-
-(defun weight-simple-array-p (x-loc)
-  (setq x-loc (weight-CC-get-arg x-loc))
-  (weight-pred-result (+ 5 x-loc)))
-
-(defun weight-instancep (x-loc)
-  (weight-pred-result (weight-CC-get-arg x-loc)))
 
 (defun weight-%car (cell)
   (setq cell (weight-CC-get-arg cell))
@@ -1431,10 +1498,6 @@
          weight-x
          weight-y))))
 
-(defun weight-%vector-length (x)
-  (setq x (weight-CC-get-arg x))
-  (+ 3 x (weight-CC-dest *result-spec*)))
-
 (defun weight-%logior (x y)
   (setq x (weight-CC-get-arg x))
   (setq y (weight-CC-get-arg y))
@@ -1464,21 +1527,56 @@
   (setq c (weight-CC-get-arg c))
   (+ 3 i c (weight-CC-dest *result-spec*)))
 
+(defun weight-instancep (x-loc)
+  (weight-pred-result (weight-CC-get-arg x-loc)))
+
 (defun weight-instance-ref (instance offset)
-  (setq instance (weight-CC-get-arg instance))
-  (setq offset (weight-CC-get-arg offset))
-  (weight-C-result (+ 3 instance offset)))
+  (weight-svref-internal instance offset))
 
 (defun weight-instance-set (new-value instance offset)
-  (setq new-value (weight-CC-get-arg new-value))
-  (setq instance (weight-CC-get-arg instance))
-  (setq offset (weight-CC-get-arg offset))
-  (weight-C-copy new-value (+ 3 instance offset)))
+  (weight-set-svref-internal new-value instance offset))
 
-(defun weight-set-slot-unbound (instance offset)
-  (setq instance (weight-CC-get-arg instance))
-  (setq offset (weight-CC-get-arg offset))
-  (+ 3 instance offset))
+(defun weight-plain-vector-length (x)
+  (setq x (weight-CC-get-arg x))
+  (+ 3 x (weight-CC-dest *result-spec*)))
+
+(defun weight-svref-internal (vector index)
+  (weight-C-result (+ 3 (weight-CC-get-arg vector) (weight-CC-get-arg index))))
+
+(defun weight-set-svref-internal (new-value vector index)
+  (weight-C-copy (weight-CC-get-arg new-value)
+                 (+ 3 (weight-CC-get-arg vector) (weight-CC-get-arg index))))
+
+(defun weight-symbol-value (sym)
+  (weight-C-result (+ 3 (weight-CC-get-arg sym))))
+
+(defun weight-set-symbol-value (value sym)
+  (weight-C-copy (weight-CC-get-arg value)
+                 (+ 3 (weight-CC-get-arg sym))))
+
+(defun weight-symbol-plist (sym)
+  (weight-symbol-value sym))
+
+(defun weight-set-symbol-plist (value sym)
+  (weight-set-symbol-value value sym))
+
+(defun weight-symbol-package (sym)
+  (weight-symbol-value sym))
+
+(defun weight-set-symbol-package (value sym)
+  (weight-set-symbol-value value sym))
+
+(defun weight-structp (x-loc)
+  (weight-pred-result (weight-CC-get-arg x-loc)))
+
+(defun weight-struct-size (struct)
+  (weight-plain-vector-length struct))
+  
+(defun weight-structure-ref (struct index)
+  (weight-svref-internal struct index))
+
+(defun weight-set-structure-ref (new-value instance offset)
+  (weight-instance-set new-value instance offset))
 
 ;;------------------------------------------------------------------------------
 ;; weight-Funktionen und -Konstanten fuer cgforeign

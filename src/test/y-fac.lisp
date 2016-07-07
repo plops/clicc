@@ -4,8 +4,11 @@
 ;;; Funktion : Eine Implementation der Fakultaetsfunktion.
 ;;;            Verwendet den Y-Kombinator, um Rekursion auszudruecken.
 ;;;
-;;; $Revision: 1.6 $
+;;; $Revision: 1.7 $
 ;;; $Log: y-fac.lisp,v $
+;;; Revision 1.7  1994/05/19  14:45:21  hk
+;;; Fakult"at mit Zahlen als (Rest)-Listen implementiert hinzugef"ugt
+;;;
 ;;; Revision 1.6  1993/02/16  17:19:06  hk
 ;;; Revision Keyword eingefuegt.
 ;;;
@@ -63,6 +66,44 @@
              ((fak 12) 479001600)
              )
             :test #'eql
+            )
+                  
+;;------------------------------------------------------------------------------
+;; Implementation der Fakultaetsfunktions mittels des Y-Kombinators
+;; wobei die Zahl n als Liste der L"ange n dargestellt wird.
+;;------------------------------------------------------------------------------
+(defun incl   (l) (cons 1 l))
+(defun decl   (l) (cdr l))
+(defun addl   (m n) (if (zerolp m) n (addl (decl m) (incl n))))
+(defun multl  (m n) (if (onelp m) n (addl n (multl (decl m) n))))
+(defun zerolp (l) (null l))
+(defun onelp  (l) (zerolp (decl l)))
+(defconstant zerol '())
+
+(defun fakl (n)
+  (let* ((Y #'(lambda (f)
+                (funcall #'(lambda (g) (funcall g g))
+                         #'(lambda (x)
+                             (funcall f #'(lambda ()
+                                            (funcall x x)))))))
+         (fac (funcall Y #'(lambda (fg)
+                             #'(lambda (&rest n)
+                                 (if (zerolp n)
+                                     (incl zerol)
+                                     (multl n (apply (funcall fg) (decl n)))))))))
+    (apply fac n)))
+
+;;------------------------------------------------------------------------------
+;; Einige Testaufrufe dazu:
+;;------------------------------------------------------------------------------
+(clicc-test "Y-fac-list" 
+";;; Here fac is implemented with the Y Combinator and numbers are ~%
+implemented as lists"
+            (((fakl '())      (1))
+             ((fakl '(1))     (1))
+             ((fakl '(1 1 1)) (1 1 1 1 1 1))
+             )
+            :test #'equal
             )
                        
 ;;------------------------------------------------------------------------------

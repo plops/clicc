@@ -4,8 +4,11 @@
 ;;; Inhalt   : Funktionen fuer die Durchfuehrung der Tests und 
 ;;;            ein einfaches Menue zur Auswahl der einzelnen Tests.
 ;;;
-;;; $Revision: 1.19 $
+;;; $Revision: 1.20 $
 ;;; $Log: testmain.lisp,v $
+;;; Revision 1.20  1993/12/12  18:03:23  sma
+;;; Tests für Arrays eingebunden (neue Datei arrays.lisp).
+;;;
 ;;; Revision 1.19  1993/05/11  14:20:43  kl
 ;;; Test fuer die Seiteneffektanalyse wieder eingebunden.
 ;;;
@@ -282,7 +285,7 @@
 (require "y-fac")
 (require "clos-test")
 (require "search")
-
+(require "arrays")
 
 ;;------------------------------------------------------------------------------
 ;; Aufruf des Menues

@@ -5,8 +5,15 @@
 ;;;            ------------------------------------------------------
 ;;; Inhalt   : Laufzeitfunktionen des FFI
 ;;;
-;;; $Revision: 1.9 $
+;;; $Revision: 1.11 $
 ;;; $Log: foreign.lisp,v $
+;;; Revision 1.11  1994/04/18  12:21:33  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Laufzeitsystemfunktionen des FFI hinzugefuegt bzw.ueberarbeitet.
+;;;
+;;; Revision 1.10  1993/12/16  16:41:43  pm
+;;; FFI-Funktionen vom rt:: Package ins FFI: Package geschoben.
+;;;
 ;;; Revision 1.9  1993/11/03  12:32:30  pm
 ;;; Inkonsistenzen in den Symbolnamen behoben.
 ;;;
@@ -38,196 +45,178 @@
 
 
 (export
- '(ffi:c-int 
-   ffi:lisp-integer ffi:lisp-character ffi:lisp-float)
+ '(ffi:c-char ffi:c-short ffi:c-int ffi:c-long
+   ffi:c-unsigned-char ffi:c-unsigned-short 
+   ffi:c-unsigned-int ffi:c-unsigned-long
+   ffi:c-float ffi:c-double ffi:c-long-double
+   ffi:c-handle ffi:c-string
+   ffi:lisp-integer ffi:lisp-character ffi:lisp-float ffi:make-lisp-string
+   ffi:make-c-string ffi:copy-c-string)
  "FFI")
 
 ;;------------------------------------------------------------------------------
 ;; Die C-Typen anlegen
 ;;------------------------------------------------------------------------------
-(deftype ffi:c-int () `(satisfies rt::c-int-p))
+(deftype ffi:c-char ()  `(satisfies ffi::c-char-p))
+(deftype ffi:c-short () `(satisfies ffi::c-short-p))
+(deftype ffi:c-int ()   `(satisfies ffi::c-int-p))
+(deftype ffi:c-long ()  `(satisfies ffi::c-long-p))
+(deftype ffi:c-unsigned-char ()  `(satisfies ffi::c-unsigned-char-p))
+(deftype ffi:c-unsigned-short () `(satisfies ffi::c-unsigned-short-p))
+(deftype ffi:c-unsigned-int ()   `(satisfies ffi::c-unsigned-int-p))
+(deftype ffi:c-unsigned-long ()  `(satisfies ffi::c-unsigned-long-p))
+(deftype ffi:c-float ()        `(satisfies ffi::c-float-p))
+(deftype ffi:c-double ()       `(satisfies ffi::c-double-p))
+(deftype ffi:c-long-double ()  `(satisfies ffi::c-long-double-p))
+
+(deftype ffi:c-string () '(satisfies ffi::c-string-p))
 
 ;;------------------------------------------------------------------------------
 ;; Die Konstruktor-Funktionen zum Anlegen von C-Daten
 ;;------------------------------------------------------------------------------
+(defun ffi:c-char (value)
+  (cond 
+    ((typep value 'character)
+      (rt::make-c-char value))
+    ((ffi:c-char-p value)
+     (rt::cast-c-char value))
+    (t (error-in "C-CHAR"
+                "The evaluated value ~S is not of type character." value))))
+
+(defun ffi:c-short (value)
+  (cond 
+    ((typep value 'integer)
+      (rt::make-c-short value))
+    ((ffi:c-short-p value)
+     (rt::cast-c-short value))
+    (t (error-in "C-SHORT"
+                 "The evaluated value ~S is not of type fixnum." value))))
+    
 (defun ffi:c-int (value)
-  (if (typep value 'fixnum)
-      (rt::make-c-int value)
-      (error-in 'c-int
-                "The evaluated value ~S is not of type fixnum." value)))
+  (cond 
+    ((typep value 'integer)
+      (rt::make-c-int value))
+    ((ffi:c-int-p value)
+     (rt::cast-c-int value))
+    (t (error-in "C-INT"
+                 "The evaluated value ~S is not of type fixnum." value))))
+    
+(defun ffi:c-long (value)
+  (cond 
+    ((typep value 'integer)
+      (rt::make-c-long value))
+    ((ffi:c-long-p value)
+     (rt::cast-c-long value))
+    (t (error-in "C-LONG"
+                 "The evaluated value ~S is not of type fixnum." value))))
+    
+(defun ffi:c-unsigned-char (value)
+  (cond 
+    ((typep value 'character)
+      (rt::make-c-unsigned-char value))
+    ((ffi:c-unsigned-char-p value)
+     (rt::cast-c-unsigned-char value))
+    (t (error-in "C-UNSIGNED-CHAR"
+                "The evaluated value ~S is not of type character." value))))
 
+(defun ffi:c-unsigned-short (value)
+  (cond 
+    ((typep value 'integer)
+      (rt::make-c-unsigned-short value))
+    ((ffi:c-unsigned-short-p value)
+     (rt::cast-c-unsigned-short value))
+    (t (error-in "C-UNSIGNED-SHORT"
+                 "The evaluated value ~S is not of type fixnum." value))))
+    
+(defun ffi:c-unsigned-int (value)
+  (cond 
+    ((typep value 'integer)
+      (rt::make-c-unsigned-int value))
+    ((ffi:c-unsigned-int-p value)
+     (rt::cast-c-unsigned-int value))
+    (t (error-in "C-UNSIGNED-INT"
+                 "The evaluated value ~S is not of type fixnum." value))))
+    
+(defun ffi:c-unsigned-long (value)
+  (cond 
+    ((typep value 'integer)
+      (rt::make-c-unsigned-long value))
+    ((ffi:c-unsigned-long-p value)
+     (rt::cast-c-unsigned-long value))
+    (t (error-in "C-UNSIGNED-LONG"
+                 "The evaluated value ~S is not of type fixnum." value))))
+    
+(defun ffi:c-float (value)
+  (cond 
+    ((typep value 'float)
+      (rt::make-c-float value))
+    ((ffi:c-float-p value)
+     (rt::cast-c-float value))
+    (t (error-in "C-FLOAT"
+                 "The evaluated value ~S is not of type float." value))))
+    
+(defun ffi:c-double (value)
+  (cond 
+    ((typep value 'float)
+      (rt::make-c-double value))
+    ((ffi:c-double-p value)
+     (rt::cast-c-double value))
+    (t (error-in "C-DOUBLE"
+                 "The evaluated value ~S is not of type float." value))))
+    
+(defun ffi:c-long-double (value)
+  (cond 
+    ((typep value 'float)
+      (rt::make-c-long-double value))
+    ((ffi:c-long-double-p value)
+     (rt::cast-c-long-double value))
+    (t (error-in "C-LONG-DOUBLE"
+                 "The evaluated value ~S is not of type float." value))))
 
+;;------------------------------------------------------------------------------
+;; 
+;;------------------------------------------------------------------------------
+(defun ffi:make-c-string (value)
+  (if (typep value 'string)
+      (rt::internal-make-c-string value)
+      (error-in "MAKE-C-STRING"
+                "The evaluated value ~S is not of type string." value)))
+
+(defun ffi:copy-c-string (c-value)
+  (if (ffi::c-string-p c-value)
+      (rt::internal-copy-c-string c-value)
+      (error-in "MAKE-C-STRING"
+                "The evaluated value ~S is not of type c-string." c-value)))
+  
+;;------------------------------------------------------------------------------
+;; 
+;;------------------------------------------------------------------------------
 (defun ffi:lisp-character (c-value)
-  (if (or (rt::c-char-p c-value)
-          (rt::c-unsigned-char-p c-value))
+  (if (or (ffi::c-char-p c-value)
+          (ffi::c-unsigned-char-p c-value))
       (rt::make-lisp-character c-value)
       (error-in 
-       'lisp-character
+       "LISP-CHARACTER"
        "The evaluated value ~S is not of type c-<char>." c-value)))
 
 (defun ffi:lisp-integer (c-value)
-  (if (or (rt::c-short-p c-value)
-          (rt::c-int-p c-value)
-          (rt::c-long-p c-value)
-          (rt::c-unsigned-short-p c-value)
-          (rt::c-unsigned-int-p c-value)
-          (rt::c-unsigned-long-p c-value))
+  (if (or (ffi::c-long-p c-value)
+          (ffi::c-unsigned-long-p c-value))
       (rt::make-lisp-integer c-value)
       (error-in
-       'lisp-integer
+       "LISP-INTEGER"
        "The evaluated value ~S is not of type c-<integer>." c-value)))
 
 (defun ffi:lisp-float (c-value)
-  (if (or (rt::c-float-p c-value)
-          (rt::c-double-p c-value)
-          (rt::c-long-double-p c-value))
+  (if (ffi::c-long-double-p c-value)
       (rt::make-lisp-float c-value)
       (error-in
-       'lisp-float 
+       "LISP-FLOAT"
        "The evaluated value ~S is not of type c-<float>." c-value)))
 
-
-#|
-(export
- '(ffi::c-char ffi::c-unsigned-char
-   ffi::c-short ffi::c-int ffi::c-long 
-   ffi::c-unsigned-short ffi::c-unsigned-int ffi::c-unsigned-long
-   ffi::c-float ffi::c-double ffi::c-long-double
-   ffi::c-char-ptr ffi::c-unsigned-char-ptr 
-   ffi::c-short-ptr ffi::c-int-ptr ffi::c-long-ptr
-   ffi::c-unsigned-short-ptr ffi::c-unsigned-int-ptr ffi::c-unsigned-long-ptr
-   ffi::c-string
-   ffi::lisp-character ffi::lisp-integer ffi::lisp-float)
- "FFI")
-
-;;------------------------------------------------------------------------------
-
-(defun ffi:c-string (value)
-  (if (typep value 'string)
-      (rt::make-c-char-ptr value)
-      (error-in 'c-string
-                "The evaluated value ~S is not of type string." value)))
-
-(defun ffi:c-char (value)
-  (if (typep value 'character)
-      (rt::make-c-char value)
-      (error-in 'c-char 
-                "The evaluated value ~S is not of type character." value)))
-
-(defun ffi:c-unsigned-char (value)
-  (if (typep value 'character)
-      (rt::make-c-unsigned-char value)
-      (error-in 'c-unsigned-char 
-                "The evaluated value ~S is not of type character." value)))
-
-(defun ffi:c-short (value)
-  (if (typep value 'fixnum)
-      (rt::make-c-short value)
-      (error-in 'c-short 
-                "The evaluated value ~S is not of type fixnum." value)))
-
-(defun ffi:c-int (value)
-  (if (typep value 'fixnum)
-      (rt::make-c-int value)
-      (error-in 'c-int
-                "The evaluated value ~S is not of type fixnum." value)))
-
-(defun ffi:c-long (value)
-  (if (typep value 'fixnum)
-      (rt::make-c-long value)
-      (error-in 'c-long 
-                "The evaluated value ~S is not of type fixnum." value)))
-
-(defun ffi:c-unsigned-short (value)
-  (if (typep value 'fixnum)
-      (rt::make-c-unsigned-short value)
-      (error-in 'c-unsigned-short 
-                "The evaluated value ~S is not of type fixnum." value)))
-
-(defun ffi:c-unsigned-int (value)
-  (if (typep value 'fixnum)
-      (rt::make-c-unsigned-int value)
-      (error-in 'c-unsigned-int
-                "The evaluated value ~S is not of type fixnum." value)))
-
-(defun ffi:c-unsigned-long (value)
-  (if (typep value 'fixnum)
-      (rt::make-c-unsigned-long value)
-      (error-in 'c-unsigned-long 
-                "The evaluated value ~S is not of type fixnum." value)))
-
-(defun ffi:c-float (value)
-  (if (typep value 'float)
-      (rt::make-c-float value)
-      (error-in 'c-float 
-                "The evaluated value ~S is not of type float." value)))
-
-(defun ffi:c-double (value)
-  (if (typep value 'float)
-      (rt::make-c-double value)
-      (error-in 'c-double 
-                "The evaluated value ~S is not of type float." value)))
-
-(defun ffi:c-long-double (value)
-  (if (typep value 'float)
-      (rt::make-c-long-double value)
-      (error-in 'c-long-double
-                "The evaluated value ~S is not of type float." value)))
-
-;;------------------------------------------------------------------------------
-;;------------------------------------------------------------------------------
-(defun ffi:c-char-ptr (c-value)
-  (if (rt::c-char-p c-value)
-      (rt::make-c-char-ptr c-value)
+(defun ffi:make-lisp-string (c-value)
+  (if (ffi::c-string-p c-value)
+      (rt::internal-make-lisp-string c-value)
       (error-in
-       'c-char-ptr "The evaluated value ~S is not of type c-char." c-value)))
-
-(defun ffi:c-short-ptr (c-value)
-  (if (rt::c-short-p c-value)
-      (rt::make-c-short-ptr c-value)
-      (error-in
-       'c-short-ptr "The evaluated value ~S is not of type c-short." c-value)))
-
-(defun ffi:c-int-ptr (c-value)
-  (if (rt::c-int-p c-value)
-      (rt::make-c-int-ptr c-value)
-      (error-in
-       'c-short-ptr "The evaluated value ~S is not of type c-int." c-value)))
-
-(defun ffi:c-long-ptr (c-value)
-  (if (rt::c-long-p c-value)
-      (rt::make-c-long-ptr c-value)
-      (error-in
-       'c-short-ptr "The evaluated value ~S is not of type c-long." c-value)))
-
-(defun ffi:c-unsigned-char-ptr (c-value)
-  (if (rt::c-unsigned-char-p c-value)
-      (rt::make-c-unsigned-char-ptr c-value)
-      (error-in
-       'c-unsigned-char-ptr 
-       "The evaluated value ~S is not of type c-unsigned-char." c-value)))
-
-(defun ffi:c-unsigned-short-ptr (c-value)
-  (if (rt::c-unsigned-short-p c-value)
-      (rt::make-c-unsigned-short-ptr c-value)
-      (error-in
-       'c-unsigned-short-ptr 
-       "The evaluated value ~S is not of type c-unsigned-short." c-value)))
-
-(defun ffi:c-unsigned-int-ptr (c-value)
-  (if (rt::c-unsigned-int-p c-value)
-      (rt::make-c-unsigned-int-ptr c-value)
-      (error-in
-       'c-unsigned-short-ptr 
-       "The evaluated value ~S is not of type c-unsigned-int." c-value)))
-
-(defun ffi:c-unsigned-long-ptr (c-value)
-  (if (rt::c-unsigned-long-p c-value)
-      (rt::make-c-unsigned-long-ptr c-value)
-      (error-in
-       'c-short-ptr 
-       "The evaluated value ~S is not of type c-unsigned-long." c-value)))
-
-;;------------------------------------------------------------------------------
-
-|#
+       "MAKE-LISP-STRING"
+       "The evaluated value ~S is not of type c-string." c-value)))

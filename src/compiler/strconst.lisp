@@ -5,8 +5,11 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Konstante benannte Strings
 ;;;
-;;; $Revision: 1.6 $
+;;; $Revision: 1.7 $
 ;;; $Log: strconst.lisp,v $
+;;; Revision 1.7  1994/02/21  09:26:02  kl
+;;; Neue Konstante TOO_MUCH_ARGS eingeführt.
+;;;
 ;;; Revision 1.6  1993/06/17  08:00:09  hk
 ;;; Copright Notiz eingefuegt
 ;;;
@@ -45,7 +48,9 @@
                                  match the lambda list ~A")
 (defconstant ILL_FORMED         "The ~S ~S is not of the form ~S")
 (defconstant IFD_BODY           "~S is an ill-formed body.")
-(defconstant NOT_ENOUGH_ARGS    "A call to ~A needs at least ~A params.")
+(defconstant NOT_ENOUGH_ARGS    "A call to ~A needs at least ~D arguments.")
+(defconstant TOO_MUCH_ARGS      "A call to ~A should have at most ~D ~
+                                 arguments.")
 
 ;;------------------------------------------------------------------------------
 ;; Fehlermeldungen: Top-Level-Forms

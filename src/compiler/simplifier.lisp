@@ -7,8 +7,34 @@
 ;;;            Verbesserungen an einem Zwischensprachknoten vor. Dabei werden
 ;;;            insbesondere Optimierungen fuer einige Funktionen vorgenommen.
 ;;;
-;;; $Revision: 1.15 $
+;;; $Revision: 1.21 $
 ;;; $Log: simplifier.lisp,v $
+;;; Revision 1.21  1994/06/09  15:26:29  hk
+;;; Im Laufzeitsystem soll auch if (null ..) optimiert werden, obwohl null
+;;; hier keine special-sys-fun ist, also wird erst mal der Name angeschaut
+;;; ...
+;;;
+;;; Revision 1.20  1994/06/09  10:40:12  hk
+;;; not mu"s nicht special-sys-fun sein.
+;;;
+;;; Revision 1.19  1994/03/03  13:53:13  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.18  1994/02/02  09:28:02  hk
+;;; Optimierung anhand der Annotationen simp-when-n-args,
+;;; simp-when-no-result, simp-when-arg-n=cons,
+;;; simp-when-some-arg-not-cons/pathn/string/bitv,
+;;; simp-when-some-arg-not-num/char, simp-when-only-test=value und
+;;; simp-test-fun-when-not-testnot eingefügt.
+;;; Spezialbehandlung für car, aref, assoc etc. entfernt.
+;;;
+;;; Revision 1.17  1994/01/15  22:03:41  kl
+;;; Substitutionen für car -> %car, usw. eingebaut.
+;;;
+;;; Revision 1.16  1994/01/14  14:32:10  sma
+;;; Optimierung für char=, char<, etc eingebaut. Ein 2-stelliger Aufruf
+;;; wird in eine spezielle rt-Variante konvertiert.
+;;;
 ;;; Revision 1.15  1993/12/03  12:48:20  jh
 ;;; Fehler in opti-equal behoben.
 ;;;
@@ -72,7 +98,6 @@
  (?opti-pass "OPTI")
  L::eq
  L::eql
- L::equal
  L::null
  L::not
  L::=
@@ -80,17 +105,10 @@
  L::<
  L::+
  L::-
- L::aref
- (L::setf L::aref)
  L::apply
  L::funcall
  L::set
- L::symbol-value
- L::assoc
- L::mapcar
- L::maplist
- L::mapcan
- L::mapcon)
+ L::symbol-value)
 
 ;;------------------------------------------------------------------------------
 
@@ -131,8 +149,10 @@
     (loop
      (if (and (app-p pred)
               (let ((form (?form pred)))
-                (and (special-sys-fun-p form)
-                     (eq (?symbol form) 'L::not))))
+                (and (fun-p form)
+                     (let ((name (?symbol form)))
+                       (or (eq name 'L::not)
+                           (eq name 'L::null))))))
          (progn
            (inc-stats 'if-not-elis)
            (psetf pred (first (?arg-list pred))
@@ -273,11 +293,185 @@
                        :type null-t))
       a-mv-lambda))
 
-(defmethod simplify-1form ((an-app app))
-  (let ((fun (?form an-app)))
-    (if (and (special-sys-fun-p fun) (?opti-pass fun))
-        (funcall (?opti-pass fun) an-app)
-        an-app)))
+;;------------------------------------------------------------------------------
+;; Sucht aus dem Teil einer Argumentliste, der an Keyword Parameter gebunden
+;; wird, den Wert heraus heraus, der einem bestimmten Keyword Parameter
+;; zugeordnet wird. Wenn das Keyword nicht vorkommt, wird der Defaultwert
+;; geliefert. Wenn der Wert nicht bestimmt werden kann, da unevaluierte
+;; Keywords vorkommen, dann wird :unknown geliefert.
+;;------------------------------------------------------------------------------
+(defun zs-get-key-value (key-args keyword default)
+  (cond
+    ((endp key-args) default)
+    ((eq (first key-args) keyword) (second key-args))
+    ((not (sym-p (first key-args))) :unknown)
+    (T (zs-get-key-value (cddr key-args) keyword default))))
+
+;;------------------------------------------------------------------------------
+;; If one of the arguments of a call to EQL satisfies this test then it may
+;; be replaced by a call to EQ.
+;;------------------------------------------------------------------------------
+(defun eql=eq (arg)
+  (let ((type (?type arg)))
+    (and (types-are-disjoined number-t type)
+         (types-are-disjoined character-t type))))
+
+;;------------------------------------------------------------------------------
+;; (f arg1 ... argn) --> (f-opt arg1 ... argn)
+;; z.B. (aref a i) --> (rt:vref a i)
+;;------------------------------------------------------------------------------
+(defun simp-when-n-args (app n f-opt)
+  (cond
+    ((= (length (?arg-list app)) n)
+     (inc-stats 'to-n-arg-fun)
+     (setf (?form app) f-opt)
+     (simplify-1form app))
+    (t app)))
+
+;;------------------------------------------------------------------------------
+;; (f ...) --> (f-opt ...),
+;; wenn das Resultat des Anwendung nicht benötigt wird.
+;; z.B. (progn (mapcar ..) ..) --> (progn (mapc ..) ..)
+;;------------------------------------------------------------------------------
+(defun simp-when-no-result (app f-opt)
+  (cond
+    ((not *result-used*)
+     (inc-stats 'to-noresult-fun)
+     (setf (?form app) f-opt)
+     (simplify-1form app))
+    (t app)))
+
+;;------------------------------------------------------------------------------
+;;  (f arg1 ... argn) --> (f-opt arg1 ... argn),
+;;  wenn das n-te Argument den Typ cons hat.
+;;  z.B. (car x) --> (%car x)
+;;------------------------------------------------------------------------------
+(defun simp-when-arg-n=cons (app n f-opt)
+  (cond
+    ((zs-subtypep (?type (nth n (?arg-list app))) cons-t)
+     (inc-stats 'fun-to-%fun)
+     (setf (?form app) f-opt)
+     (simplify-1form app))
+    (t app)))
+
+;;------------------------------------------------------------------------------
+;; (f arg1 ...) --> (f-opt arg1 ...),
+;; wenn nicht alle Argumente vom Typ (or cons pathname string bitvector) sind.
+;; z.B. (equal x 's) --> (eql x 's)
+;;------------------------------------------------------------------------------
+(defun simp-when-some-arg-not-cons/pathn/string/bitv (app f-opt)
+  (labels ((equal=eql (arg)
+             (let ((type (?type arg)))
+               (and (types-are-disjoined cons-t type)
+                    (types-are-disjoined non-string-vector-t type)
+                    (types-are-disjoined string-t type)
+                    (types-are-disjoined pathname-t type)))))
+    (cond
+      ((some #'equal=eql (?arg-list app))
+       (inc-stats 'equal-to-eql)
+       (setf (?form app) f-opt)
+       (simplify-1form app))
+      (t app))))
+
+;;------------------------------------------------------------------------------
+;; (f arg1 ...) --> (f-opt arg1 ...),
+;; wenn nicht alle Argumente vom Typ (or number character) sind.
+;; z.B. (eql x 's) --> (eq x 's)
+;;------------------------------------------------------------------------------
+(defun simp-when-some-arg-not-num/char (app f-opt)
+  (cond
+    ((some #'eql=eq (?arg-list app))
+     (inc-stats 'eql-to-eq)
+     (setf (?form app) f-opt)
+     (simplify-1form app))
+    (t app)))
+
+;;------------------------------------------------------------------------------
+;; (f arg1 .. argn :testkey g) --> (f-opt arg1 .. argn),
+;; wenn nur das Test-Keyword mit dem geforderten Wert angegeben ist.
+;; z.B. (assoc x a :test #'eq) --> (simple-assoc 'x a)
+;;------------------------------------------------------------------------------
+(defun simp-when-only-test=value (app
+                                  key-args-position test-keyword value f-opt)
+  (let ((key-args (nthcdr key-args-position (?arg-list app))))
+    (cond
+      ((and (eq test-keyword (first key-args))
+            (eq value (second key-args))
+            (null (cddr key-args)))
+       (inc-stats 'only-test-optis)
+       (setf (?form app) f-opt)
+       (setf (?arg-list app) (subseq (?arg-list app) 0 key-args-position))
+       (simplify-1form app))
+      (t app))))
+
+;;------------------------------------------------------------------------------
+;; (f arg1 .. argn .. :testkey g ..) --> (f arg1 .. argn .. :testkey g-opt ..)
+;; wenn die Testfunktion feststeht und angewandt auf das i-te Argument
+;; optimiert werden kann.
+;; z.B. (assoc 'x a :test #'eql) --> (assoc 'x a :test #'eq)
+;;------------------------------------------------------------------------------
+(defun simp-test-fun-when-not-testnot (app
+                                       test-on-pos
+                                       key-args-position
+                                       test-keyword
+                                       default
+                                       test-not-keyword)
+  (let* ((arg-list (?arg-list app))
+         (key-args (nthcdr key-args-position arg-list))
+         (test (zs-get-key-value key-args test-keyword default))
+         (test-not (zs-get-key-value key-args test-not-keyword nil)))
+    (cond
+      ((and (null test-not)
+            (fun-p test)
+            (?simp-when-some-arg-not-num/char test)
+            (eql=eq (nth test-on-pos arg-list)))
+       (inc-stats 'test-fun-optis)
+       (unless (eq key-args
+                   (progn
+                     (setf (getf key-args test-keyword)
+                           (?simp-when-some-arg-not-num/char test))
+                     key-args))
+         (setf (?arg-list app)
+               (append (subseq arg-list 0 key-args-position) key-args))))
+      (t app))))
+
+;;------------------------------------------------------------------------------
+;; Spezielle Annotationen von Funktionen beruecksichtigen
+;;------------------------------------------------------------------------------
+(defmethod simplify-1form ((app app))
+  (let ((fun (?form app)))
+    (cond
+      ((fun-p fun)
+       (when (?simp-test-fun-when-not-testnot fun)
+         (setq app (apply #'simp-test-fun-when-not-testnot
+                          app (?simp-test-fun-when-not-testnot fun))))
+       (cond
+         ((?simp-when-n-args fun)
+          (apply #'simp-when-n-args app (?simp-when-n-args fun)))
+
+         ((?simp-when-no-result fun)
+          (simp-when-no-result app (?simp-when-no-result fun)))
+
+         ((?simp-when-arg-n=cons fun)
+          (apply #'simp-when-arg-n=cons app (?simp-when-arg-n=cons fun)))
+
+         ((?simp-when-some-arg-not-cons/pathn/string/bitv fun)
+          (simp-when-some-arg-not-cons/pathn/string/bitv
+           app (?simp-when-some-arg-not-cons/pathn/string/bitv fun)))
+
+         ((?simp-when-some-arg-not-num/char fun)
+          (simp-when-some-arg-not-num/char
+           app (?simp-when-some-arg-not-num/char fun)))
+
+         ((?simp-when-only-test=value fun)
+          (apply #'simp-when-only-test=value
+                 app (?simp-when-only-test=value fun)))
+       
+         ((and (special-sys-fun-p fun) (?opti-pass fun))
+          (funcall (?opti-pass fun) app))
+
+         (T app)))
+      (T app))))
 
 ;;------------------------------------------------------------------------------
 ;; Funcall kann in der Zwischensprache direkt ausgedrueckt werden.
@@ -381,25 +575,6 @@
   app)
 
 ;;------------------------------------------------------------------------------
-;; Wenn der Typ eines der beiden Argumente eines equal-Aufrufs die Typen CONS,
-;; PATHNAME und VECTOR (hier wuerde eigentlich STRING und BIT-VECTOR reichen,
-;; der verwendete Typverband enthaelt den Typ BIT-VECTOR nicht) oder deren
-;; Untertypen nicht enthaelt, kann equal durch eql ersetzt werden.
-;;------------------------------------------------------------------------------
-(defun opti-equal (app)
-  (let ((arg-list (?arg-list app)))
-    (labels ((equal=eql (arg)
-               (let ((type (?type arg)))
-                 (and (types-are-disjoined cons-t type)
-                      (types-are-disjoined vector-t type)
-                      (types-are-disjoined pathname-t type)))))
-      (when (or (equal=eql (first arg-list)) (equal=eql (second arg-list)))
-        (inc-stats 'equal-to-eql)
-        (setf (?form app) (get-global-fun 'L::eql))
-        (setq app (opti-eql app)))))
-  app)
-
-;;------------------------------------------------------------------------------
 ;; (null x) -> (not x)
 ;;
 ;; Das ist nur notwendig, da fur not weitreichendere Optimierungen vorgenommen
@@ -414,8 +589,8 @@
 ;;------------------------------------------------------------------------------
 (defun is-constant (x)
   (typecase x
-    (named-const (literal-p (?value x)))
-    ((or sym literal class-def fun ) t)
+    (defined-named-const (literal-p (?value x)))
+    ((or imported-named-const sym literal class-def fun ) t)
     (t nil)))
 
 (defun opti-not (app)
@@ -608,27 +783,6 @@
            (t app))))
       (t app))))
 
-;;------------------------------------------------------------------------------
-;; (aref array index) --> (vref array index)
-;;------------------------------------------------------------------------------
-(defun opti-aref (app)
-  (cond
-    ((= (length (?arg-list app)) 2)
-     (inc-stats 'aref-to-vref)
-     (setf (?form app) (get-global-fun 'RT::vref))
-     app)
-    (t app)))
-
-;;------------------------------------------------------------------------------
-;; (setf (aref array index) v) --> (setf (rt:vref array index) v)
-;;------------------------------------------------------------------------------
-(defun opti-set-aref (app)
-  (cond
-    ((= (length (?arg-list app)) 3)
-     (inc-stats 'aref-to-vref)
-     (setf (?form app) (cdr (get-global-setf-fun-def '(setf RT::vref))))
-     app)
-    (t app)))
 
 ;;------------------------------------------------------------------------------
 ;; Ueberfuehre (SET symbol form) in (SETQ zugeh. dynamic form).
@@ -662,101 +816,6 @@
                          :var (get-global-dynamic (?symbol first-arg))
                          :type top-t))
         app)))
-
-;;------------------------------------------------------------------------------
-;; Wird bei einem Aufruf von assoc als Testfunktion eq und als Key-Funktion car
-;; verwendet kann statt assoc simple-assoc verwendet werden.
-;; Ist der Typ FLOAT nicht im Typen des ersten Arguments enthalten, wird eql
-;; durch eq ersetzt.
-;;------------------------------------------------------------------------------
-
-(defun opti-assoc (app)
-  (let* ((arg-list (?arg-list app))
-         (item (first arg-list))
-         (a-list (second arg-list))
-         (key-args (rest (rest arg-list)))
-         (eql-fun (get-global-fun 'L::eql))
-         (eq-fun (get-global-fun 'L::eq))
-         (key-key (get-symbol-bind 'keyword::key))
-         (test-key (get-symbol-bind 'keyword::test))
-         (test-not-key (get-symbol-bind 'keyword::test-not))
-         (key nil)
-         (test nil)
-         (test-not nil)
-         (unknown-or-multiple-keys nil))
-
-    (do* ((keyword (pop key-args) (pop key-args))
-          (key-arg (car key-args) (car key-args)))
-         ((null key-args))
-      (cond ((eq keyword key-key)
-             (if key
-                 (setq unknown-or-multiple-keys T)
-                 (setq key key-arg)))
-            ((eq keyword test-key)
-             (if test
-                 (setq unknown-or-multiple-keys T)
-                 (setq test key-arg)))
-            ((eq keyword test-not-key)
-             (if test-not
-                 (setq unknown-or-multiple-keys T)
-                 (setq test-not key-arg)))
-            (T (setq unknown-or-multiple-keys T)))
-      (setq key-args (cdr key-args)))
-
-    ;; Wenn kein Test angegeben ist, wird eql als default eingesetzt.
-    ;;---------------------------------------------------------------
-    (unless (or test test-not)
-      (setq test eql-fun))
-
-    ;; Wenn FLOAT nicht im Typen des ersten Arguments enthalten ist, wird eql
-    ;; durch eq ersetzt.
-    ;;-----------------------------------------------------------------------
-    (when (and (eq test eql-fun) (not (zs-subtypep float-t (?type item))))
-      (inc-stats 'eql-to-eq)
-      (setq test eq-fun))
-
-    (when (eq test eq-fun)
-      (if (and (null key)
-               (null unknown-or-multiple-keys))
-          (progn
-            (inc-stats 'assoc-optis)
-            (setf (?form app) (get-global-fun 'rt::simple-assoc)
-                  (?arg-list app) (list item a-list)))
-          (let ((test-pos (position test-key arg-list)))
-            (if test-pos
-                (setf (nth (1+ test-pos) arg-list) eq-fun)
-                (setf (?arg-list app) (append arg-list
-                                              (list test-key eq-fun))))))))
-  app)
-
-;;------------------------------------------------------------------------------
-;; Wenn das Ergebnis der Applikation nicht benoetigt wird, werden statt
-;; mapcar, maplist, mapcan und mapcon mapc und mapl verwendet.
-;;------------------------------------------------------------------------------
-
-(defun opti-mapcar (app)
-  (unless *result-used*
-    (inc-stats 'mapcar-mapc)
-    (setf (?form app) (get-global-fun 'L::mapc)))
-  app)
-
-(defun opti-maplist (app)
-  (unless *result-used*
-    (inc-stats 'maplist-mapl)
-    (setf (?form app) (get-global-fun 'L::mapl)))
-  app)
-
-(defun opti-mapcan (app)
-  (unless *result-used*
-    (inc-stats 'mapcan-mapc)
-    (setf (?form app) (get-global-fun 'L::mapc)))
-  app)
-
-(defun opti-mapcon (app)
-  (unless *result-used*
-    (inc-stats 'mapcon-mapl)
-    (setf (?form app) (get-global-fun 'L::mapl)))
-  app)
 
 ;;------------------------------------------------------------------------------
 (provide "simplifier")

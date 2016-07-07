@@ -5,8 +5,11 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Laufzeitsystem, Funktionen EQUAL, EQUALP
 ;;;
-;;; $Revision: 1.7 $
+;;; $Revision: 1.8 $
 ;;; $Log: equal.lisp,v $
+;;; Revision 1.8  1994/02/02  09:41:32  hk
+;;; Deklaration simp-when-some-arg-not-cons/pathn/string/bitv für equal eingefügt.
+;;;
 ;;; Revision 1.7  1993/06/16  15:20:38  hk
 ;;;  Copyright Notiz eingefuegt.
 ;;;
@@ -19,7 +22,7 @@
 ;;;
 ;;; Revision 1.5  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.7 $ eingefuegt
+;;; $Revision: 1.8 $ eingefuegt
 ;;;
 ;;; Revision 1.4  1993/01/11  15:28:18  hk
 ;;; structure -> struct
@@ -44,6 +47,7 @@
 ;; - PATHNAME : entfaellt
 ;;------------------------------------------------------------------------------
 (defun equal (x y)
+  (declare (:simp-when-some-arg-not-cons/pathn/string/bitv eql))
   (typecase x
     (cons (and (consp y) (equal (car x) (car y)) (equal (cdr x) (cdr y))))
     (string (and (stringp y) (string= x y)))

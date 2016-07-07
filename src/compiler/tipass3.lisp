@@ -10,8 +10,18 @@
 ;;;               kein Funktionstyp ist,
 ;;;             o eine Funktion wurde auf Argumente mit Bottom-Typ appliziert.
 ;;;
-;;; $Revision: 1.17 $
+;;; $Revision: 1.19 $
 ;;; $Log: tipass3.lisp,v $
+;;; Revision 1.19  1994/02/21  15:22:29  hk
+;;; look-for-type-errors v"ollig umgestellt. Untersucht Ausdr"ucke auf
+;;; potentielle Typfehler. Wenn ein Ausdruck mit Typfehlern gefunden
+;;; wurde, so werden seine Teilausdr"ucke nicht weiter analysiert, um
+;;; redundanten Meldungen vorzubeugen.
+;;;
+;;; Revision 1.18  1994/02/18  14:06:03  hk
+;;; write-type-warnings f"ur var-ref und setq-form geben nun den Namen der
+;;; Variablen an.
+;;;
 ;;; Revision 1.17  1993/12/09  10:35:48  hk
 ;;; provide wieder an das Dateiende
 ;;;
@@ -71,7 +81,168 @@
 (require "traverse")
 
 ;;------------------------------------------------------------------------------
-;; Gibt eine Warnzeile aus.
+;; Traversiert das uebergebene Modul und durchsucht es nach Typfehlern.
+;;------------------------------------------------------------------------------
+(defun look-for-type-errors (a-module)
+  (when (> *ti-verbosity* 0)
+    (clicc-message "Looking for type errors"))
+  (mapc #'tw-fun (?fun-list a-module)))
+
+;;------------------------------------------------------------------------------
+;; Funktionen, deren Parameter den Typ BOTTOM haben, sollen nicht weiter
+;; analysiert werden
+;;------------------------------------------------------------------------------
+(defun tw-fun (fun)
+  (let* ((*current-fun* fun)
+         (all-vars (?all-vars (?params fun)))
+         (bottom-params (remove-if-not #'is-bottom-typed all-vars)))
+    (cond
+      (bottom-params
+       (ti-warning "Some parameters are BOTTOM typed")
+       (ti-warn-line 2 "the bottom typed parameters : ~S"
+                     (mapcar #'?symbol bottom-params)))
+      (T (tw-params (?params fun))
+         (tw-form (?body fun))))))
+
+;;------------------------------------------------------------------------------
+(defun tw-params (params)
+  (dolist (a-opt (?opt-list params))
+    (tw-form (?init a-opt)))
+  (dolist (a-key (?key-list params))
+    (tw-form (?init a-key))))
+
+;;------------------------------------------------------------------------------
+;; Untersucht Ausdr"ucke auf potentielle Typfehler.
+;; Wenn ein Ausdruck mit Typfehlern gefunden wurde, so werden seine
+;; Teilausdr"ucke nicht weiter analysiert, um redundanten Meldungen vorzubeugen.
+;;------------------------------------------------------------------------------
+(defgeneric tw-form (object))
+
+(defmethod tw-form ((a-form form)))
+(defmethod tw-form ((a-cont cont)))
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((an-app app))
+  (let* ((function       (?form an-app))
+         (function-type  (?type function))
+         (arguments      (?arg-list an-app))
+         (argument-types (mapcar #'?type arguments)))
+
+    (cond
+      ((and (not (types-are-conform function-t function-type))
+            (not (cont-p function)))
+       (ti-warning "A non-function is applied.")
+       (ti-warn-line 2 "function      : ~S" function)
+       (ti-warn-line 2 "function type : ~S" (output-type function-type))
+       (ti-warn-line 2 ""))
+
+      ((some #'is-bottom-t argument-types)
+       (ti-warning "BOTTOM typed argument types")
+       (ti-warn-line 2 "applied function : ~S" 
+                     (if (fun-p function)
+                         (?symbol function)
+                         `unknown))
+       (ti-warn-line 2 "arguments        : ~S" arguments)
+       (ti-warn-line 2 "argument types   : ~S" (mapcar #'output-type 
+                                                       argument-types)))
+      (T (tw-form function)
+         (mapc #'tw-form arguments)))))
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((a-setq-form setq-form))
+  (cond
+    ((is-bottom-t (?type a-setq-form))
+     (ti-warning "A location is set to type BOTTOM.")
+     (ti-warn-line 2 "location : ~S"
+                   (?symbol (let ((location (?location a-setq-form)))
+                              (if (var-ref-p location)
+                                  (?var location)
+                                  location))))
+     (ti-warn-line 2 "form     : ~S" (?form a-setq-form)))
+    (T (tw-form (?form a-setq-form)))))
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((a-let*-form let*-form))
+  (let* ((init-list (?init-list a-let*-form))
+         (var-list (?var-list a-let*-form))
+         (bottom-form-pos (position-if #'is-bottom-typed init-list)))
+    (cond
+      (bottom-form-pos
+       (ti-warning "An initform in let* has type BOTTOM")
+       (ti-warn-line 2 "variable : ~S"
+                     (?symbol (nth bottom-form-pos var-list)))
+       (ti-warn-line 2 "initform : ~S" (nth bottom-form-pos init-list)))
+      (T (mapc #'tw-form init-list)
+         (tw-form (?body a-let*-form))))))
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((a-labels-form labels-form))
+  (mapc #'tw-fun (?fun-list a-labels-form))
+  (tw-form (?body a-labels-form)))
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((a-progn-form progn-form))
+  (do* ((form-list (?form-list a-progn-form) (cdr form-list))
+        (form (first form-list)))
+       ((null form-list))
+    (when (and (cdr form-list) (is-bottom-typed form))
+      (ti-warning "A BOTTOM typed form precedes a form") 
+      (ti-warn-line 2 "the bottom typed form : ~S" form)
+      (ti-warn-line 2 "the next form         : ~S" (second form-list))
+      (return))
+    (tw-form form)))
+        
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((an-if-form if-form))
+  (let ((pred (?pred an-if-form)))
+    (cond
+      ((is-bottom-typed pred)
+       (ti-warning "The predicate of an if-form has type BOTTOM")
+       (ti-warn-line 2 "the predicate : ~S" pred))
+      (T (tw-form pred)
+         (tw-form (?then an-if-form))
+         (tw-form (?else an-if-form))))))
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((a-switch-form switch-form))
+  (let ((form (?form a-switch-form)))
+    (cond
+      ((is-bottom-typed form)
+       (ti-warning "The control form of an switch-form has type BOTTOM")
+       (ti-warn-line 2 "the form : ~S" form))
+      (T (tw-form form)
+         (dolist (a-labeled-form (?case-list a-switch-form))
+           (tw-form (?form a-labeled-form)))
+         (tw-form (?otherwise a-switch-form))))))
+
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((a-let/cc-form let/cc-form))
+  (tw-form (?body a-let/cc-form)))
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((a-tagbody-form tagbody-form))
+  (tw-form (?first-form a-tagbody-form))
+  (mapc-tagged-form-list (?tagged-form-list a-tagbody-form)
+                         #'tw-form
+                         #'tw-form))
+
+;;------------------------------------------------------------------------------
+(defmethod tw-form ((a-mv-lambda mv-lambda))
+  (cond
+    ((is-bottom-typed (?arg a-mv-lambda))
+     (ti-warning "Argument of mv-lambda has type BOTTOM.")
+     (ti-warn-line 2 "argument: ~s" (?arg a-mv-lambda)))
+    (T (tw-form (?arg a-mv-lambda))
+       (tw-params (?params a-mv-lambda))
+       (tw-form (?body a-mv-lambda)))))
+
+;;------------------------------------------------------------------------------
+(defun is-bottom-typed (a-form)
+  (is-bottom-t (?type a-form)))
+
+;;------------------------------------------------------------------------------
+;; Gibt eine Warnzeile aus. Beachtet *ti-verbosity*.
 ;;------------------------------------------------------------------------------
 (defun ti-warn-line (priority warn-string &rest args-for-warn-string)
   (when (>= *ti-verbosity* priority)
@@ -88,69 +259,10 @@
   (let ((complete-warn-string
          (concatenate 'string 
                       (format nil "Warning (in ~A): " 
-                              (?symbol (first *tr-analyzation-path*)))
+                              (?symbol *current-fun*))
                       warn-string)))
     (apply #'ti-warn-line 1 complete-warn-string args-for-warn-string)))
   
-
-;;------------------------------------------------------------------------------
-;; Untersucht Applikationen auf potentielle Typfehler.
-;;------------------------------------------------------------------------------
-(defgeneric write-type-warnings (object))
-
-(defmethod write-type-warnings ((a-form form)))
-(defmethod write-type-warnings ((a-cont cont)))
-
-
-(defmethod write-type-warnings ((an-app app))
-  (let* ((function       (?form an-app))
-         (function-type  (?type function))
-         (arguments      (?arg-list an-app))
-         (argument-types (mapcar #'?type arguments)))
-
-    (when (and (not (types-are-conform function-t function-type))
-               (not (cont-p function)))
-      (ti-warning "A non-function is applied.")
-      (ti-warn-line 2 "function      : ~S" function)
-      (ti-warn-line 2 "function type : ~S" (output-type function-type))
-      (ti-warn-line 2 ""))
-
-    (when (some #'is-bottom-t argument-types)
-      (ti-warning "Bad argument types")
-      (ti-warn-line 2 "applied function : ~S" 
-                    (if (fun-p function)
-                        (?symbol function)
-                        `unknown))
-      (ti-warn-line 2 "arguments        : ~S" arguments)
-      (ti-warn-line 2 "argument types   : ~S" (mapcar #'output-type 
-                                                      argument-types))
-      (ti-warn-line 2 ""))))
-
-
-(defmethod write-type-warnings ((a-var-ref var-ref))
-  (when (is-bottom-t (?type a-var-ref))
-    (ti-warning "A variable reference is typed BOTTOM.")
-    (ti-warn-line 2 "variable-ref : ~S" a-var-ref)))
-
-
-(defmethod write-type-warn-line ((a-setq-form setq-form))
-  (when (is-bottom-t (?type a-setq-form))
-    (ti-warning "A location is set to type BOTTOM.")
-    (ti-warn-line 2 "location : ~S" (?location a-setq-form))))
-
-
-;;------------------------------------------------------------------------------
-;; Traversiert das uebergebene Modul und durchsucht es nach Typfehlern.
-;;------------------------------------------------------------------------------
-(defun look-for-type-errors (a-module)
-  (when (> *ti-verbosity* 0)
-    (clicc-message "Looking for type errors"))
-  
-  (traverse-module a-module 
-                   :after-funs (list #'write-type-warnings)
-                   :tr-fun-body-p #'(lambda (a-fun)
-                                      (declare (ignore a-fun)) nil)))
-
 
 ;;------------------------------------------------------------------------------
 (provide "tipass3") 

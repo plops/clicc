@@ -5,8 +5,18 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Type Specifiers
 ;;;
-;;; $Revision: 1.28 $
+;;; $Revision: 1.30 $
 ;;; $Log: p1type.lisp,v $
+;;; Revision 1.30  1993/12/14  13:01:29  sma
+;;; Vorhandensein des neuen Typtests rt::plain-vector-p ausgenutzt für
+;;; Test auf (simple-array * (*)).
+;;;
+;;; Revision 1.29  1993/12/09  14:22:17  sma
+;;; simple-vectorp und simple-stringp in simple-vector-p (dito string)
+;;; korrigiert, desweiteren wird jetzt auf simple-vector-p auch bei
+;;; (simple-array T (*)) statt (simple-array * (*)) optimiert (dito
+;;; string). Außerdem einige Leerzeilen am Ende gelöscht.
+;;;
 ;;; Revision 1.28  1993/11/09  11:52:05  hk
 ;;; Fehler in p1-type-expand behoben: (eq 1 ...) --> (eql 1 ...)
 ;;;
@@ -338,20 +348,25 @@
                       ((or (eq type 'L::character)
                            (eq type 'L::standard-char))
                        (if (eq 'L::* (first dims))
-                           `(L::simple-stringp ,object)
-                           `(L::and (L::simple-stringp ,object)
+                           `(L::simple-string-p ,object)
+                           `(L::and (L::simple-string-p ,object)
+                             (L::eql (L::length ,object) ,(first dims)))))
+                      ((eq type 'L::T)
+                       (if (eq 'L::* (first dims))
+                           `(L::simple-vector-p ,object)
+                           `(L::and (L::simple-vector-p ,object)
                              (L::eql (L::length ,object) ,(first dims)))))
                       ((eq type 'L::*)
                        (if (eq 'L::* (first dims))
-                           `(L::simple-vectorp ,object)
-                           `(L::and (L::simple-vectorp ,object)
+                           `(RT::plain-vector-p ,object)
+                           `(L::and (RT::plain-vector-p ,object)
                              (L::eql (L::length ,object) ,(first dims)))))
                       (t
-                       `(RT::CHECK-SIMPLE-ARRAY
+                       `(RT::check-simple-array
                          ,object (L::QUOTE ,type) (L::QUOTE ,dims)))))
                    ((and (eq type 'L::*) (eq dims 'L::*))
                     `(rt::simple-array-p ,object))
-                   (t `(RT::CHECK-SIMPLE-ARRAY
+                   (t `(RT::check-simple-array
                         ,object (L::QUOTE ,type) (L::QUOTE ,dims))))))
               
               (L::INTEGER-INTERNAL
@@ -371,14 +386,3 @@
 
 ;;------------------------------------------------------------------------------
 (provide "p1type")
-
-
-
-
-
-
-
-
-
-
-

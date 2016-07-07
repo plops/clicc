@@ -5,8 +5,12 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Lambda-Expressions
 ;;;
-;;; $Revision: 1.32 $
+;;; $Revision: 1.33 $
 ;;; $Log: p1lambda.lisp,v $
+;;; Revision 1.33  1994/02/01  11:28:32  hk
+;;; In p1-named-lambda wird *current-fun* an die gerade generierte fun
+;;; gebunden.
+;;;
 ;;; Revision 1.32  1993/10/07  08:04:37  ft
 ;;; ll-par-spec hinzugefuegt und Fehler darin behoben.
 ;;;
@@ -409,6 +413,7 @@
 ;;------------------------------------------------------------------------------
 (defun p1-named-lambda (fun name function-block-name lambda-list_body)
   (let ((*FUN-NAME* name)
+        (*CURRENT-FUN* fun)
         (*LOCAL-ENVIRONMENT* (copy-env *LOCAL-ENVIRONMENT*)))
 
     (multiple-value-bind (params aux-list decl body)

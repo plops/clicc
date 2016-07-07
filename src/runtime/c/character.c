@@ -5,8 +5,29 @@
  *            ------------------------------------------------------
  * Funktion : System-Funktionen: Characters
  *
- * $Revision: 1.11 $
+ * $Revision: 1.17 $
  * $Log: character.c,v $
+ * Revision 1.17  1994/05/22  15:50:05  sma
+ * LOAD_FIXNUM -> LOAD_SMALLFIXNUM um Compiler-Warnung abzuschaffen.
+ *
+ * Revision 1.16  1994/04/28  09:43:25  sma
+ * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument erg‰nzt.
+ *
+ * Revision 1.15  1994/04/23  16:30:42  sma
+ * RET_BOOL_OPT eingef¸hrt. Dieses Makro l‰dt nicht explizit einen "true
+ * value", wenn das Pr‰dikat erf¸llt ist.
+ *
+ * Revision 1.14  1994/02/01  14:13:36  uho
+ * In rt_digit_char das fehlende 'X' in digitchars erg‰nzt.
+ *
+ * Revision 1.13  1994/01/14  09:20:41  sma
+ * Character-Funktionen neu geschrieben. Mehr Lisp, weniger C. Alle
+ * zeichensatzunabh‰ngigen Funktionen befinden sich jetzt im LISP-Teil.
+ *
+ * Revision 1.12  1994/01/05  12:47:15  sma
+ * Namens‰nderung: Alle Laufzeitsystemfunktionen mit dem Pr‰fix rt_
+ * versehen und den Postfix _internal entfernt. STACK(base,x) -> ARG(x)
+ *
  * Revision 1.11  1993/08/27  11:48:44  sma
  * cproto-Warnungen wegen mehrzeiligem String beseitigt
  *
@@ -47,674 +68,100 @@
  * 12.11.90 : Erste Version
  *----------------------------------------------------------------------------*/
 
-#include <string.h>
-#include <ctype.h>
 #include <c_decl.h>
 #include "sys.h"
-
-
-/*------------------------------------------------------------------------------
- * Fehlermeldungen
- *----------------------------------------------------------------------------*/
-char No_char[] = "~a is not a character";
-
+#include <ctype.h>
+#include <string.h>
 
 /*------------------------------------------------------------------------------
- * Globale Variablen
+ * Zeichenklassen-Tests
  *----------------------------------------------------------------------------*/
 
-char *char_name[] =
-{  /* Standard-Character */
-   /* ------------------ */
-   "Space", "Newline",
+LISP_FUN(rt_standard_char_p)
+{
+   int ch = GET_CHAR(ARG(0));
+   RET_BOOL_OPT(isprint(ch) || ch == '\n');
+}
+
+LISP_FUN(rt_graphic_char_p)
+{
+   RET_BOOL_OPT(isprint(GET_CHAR(ARG(0))));
+}
+
+LISP_FUN(rt_alpha_char_p)
+{
+   RET_BOOL_OPT(isalpha(GET_CHAR(ARG(0))));
+}
    
-   /* Semi-Standard Character */
-   /* ----------------------- */
-   "Backspace", "Tab", "Linefeed", "Page", "Return", "Rubout", NULL };
+LISP_FUN(rt_upper_case_p)
+{
+   RET_BOOL_OPT(isupper(GET_CHAR(ARG(0))));
+}
 
-char char_intern[] = { ' ', '\n', '\b', '\t', '\n', '\f', '\r', '\177' };
+LISP_FUN(rt_lower_case_p)
+{
+   RET_BOOL_OPT(islower(GET_CHAR(ARG(0))));
+}
 
-/* Dieser String muﬂ in einer Zeile stehen, damit cproto keine Fehler anzeigt */
-static char standard_char[] =
-" \n!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
-
-char digit_char[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
+LISP_FUN(rt_both_case_p)
+{
+   int ch = GET_CHAR(ARG(0));
+   /* Buchstabe, f¸r den ein ‰quivalenter GROSS/kleinbuchstabe existiert */
+   RET_BOOL_OPT(isalnum(ch) && (islower(ch) && toupper(ch) != ch
+                                || isupper(ch) && tolower(ch) != ch));
+}
 
 /*------------------------------------------------------------------------------
- * Prueft auf Typ CHARACTER
- * Rueckgabewert: Der eigentliche Character der CL_FORM
+ * RT:DIGIT-CHAR char
  *----------------------------------------------------------------------------*/
-char check_char(base)
-CL_FORM *base;
+LISP_FUN(rt_digit_char)
 {
-   if(NOT(CL_CHARP(base)))
+   static char digitchars[] =
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+   int ch = GET_CHAR(ARG(0));
+
+   if (isalnum(ch))
    {
-      Lerror(STACK(base, 0), No_char);
-   }
-   return(GET_CHAR(base));
-}
-
-
-/*------------------------------------------------------------------------------
- * Wandelt einen Kleinbuchstaben in einen Grossbuchstaben um.
- * Sonstige Zeichen werden nicht veraendert.
- * 'toupper' ist in SYS 5 und BSD 4.3 unterschiedlich definiert.
- *----------------------------------------------------------------------------*/
-char save_toupper(ch)
-int ch;
-{
-   return (char)(islower(ch) ? toupper(ch) : ch);
-}
-
-
-/*----------------------------------------------------------------------------*/
-/* 13.1. Character Attributes                                                 */
-/*----------------------------------------------------------------------------*/
-
-/*----------------------------------------------------------------------------*/
-/* CHAR-CODE-LIMIT = 256                                                      */
-/*----------------------------------------------------------------------------*/
-
-/*----------------------------------------------------------------------------*/
-/* 13.2. Predicates on Characters                                             */
-/*----------------------------------------------------------------------------*/
-
-
-/*------------------------------------------------------------------------------
- * standard-char-p char
- *----------------------------------------------------------------------------*/
-void Fstandard_char_p(base)
-CL_FORM *base;
-{
-   RET_BOOL(strchr(standard_char, check_char(STACK(base, 0))));
-}
-
-
-/*------------------------------------------------------------------------------
- * graphic-char-p char
- *----------------------------------------------------------------------------*/
-void Fgraphic_char_p(base)
-CL_FORM *base;
-{
-   char ch = check_char(STACK(base, 0));
-   /* Alle Standardzeichen bis auf #\Newline sind Graphikzeichen */
-   RET_BOOL(ch != '\n' && strchr(standard_char, ch));
-}
-
-
-/*------------------------------------------------------------------------------
- * string-char-p char
- *----------------------------------------------------------------------------*/
-void Fstring_char_p(base)
-CL_FORM *base;
-{
-   check_char(STACK(base, 0));
-   LOAD_T(STACK(base, 0));    /* Alle Zeichen koennen in Strings vorkommen */
-}
-
-
-/*------------------------------------------------------------------------------
- * alpha-char-p char
- *----------------------------------------------------------------------------*/
-void Falpha_char_p(base)
-CL_FORM *base;
-{
-   RET_BOOL(isalpha(check_char(STACK(base, 0))));
-}
-
-
-/*------------------------------------------------------------------------------
- * upper-case-p char
- *----------------------------------------------------------------------------*/
-void Fupper_case_p(base)
-CL_FORM *base;
-{
-   RET_BOOL(isupper(check_char(STACK(base, 0))));
-}
-
-
-/*------------------------------------------------------------------------------
- * lower-case-p char
- *----------------------------------------------------------------------------*/
-void Flower_case_p(base)
-CL_FORM *base;
-{
-   RET_BOOL(islower(check_char(STACK(base, 0))));
-}
-
-
-/*------------------------------------------------------------------------------
- * both-case-p char
- *----------------------------------------------------------------------------*/
-void Fboth_case_p(base)
-CL_FORM *base;
-{
-   RET_BOOL(isalpha(check_char(STACK(base, 0))));
-}
-
-
-/*------------------------------------------------------------------------------
- * digit-char-p-internal char radix
- * ACHTUNG: Funktioniert so nicht f¸r EBCDI !
- *----------------------------------------------------------------------------*/
-void digit_char_p_internal(base)
-CL_FORM *base;
-{
-   char ch    = check_char(STACK(base, 0)); /* Zeichen selektieren */
-   long radix = GET_FIXNUM(STACK(base, 1));
-
-   if(isdigit(ch))
-   {
-      ch -= '0';
-   }
-   else if(islower(ch))
-   {
-      ch -= ('a' - 10);
-   }
-   else if(isupper(ch))
-   {
-      ch -= ('A' - 10);
+      ch = (int)(strchr(digitchars, ch) - digitchars);
+      if (ch >= 36) ch -= 26;
+      LOAD_SMALLFIXNUM(ch, ARG(0));
    }
    else
-   {
-      LOAD_NIL(STACK(base, 0));
-      return;
-   }
-
-   if(ch < radix)
-   {
-      LOAD_FIXNUM(ch, STACK(base, 0));
-   }
-   else
-   {
-      LOAD_NIL(STACK(base, 0));
-   }
-}
-
-
-/*------------------------------------------------------------------------------
- * alphanumericp char
- *----------------------------------------------------------------------------*/
-void Falphanumericp(base)
-CL_FORM *base;
-{
-   RET_BOOL(isalnum(check_char(STACK(base, 0))));
-}
-
-
-/*------------------------------------------------------------------------------
- * char= character &REST more-characters
- *----------------------------------------------------------------------------*/
-void FcharE(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char ch;
-   int i;
-
-   ch = check_char(STACK(base, 0)); /* 1. Zeichen selektieren */
-
-	/* Typueberpruefung auf CL_CHAR und Vergleich mit dem 1. Zeichen.
-    * Beim ersten Zeichen, welches ungleich dem 1. Zeichen ist,
-    * Abbruch und als Ergebnis NIL liefern.
-    */
-   for(i = 1; i < nargs; i++)
-   {
-      if(ch != check_char(STACK(base, i)))
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * CHAR/= character &REST more-characters
- *----------------------------------------------------------------------------*/
-void FcharNE(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   int  i, j;
-   char ch;
-
-   for(i = 0; i < nargs; i++)
-   {
-      ch = check_char(STACK(base, i)); /* Typueberpruefung des i-ten Args */
-
-      /* Vergleich mit allen Argumenten j > i */
-      for(j = i + 1; j < nargs; j++)
-      {
-         if(ch == check_char(STACK(base, j)))
-         {
-            LOAD_NIL(STACK(base, 0));
-            return;
-         }
-      }
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char< character &REST more-characters
- *----------------------------------------------------------------------------*/
-void FcharL(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char last_ch, next_ch;
-   int  i;
-
-   last_ch = check_char(STACK(base, 0));
-   for(i = 1; i < nargs; i++)
-   {
-      next_ch = check_char(STACK(base, i));
-      if(last_ch >= next_ch)
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-      last_ch = next_ch;
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char> character &REST more-characters
- *----------------------------------------------------------------------------*/
-void FcharG(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char last_ch, next_ch;
-   int  i;
-
-   last_ch = check_char(STACK(base, 0));
-   for(i = 1; i < nargs; i++)
-   {
-      next_ch = check_char(STACK(base, i));
-      if(last_ch <= next_ch)
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-      last_ch = next_ch;
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char<= character &REST more-characters
- *----------------------------------------------------------------------------*/
-void FcharLE(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char last_ch, next_ch;
-   int  i;
-
-   last_ch = check_char(STACK(base, 0));
-   for(i = 1; i < nargs; i++)
-   {
-      next_ch = check_char(STACK(base, i));
-      if(last_ch > next_ch)
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-      last_ch = next_ch;
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char>= character &REST more-characters
- *----------------------------------------------------------------------------*/
-void FcharGE(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char last_ch, next_ch;
-   int  i;
-
-   last_ch = check_char(STACK(base, 0));
-   for(i = 1; i < nargs; i++)
-   {
-      next_ch = check_char(STACK(base, i));
-      if(last_ch < next_ch)
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-      last_ch = next_ch;
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char-equal character &rest more-characters
- *----------------------------------------------------------------------------*/
-void Fchar_equal(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char ch;
-   int i;
-
-	/* 1. Zeichen selektieren und in Grossbuchstaben umwandeln */
-   ch = save_toupper(check_char(STACK(base, 0)));
-
-   for(i = 1; i < nargs; i++)
-   {
-      /* Typueberpruefung auf CL_CHAR und Vergleich mit dem 1. Zeichen.
-       * Durch Umwandlung in Grossbuchstaben wird gross/klein ignoriert.
-       * Beim ersten Zeichen, welches ungleich dem 1. Zeichen ist,
-       * Abbruch und als Ergebnis NIL liefern.
-       */
-      if(ch != save_toupper(check_char(STACK(base, i))))
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char-not-equal character &rest more-characters
- *----------------------------------------------------------------------------*/
-void Fchar_not_equal(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   int  i, j;
-   char ch;
-
-   for(i = 0; i < nargs; i++)
-   {
-		/* Typueberpruefung des i-ten Args */
-      ch = save_toupper(check_char(STACK(base, i)));
-
-		/* Vergleich mit allen Argumenten j > i */
-      for(j = i + 1; j < nargs; j++)
-      {
-         if(ch == save_toupper(check_char(STACK(base, j))))
-         {
-            LOAD_NIL(STACK(base, 0));
-            return;
-         }
-      }
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char-lessp character &rest more-characters
- *----------------------------------------------------------------------------*/
-void Fchar_lessp(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char last_ch, next_ch;
-   int  i;
-
-   last_ch = save_toupper(check_char(STACK(base, 0)));
-   for(i = 1; i < nargs; i++)
-   {
-      next_ch = save_toupper(check_char(STACK(base, i)));
-      if(last_ch >= next_ch)
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-      last_ch = next_ch;
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char-greaterp character &rest more-characters
- *----------------------------------------------------------------------------*/
-void Fchar_greaterp(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char last_ch, next_ch;
-   int  i;
-
-   last_ch = save_toupper(check_char(STACK(base, 0)));
-   for(i = 1; i < nargs; i++)
-   {
-      next_ch = save_toupper(check_char(STACK(base, i)));
-      if(last_ch <= next_ch)
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-      last_ch = next_ch;
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char-not-greaterp character &rest more-characters
- *----------------------------------------------------------------------------*/
-void Fchar_not_greaterp(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char last_ch, next_ch;
-   int  i;
-
-   last_ch = save_toupper(check_char(STACK(base, 0)));
-   for(i = 1; i < nargs; i++)
-   {
-      next_ch = save_toupper(check_char(STACK(base, i)));
-      if(last_ch > next_ch)
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-      last_ch = next_ch;
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char-not-lessp character &rest more-characters
- *----------------------------------------------------------------------------*/
-void Fchar_not_lessp(base, nargs)
-CL_FORM *base;
-int nargs;
-{
-   char last_ch, next_ch;
-   int  i;
-
-   last_ch = save_toupper(check_char(STACK(base, 0)));
-   for(i = 1; i < nargs; i++)
-   {
-      next_ch = save_toupper(check_char(STACK(base, i)));
-      if(last_ch < next_ch)
-      {
-         LOAD_NIL(STACK(base, 0));
-         return;
-      }
-      last_ch = next_ch;
-   }
-   LOAD_T(STACK(base, 0));
-}
-
-
-/*----------------------------------------------------------------------------*/
-/* 13.3. Character Construction and Selection                                 */
-/*----------------------------------------------------------------------------*/
-
-/*------------------------------------------------------------------------------
- * char-code char
- *----------------------------------------------------------------------------*/
-void Fchar_code(base)
-CL_FORM *base;
-{
-   char ch = check_char(STACK(base, 0));
-
-   LOAD_FIXNUM(ch, STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * code-char-internal code                                   [CL2]
- *----------------------------------------------------------------------------*/
-void code_char_internal(base)
-CL_FORM *base;
-{
-   char code = GET_FIXNUM(STACK(base, 0));
-
-   LOAD_CHAR(code, STACK(base, 0));
-}
-
-
-/*----------------------------------------------------------------------------*/
-/* 13.4. Character Conversions                                                */
-/*----------------------------------------------------------------------------*/
-
-/*----------------------------------------------------------------------------*/
-/* CHARACTER object                                                           */
-/*    -> COERCE object 'CHARACTER                                             */
-/*----------------------------------------------------------------------------*/
-
-/*------------------------------------------------------------------------------
- * char-upcase char
- *----------------------------------------------------------------------------*/
-void Fchar_upcase(base)
-CL_FORM *base;
-{
-   char upper = save_toupper(check_char(STACK(base, 0)));
-   LOAD_CHAR(upper, STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char-downcase char
- *----------------------------------------------------------------------------*/
-void Fchar_downcase(base)
-CL_FORM *base;
-{
-   char lower = check_char(STACK(base, 0));
-   if(isupper(lower))
-      lower = tolower(lower);
-   LOAD_CHAR(lower, STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * digit-char-internal weight radix                          [CL2]
- *----------------------------------------------------------------------------*/
-void digit_char_internal(base)
-CL_FORM *base;
-{
-   long weight = GET_FIXNUM(STACK(base, 0));
-   LOAD_CHAR(digit_char[weight], STACK(base, 0));
-}
-
-
-/*------------------------------------------------------------------------------
- * char-int char
- *----------------------------------------------------------------------------*/
-void Fchar_int(base)
-CL_FORM *base;
-{
-   char ch = check_char(STACK(base, 0));
-
-   LOAD_FIXNUM(ch, STACK(base, 0));
+      LOAD_NIL(ARG(0));
 }
 
 /*------------------------------------------------------------------------------
- * char-name char
+ * RT::CHAR-CODE char
  *----------------------------------------------------------------------------*/
-void Fchar_name(base)
-CL_FORM *base;
+LISP_FUN(rt_char_code)
 {
-   int index;
-
-   switch(check_char(STACK(base, 0)))
-   {
-   case ' ' : index = 0; break;
-   case '\n': index = 1; break;
-   case '\b': index = 2; break;
-   case '\t': index = 3; break;
-   case '\f': index = 5; break;
-   case '\r': index = 6; break;
-   default: LOAD_NIL(STACK(base, 0)); return;
-   }
-   make_string(STACK(base, 0), char_name[index]);
+    LOAD_SMALLFIXNUM((int)GET_CHAR(ARG(0)), ARG(0));
 }
-
 
 /*------------------------------------------------------------------------------
- * our_strncasecmp str1 str2 len
+ * RT::CODE-CHAR code
  *----------------------------------------------------------------------------*/
-int our_strncasecmp(str1, str2, len)
-char *str1, *str2;
-int len;
+LISP_FUN(rt_code_char)
 {
-   int diff;
-
-   while(len--)
-   {
-      if(*str1 == '\0')
-         return(-(*str2 != '\0'));
-      if(*str2 == '\0')
-         return(1);
-
-      diff = save_toupper(*str1) - save_toupper(*str2);
-      if(diff)
-         return((diff > 0) ? 1 : -1);
-      else
-      {
-         str1++;
-         str2++;
-      }
-   }
-   return(0);
+    LOAD_CHAR(ARG(1), GET_FIXNUM(ARG(0)), ARG(0));
 }
-
 
 /*------------------------------------------------------------------------------
- * name-char name
+ * RT::CHAR-UPCASE charcode
  *----------------------------------------------------------------------------*/
-void Fname_char(base)
-CL_FORM *base;
+LISP_FUN(rt_char_upcase)
 {
-   extern Fstring();
-   char *string;
-   long size;
-   int i = 0;
-
-   Fstring(STACK(base, 0));   /* (STRING name) */
-   size   = AR_SIZE(GET_FORM(STACK(base, 0)));
-   string = get_c_string(STACK(base, 0));
-   while(char_name[i])
-   {
-      if(! our_strncasecmp(string, char_name[i], size))
-      {
-         LOAD_CHAR(char_intern[i], STACK(base, 0));
-         return;
-      }
-      i++;
-   }
-   LOAD_NIL(STACK(base, 0));
+   int ch = GET_CHAR(ARG(0));
+   LOAD_CHAR(ARG(0), islower(ch) ? toupper(ch) : ch, ARG(0));
 }
+
+/*------------------------------------------------------------------------------
+ * RT::CHAR-DOWNCASE charcode
+ *----------------------------------------------------------------------------*/
+LISP_FUN(rt_char_downcase)
+{
+   int ch = GET_CHAR(ARG(0));
+   LOAD_CHAR(ARG(0), isupper(ch) ? tolower(ch) : ch, ARG(0));
+}
+   
 

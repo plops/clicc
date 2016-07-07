@@ -1,12 +1,29 @@
-;;;-----------------------------------------------------------------------------
+;;-----------------------------------------------------------------------------
 ;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
 ;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
 ;;;            ------------------------------------------------------
 ;;; Funktion : Typdeklarationen der Funktionstypen importierter Funktionen.
 ;;;
-;;; $Revision: 1.42 $
+;;; $Revision: 1.47 $
 ;;; $Log: tiimpdec.lisp,v $
+;;; Revision 1.47  1994/06/09  12:06:27  hk
+;;; Typen von Structure-Funktionen korrigiert
+;;;
+;;; Revision 1.46  1994/01/27  19:23:32  kl
+;;; Anpassungen an den erweiterten Typverband vorgenommen.
+;;;
+;;; Revision 1.45  1994/01/26  19:13:42  kl
+;;; Typisierung für symp, rt::<fix und rt::1-fix eingeführt. Typisierung
+;;; der member-Familie verbessert.
+;;;
+;;; Revision 1.44  1994/01/15  22:30:50  kl
+;;; Typisierungen erweitert.
+;;;
+;;; Revision 1.43  1994/01/13  16:09:05  sma
+;;; Funktionsnamen korrigiert, nicht mehr existierende Funktionen
+;;; gelöscht, mehr Funktionen aus dem Laufzeitsystem hinzugefügt.
+;;;
 ;;; Revision 1.42  1993/12/09  10:33:33  hk
 ;;; provide wieder an das Dateiende
 ;;;
@@ -150,26 +167,14 @@
 (require "timisc")
 
 ;;------------------------------------------------------------------------------
-;; Beim jedem Laden dieser Datei wird dieser Schalter zurueckgesetzt, weil sich
-;; Funktionsbeschreibungen geaendert haben koennten.
+;; Beim jedem Laden dieser Datei wird dieser Schalter zurückgesetzt, weil sich
+;; Funktionsbeschreibungen geändert haben könnten.
 ;;------------------------------------------------------------------------------
 (setf *ti-type-declarations-are-initialized* nil) 
 
 
 ;;------------------------------------------------------------------------------
-;; Einige haeufig verwendete Typen:
-;;------------------------------------------------------------------------------
-(declare-joined-type or-symbol-string-t   symbol-t string-t)
-(declare-joined-type or-sym-str-char-t    symbol-t string-t character-t)
-(declare-joined-type or-null-character-t  null-t   character-t)
-(declare-joined-type package-name-t       or-symbol-string-t)
-(declare-joined-type package-or-name-t    package-t package-name-t)
-(declare-joined-type my-stream-t          null-t symbol-t stream-t)
-(declare-joined-type file-t               string-t pathname-t stream-t)
-
-
-;;------------------------------------------------------------------------------
-;; Einige haeufig verwendete Typabstraktionsfunktionen:
+;; Einige häufig verwendete Typabstraktionsfunktionen:
 ;;------------------------------------------------------------------------------
 (defun the-first-type (type1 &rest other-types)
   (declare (ignore other-types))
@@ -266,6 +271,13 @@
 
 
 ;;------------------------------------------------------------------------------
+(defun member-type (arg1-type list-type &rest other-types)
+  (declare (ignore arg1-type other-types))
+  (type-meet all-list-t
+             (type-join null-t
+                        list-type)))
+
+;;------------------------------------------------------------------------------
 (defun setf-type  (type1 &rest other-types)
   (declare (ignore other-types))
   type1)
@@ -280,6 +292,8 @@
         (T
           (zs-typecase (apply #'multiple-type-join types)
              (bottom-t           bottom-t)
+             (byte-t             word-t)
+             (word-t             fixnum-t)
              (integer-t          integer-t)
              (float-t            float-t)
              ((conform number-t) number-t)
@@ -290,6 +304,8 @@
 (defun inc-dec-op (type)
   (zs-typecase type
     (bottom-t           bottom-t)
+    (byte-t             word-t)
+    (word-t             fixnum-t)
     (integer-t          integer-t)
     (float-t            float-t)
     ((conform number-t) number-t)
@@ -376,24 +392,31 @@
   (declare-type-predicates ((L::not                null-t)
                             (L::endp               null-t)
                             (L::symbolp            symbol-t)
+                            (rt::symp              non-null-sym-t)
                             (L::atom               atom-t)
                             (L::consp              cons-t)
                             (L::listp              all-list-t) 
-                            (L::numberp            number-t)
+
+                            (rt::fixnump           fixnum-t)
                             (L::integerp           integer-t)
                             (L::floatp             float-t)
+                            (L::numberp            number-t)
+
                             (L::characterp         character-t)
                             (L::stringp            string-t)
                             (L::vectorp            vector-t)
                             (L::simple-vector-p    vector-t)
                             (L::simple-string-p    string-t)
                             (L::arrayp             array-t)
-                            (rt::simple-array-p    array-t)
-                            (L::streamp            stream-t)
-                            (L::packagep           package-t)
+                            (L::simple-array-p     array-t)
+                            (rt::plain-vector-p    array-t)
+
                             (L::functionp          function-t)
                             (rt::structp           structure-t)
-                            (rt::instancep         class-t)))
+                            (rt::instancep         class-t)
+                            (L::packagep           package-t)
+                            (L::streamp            stream-t)
+                            (L::hash-table-p       hash-table-t)))
 )
 
 
@@ -413,14 +436,17 @@
   ;; 7.1.1. Reference
   ;; ----------------
   (dec-type L::symbol-value     (symbol-t) -> top-t)
+  (dec-type rt::symbol-value    (symbol-t) -> top-t)
   (dec-type L::boundp           (symbol-t) -> bool-t)
   (dec-type rt::unbound-value-p (top-t)    -> bool-t)
 
   
   ;; 7.1.2. Assignment
   ;; -----------------
-  (dec-type L::set           (symbol-t top-t) -> top-t #'the-second-type)
-  (dec-type L::makunbound    (symbol-t)       -> symbol-t)
+  (dec-type L::set                  (symbol-t top-t) -> top-t #'the-second-type)
+  (dec-type (setf rt::symbol-value) (top-t symbol-t) -> top-t #'the-first-type)
+  (dec-type L::makunbound           (symbol-t)       -> symbol-t)
+  (dec-type rt::makunbound          (symbol-t)       -> symbol-t)
   
   ;;  7.9. Multiple Values
   ;; ---------------------
@@ -432,14 +458,20 @@
   (dec-type L::get          (symbol-t top-t) -> top-t)
   (dec-type L::remprop      (symbol-t top-t) -> top-t)
   (dec-type L::symbol-plist (symbol-t)       -> top-t)
+  (dec-type rt::symbol-plist (symbol-t)      -> list-t)
+  (dec-type (setf rt::symbol-plist) (list-t symbol-t) -> list-t 
+                                     #'the-first-type)
   
   ;; 10.2. The Print Adr
   ;; --------------------
   (dec-type L::symbol-name  (symbol-t) -> string-t)
+  (dec-type rt::symbol-name (symbol-t) -> string-t)
+  (dec-type (setf rt::symbol-name) (string-t symbol-t) -> string-t)
   
   ;; 10.3. Creating Symbols
   ;; ----------------------
   (dec-type L::make-symbol    (string-t) -> symbol-t)
+  (dec-type rt::make-symbol   ()         -> symbol-t)
   (dec-type L::copy-symbol    (symbol-t) -> symbol-t)
   (dec-type L::gensym         ()         -> symbol-t)
   (dec-type L::gentemp        ()         -> symbol-t)
@@ -447,7 +479,8 @@
   (dec-type L::keywordp       (top-t)    -> bool-t)
 
   (dec-type rt::symbol-package-index (symbol-t) -> (type-join null-t integer-t))
-
+  (dec-type rt::constant-flag-p (symbol-t) -> bool-t)
+  (dec-type rt::set-constant-flag (symbol-t) -> symbol-t)
   
   ;; 11.7. Package System Functions and Variables
   ;; --------------------------------------------
@@ -505,6 +538,7 @@
   (dec-type L::=    (number-t number-t) -> bool-t)
   (dec-type L::/=   (number-t number-t) -> bool-t)
   (dec-type L::<    (number-t number-t) -> bool-t)
+  (dec-type rt::<fix (fixnum-t fixnum-t) -> top-t)
   (dec-type L::>    (number-t number-t) -> bool-t)
   (dec-type L::<=   (number-t number-t) -> bool-t)
   (dec-type L::>=   (number-t number-t) -> bool-t)
@@ -513,20 +547,21 @@
 
   ;; 12.4. Arithmetic Operations
   ;; ---------------------------
-  (dec-type L::+    (number-t number-t) -> number-t  #'add-multiplication-op)
-  (dec-type L::-    (number-t number-t) -> number-t  #'add-multiplication-op)
-  (dec-type L::*    (number-t number-t) -> number-t  #'add-multiplication-op)
-  (dec-type L::1+   (number-t)          -> number-t  #'inc-dec-op)
-  (dec-type L::1-   (number-t)          -> number-t  #'inc-dec-op)
-  (dec-type L::/    (number-t number-t) -> number-t  #'division-op)
-  (dec-type L::abs  (number-t)          -> number-t)
+  (dec-type L::+      (number-t number-t) -> number-t  #'add-multiplication-op)
+  (dec-type L::-      (number-t number-t) -> number-t  #'add-multiplication-op)
+  (dec-type L::*      (number-t number-t) -> number-t  #'add-multiplication-op)
+  (dec-type L::1+     (number-t)          -> number-t  #'inc-dec-op)
+  (dec-type L::1-     (number-t)          -> number-t  #'inc-dec-op)
+  (dec-type rt::1-fix (fixnum-t)          -> fixnum-t)
+  (dec-type L::/      (number-t number-t) -> number-t  #'division-op)
+  (dec-type L::abs    (number-t)          -> number-t)
 
-  (dec-type rt::log-internal      (number-t number-t)   -> number-t)
-  (dec-type rt::float-internal    (number-t)            -> float-t)
-  (dec-type rt::floor-internal    (number-t number-t)   -> number-t)
-  (dec-type rt::ceiling-internal  (number-t number-t)   -> number-t)
-  (dec-type rt::truncate-internal (number-t number-t)   -> number-t)
-  (dec-type rt::round-internal    (number-t number-t)   -> number-t)
+  (dec-type rt::log               (number-t number-t)   -> number-t)
+  (dec-type rt::float             (number-t)            -> float-t)
+  (dec-type rt::floor             (number-t number-t)   -> number-t)
+  (dec-type rt::ceiling           (number-t number-t)   -> number-t)
+  (dec-type rt::truncate          (number-t number-t)   -> number-t)
+  (dec-type rt::round             (number-t number-t)   -> number-t)
   
   (dec-type rt::%logior           (fixnum-t fixnum-t)   -> fixnum-t)
   (dec-type rt::%logxor           (fixnum-t fixnum-t)   -> fixnum-t)
@@ -557,46 +592,58 @@
 
   ;; 13.2. Predicates on Characters
   ;; ------------------------------
-  (dec-type L::standard-char-p   (character-t) -> bool-t)
-  (dec-type L::graphic-char-p    (character-t) -> bool-t)
-  (dec-type L::alpha-char-p      (character-t) -> bool-t)
-  (dec-type L::upper-case-p      (character-t) -> bool-t)
-  (dec-type L::lower-case-p      (character-t) -> bool-t)
-  (dec-type L::both-case-p       (character-t) -> bool-t)
-  (dec-type L::digit-char-p      (character-t) -> (type-join null-t fixnum-t))
-  (dec-type L::alphanumericp     (character-t) -> bool-t)
+  (dec-type L::standard-char-p    (character-t) -> bool-t)
+  (dec-type L::graphic-char-p     (character-t) -> bool-t)
+  (dec-type L::alpha-char-p       (character-t) -> bool-t)
+  (dec-type L::upper-case-p       (character-t) -> bool-t)
+  (dec-type L::lower-case-p       (character-t) -> bool-t)
+  (dec-type L::both-case-p        (character-t) -> bool-t)
+  (dec-type L::digit-char-p       (character-t) -> (type-join null-t fixnum-t))
+  (dec-type L::alphanumericp      (character-t) -> bool-t)
                  
-  (dec-type L::char=             (character-t character-t) -> bool-t)
-  (dec-type L::char/=            (character-t character-t) -> bool-t)
-  (dec-type L::char<             (character-t character-t) -> bool-t)
-  (dec-type L::char>             (character-t character-t) -> bool-t)
-  (dec-type L::char<=            (character-t character-t) -> bool-t)
-  (dec-type L::char>=            (character-t character-t) -> bool-t)
-  (dec-type L::char-equal        (character-t character-t) -> bool-t)
-  (dec-type L::char-not-equal    (character-t character-t) -> bool-t)
-  (dec-type L::char-lessp        (character-t character-t) -> bool-t)
-  (dec-type L::char-greaterp     (character-t character-t) -> bool-t)
-  (dec-type L::char-not-greaterp (character-t character-t) -> bool-t)
-  (dec-type L::char-not-lessp    (character-t character-t) -> bool-t)
+  (dec-type L::char=              (character-t character-t) -> bool-t)
+  (dec-type L::char/=             (character-t character-t) -> bool-t)
+  (dec-type L::char<              (character-t character-t) -> bool-t)
+  (dec-type L::char>              (character-t character-t) -> bool-t)
+  (dec-type L::char<=             (character-t character-t) -> bool-t)
+  (dec-type L::char>=             (character-t character-t) -> bool-t)
+  (dec-type L::char-equal         (character-t character-t) -> bool-t)
+  (dec-type L::char-not-equal     (character-t character-t) -> bool-t)
+  (dec-type L::char-lessp         (character-t character-t) -> bool-t)
+  (dec-type L::char-greaterp      (character-t character-t) -> bool-t)
+  (dec-type L::char-not-greaterp  (character-t character-t) -> bool-t)
+  (dec-type L::char-not-lessp     (character-t character-t) -> bool-t)
+
+  (dec-type rt::char=             (character-t character-t) -> bool-t)
+  (dec-type rt::char/=            (character-t character-t) -> bool-t)
+  (dec-type rt::char<             (character-t character-t) -> bool-t)
+  (dec-type rt::char>             (character-t character-t) -> bool-t)
+  (dec-type rt::char<=            (character-t character-t) -> bool-t)
+  (dec-type rt::char>=            (character-t character-t) -> bool-t)
+  (dec-type rt::char-equal        (character-t character-t) -> bool-t)
+  (dec-type rt::char-not-equal    (character-t character-t) -> bool-t)
+  (dec-type rt::char-lessp        (character-t character-t) -> bool-t)
+  (dec-type rt::char-greaterp     (character-t character-t) -> bool-t)
+  (dec-type rt::char-not-greaterp (character-t character-t) -> bool-t)
+  (dec-type rt::char-not-lessp    (character-t character-t) -> bool-t)
 
   ;; 13.3. Character Construction and Selection
   ;; ------------------------------------------
-  (dec-type L::char-code         (character-t) -> fixnum-t)
-  (dec-type L::code-char         (integer-t)   -> or-null-character-t)
-; (dec-type L::character         (top-t)       -> character-t)
-  (dec-type L::char-upcase       (character-t) -> character-t)
-  (dec-type L::char-downcase     (character-t) -> character-t)
-  (dec-type L::digit-char        (integer-t)   -> or-null-character-t)
-  (dec-type L::char-name         (character-t) -> (type-join null-t string-t))
-  (dec-type L::name-char         (top-t) -> top-t
-                                 #'(lambda (type) (type-join null-t type)))
+  (dec-type L::char-code          (character-t) -> fixnum-t)
+  (dec-type L::code-char          (fixnum-t)    -> or-null-character-t)
+; (dec-type L::character          (top-t)       -> character-t)
+  (dec-type L::char-upcase        (character-t) -> character-t)
+  (dec-type L::char-downcase      (character-t) -> character-t)
+  (dec-type L::digit-char         (integer-t)   -> or-null-character-t)
+  (dec-type L::char-name          (character-t) -> (type-join null-t string-t))
+  (dec-type L::name-char          (top-t) -> top-t
+                                  #'(lambda (type) (type-join null-t type)))
 
-  (dec-type rt::char-internal      (string-t fixnum-t) -> character-t)
-  (dec-type rt::set-char-internal  (character-t string-t fixnum-t) -> 
-                                   character-t #'the-first-type)
-  (dec-type rt::schar-internal     (string-t fixnum-t) -> character-t)
-  (dec-type rt::set-schar-internal (character-t string-t fixnum-t) -> 
-                                   character-t #'the-first-type)
+  (dec-type rt::char-code         (character-t) -> fixnum-t)
+  (dec-type rt::code-char         (fixnum-t)    -> or-null-character-t)
+  (dec-type rt::char-upcase       (character-t) -> character-t)
+  (dec-type rt::char-downcase     (character-t) -> character-t)
+
   
   ;; 14. Sequences
   ;; -------------
@@ -770,9 +817,12 @@
 
   ;; 15.5. Using Lists as Sets
   ;; -------------------------
-  (dec-type L::member         (top-t      all-list-t) -> top-t)
-  (dec-type L::member-if      (function-t all-list-t) -> top-t)
-  (dec-type L::member-if-not  (function-t all-list-t) -> top-t)
+  (dec-type L::member         (top-t      all-list-t) -> top-t
+                              #'member-type)
+  (dec-type L::member-if      (function-t all-list-t) -> top-t
+                              #'member-type)
+  (dec-type L::member-if-not  (function-t all-list-t) -> top-t
+                              #'member-type)
   (dec-type L::tailp          (all-list-t all-list-t) -> bool-t)
   (dec-type L::adjoin         (top-t all-list-t) -> cons-t
                               #'(lambda (new list &rest other-types)
@@ -842,9 +892,6 @@
   (dec-type L::nstring-capitalize (or-symbol-string-t)           -> string-t)
   (dec-type L::string             (or-sym-str-char-t)            -> string-t)
 
-  (dec-type rt::make-string-internal (integer-t)                 -> string-t)
-
-
   ;; 22.3.1 Output to Character Streams
   ;;-----------------------------------
   (dec-type L::write  (top-t)             -> top-t    #'the-first-type)
@@ -880,36 +927,50 @@
                    ((conform my-stream-t) (type-join string-t null-t))
                    (otherwise  bottom-t))))
 
-  (dec-type L::error  (string-t) -> bottom-t #'abort-function)
+  (dec-type L::error           (string-t) -> bottom-t #'abort-function)
+  (dec-type rt::the-type-error ()         -> bottom-t #'abort-function)
+
+
+  (dec-type rt::make-stream    () -> stream-t)
 
 
   
   ;;----------------------------------------------------------------------------
   ;; Strukturen
   ;;----------------------------------------------------------------------------
-  (dec-type rt::struct-type             (structure-t) -> symbol-t)
-  (dec-type rt::new-struct              (fixnum-t symbol-t) -> structure-t)
-  (dec-type rt::struct-size             (structure-t) -> fixnum-t)
-  (dec-type rt::struct-ref-internal     (structure-t fixnum-t) -> top-t)
-  (dec-type rt::set-struct-ref-internal (structure-t fixnum-t top-t) -> top-t)
-
+  (dec-type rt::structp          (top-t)             -> bool-t)
+  (dec-type rt::struct-typep     (top-t    symbol-t) -> bool-t)
+  (dec-type rt::new-struct       (fixnum-t)          -> structure-t)
+  (dec-type rt::make-struct      (symbol-t)          -> structure-t)
+  (dec-type rt::struct-type      (structure-t)       -> symbol-t)
+  (dec-type rt::struct-size      (structure-t)       -> fixnum-t)
+  (dec-type rt::struct-ref       (structure-t fixnum-t symbol-t) -> top-t)
+  (dec-type (setf rt::struct-ref) (top-t structure-t fixnum-t symbol-t) -> top-t
+                                   #'the-first-type)
+  (dec-type rt::structure-ref    (structure-t fixnum-t) -> top-t)
+  (dec-type (setf rt::structure-ref) (top-t structure-t fixnum-t) -> top-t
+                                      #'the-first-type)
 
   ;;----------------------------------------------------------------------------
   ;; Arrays 
   ;;----------------------------------------------------------------------------
-  (dec-type rt::make-vector-internal        (top-t integer-t)       -> vector-t)
-  (dec-type rt::make-array-internal         (top-t integer-t)       -> array-t)
+  (dec-type rt::make-vector-t      (integer-t) -> vector-t)
+  (dec-type rt::make-vector-fixnum (integer-t) -> vector-t)
+  (dec-type rt::make-vector-float  (integer-t) -> vector-t)
+  (dec-type rt::make-vector-char   (integer-t character-t) -> vector-t)
+  (dec-type rt::make-vector-bit    (integer-t) -> vector-t)
+
   (dec-type rt::row-major-aref-internal     (array-t integer-t)       -> top-t)
   (dec-type rt::set-row-major-aref-internal (top-t array-t integer-t) -> top-t
                                             #'the-first-type)
   (dec-type rt::svref-internal              (vector-t integer-t)       -> top-t)
   (dec-type rt::set-svref-internal          (top-t vector-t integer-t) -> top-t
                                             #'the-first-type)
-  (dec-type rt::%vector-length              (vector-t)           -> integer-t)
-  (dec-type rt::array-element-type-internal (array-t)            -> fixnum-t)
-  (dec-type rt::array-dimension-internal    (array-t fixnum-t)   -> fixnum-t)
-  (dec-type rt::set-fill-pointer-internal   (integer-t vector-t) -> integer-t)
-  (dec-type rt::displace-array              (array-t array-t)    -> array-t)
+  (dec-type rt::pvref                       (vector-t integer-t)       -> top-t)
+  (dec-type rt::set-pvref                   (top-t vector-t integer-t) -> top-t
+                                            #'the-first-type)
+  (dec-type rt::plain-vector-length         (vector-t)           -> integer-t)
+  (dec-type rt::plain-vector-element-code   (vector-t)           -> fixnum-t)
   (dec-type rt::check-array                 ()                   -> bool-t)
   (dec-type L::make-array       ((type-join integer-t (list-of integer-t))) -> 
                                 array-t)
@@ -920,10 +981,14 @@
 
 
   (dec-type L::char             (string-t integer-t) -> character-t)
-  
-  (dec-type L::make-hash-table  () -> hash-table-t)
-  (dec-type rt::string-hash     (string-t integer-t) -> integer-t)
+  (dec-type L::schar            (string-t integer-t) -> character-t)
 
+  (dec-type L::make-hash-table  () -> hash-table-t)
+  (dec-type L::maphash          (function-t hash-table-t) -> null-t)
+  (dec-type L::string-hash      (string-t integer-t) -> integer-t)
+  (dec-type L::sxhash           (top-t) -> integer-t)
+  (dec-type rt::sxhash-string   (string-t) -> integer-t)
+  (dec-type rt::combine-hash    (integer-t integer-t) -> integer-t)
 
   (dec-type L::y-or-n-p         (string-t) -> bool-t)
   (dec-type L::yes-or-no-p      (string-t) -> bool-t)
@@ -939,11 +1004,11 @@
 
   ;; 28. Common Lisp Object System (clos.c)
   ;;--------------------------------------
-  (dec-type rt::make-instance-internal (fixnum-t) -> class-t)
-  (dec-type rt::instance-ref           (class-t fixnum-t)       -> top-t)
-  (dec-type rt::instance-set           (top-t class-t fixnum-t) -> top-t
-                                       #'the-first-type)
-  (dec-type rt::set-slot-unbound       (fixnum-t class-t) -> fixnum-t)
+  (dec-type rt::make-instance      (fixnum-t) -> class-t)
+  (dec-type rt::instance-ref       (class-t fixnum-t)       -> top-t)
+  (dec-type rt::instance-set       (top-t class-t fixnum-t) -> top-t
+                                    #'the-first-type)
+  (dec-type rt::set-slot-unbound   (fixnum-t class-t) -> fixnum-t)
 
   ;; (clos.lisp)
   ;;------------
@@ -961,6 +1026,22 @@
                                     #'abort-function)
   (dec-type L::slot-unbound         (class-t class-t top-t)          -> bottom-t
                                     #'abort-function)
+
+
+  ;;----------------------------------------------------------------------------
+  ;; Funktionen zum Erzeugen von Lisp-Werten aus C-Werten
+  ;;----------------------------------------------------------------------------
+  (dec-type rt::make-lisp-character  (top-t) -> character-t)
+  (dec-type rt::make-lisp-integer    (top-t) -> integer-t)
+  (dec-type rt::make-lisp-float      (top-t) -> float-t)
+  
+  (dec-type ffi::make-lisp-character (top-t) -> character-t)
+  (dec-type ffi::make-lisp-integer   (top-t) -> integer-t)
+  (dec-type ffi::make-lisp-float     (top-t) -> float-t)
+  
+
+
+
 
 ) ; initialize-function-descriptions-part4
 

@@ -5,8 +5,19 @@
  *            ------------------------------------------------------
  * Funktion : Laufzeitsystem: Definition des C Hauptprogramms
  *
- * $Revision: 1.11 $
+ * $Revision: 1.14 $
  * $Log: main.c,v $
+ * Revision 1.14  1994/06/22  13:30:04  hk
+ * lisp.h wird nicht eingelesen, sondern nur eine extern Deklaration f"ur
+ * die Funktion rt_startup des Lisp-Moduls eingef"ugt. lisp.h existiert
+ * evtl. noch gar nicht, wenn man diese Datei "ubersetzt.
+ *
+ * Revision 1.13  1994/05/20  08:45:17  uho
+ * lisp.h mit eingelesen, um Prototypen von Lisp-Funktionen bekanntzumachen.
+ *
+ * Revision 1.12  1994/01/05  12:51:46  sma
+ * Namensänderung: startup mit dem Präfix rt_ versehen.
+ *
  * Revision 1.11  1993/07/09  13:43:28  hk
  * In initialize: Variable noargs static deklariert.
  *
@@ -52,6 +63,11 @@
 #include <c_decl.h>
 #include "sys.h"
 
+
+/* Referenz in das Lisp-Modul */
+/*----------------------------*/
+extern void rt_startup(/* CL_FORM *base */);
+
 /* wird im erzeugten Code verwendet */
 /*----------------------------------*/
 char TOO_MANY_ARGS[] = "too many Arguments";
@@ -88,7 +104,7 @@ char *argv[];
 
    save_stack = stack;
 
-   startup(stack);
+   rt_startup(stack);
    
 #ifdef DEBUG
    /* um eine Referenz darauf zu erzwingen */

@@ -7,7 +7,7 @@
 #            Uses Environment variable CLICCROOT and CROSS386.
 #            Called by clicc/bin/cl and clicc/bin/clg.
 #
-#  $Source: /home3/apply/public/clicc-0.6.2a/lib/RCS/makefile.cl386,v $
+#  $Source: /home3/apply/public/clicc-0.6.4/lib/RCS/makefile.cl386,v $
 #  $Author: hk $
 #  $Revision: 1.8 $
 #  $Date: 1993/11/18 16:22:23 $

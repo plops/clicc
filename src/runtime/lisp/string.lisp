@@ -5,8 +5,25 @@
 ;;;            ------------------------------------------------------
 ;;; Funkion  : System-Funktionen (18. Strings)
 ;;;
-;;; $Revision: 1.7 $
+;;; $Revision: 1.11 $
 ;;; $Log: string.lisp,v $
+;;; Revision 1.11  1994/01/05  12:42:23  sma
+;;; make-string benutzt jetzt rt::make-vector-char zum Anlegen eines
+;;; (simple-)strings und nicht mehr das allgemeine make-array.
+;;;
+;;; Revision 1.10  1993/12/14  12:43:50  sma
+;;; char und schar optimiert. Benutzen jetzt direkt row-major-aref bzw.
+;;; pvset, eine private Funktion aus array.lisp um doppelte Typ-Tests
+;;; einzusparen.
+;;;
+;;; Revision 1.9  1993/12/12  15:42:49  sma
+;;; make-string benutzt jetzt make-array.
+;;;
+;;; Revision 1.8  1993/12/09  17:17:50  sma
+;;; Aufgrund neuer Repräsentation für arrays auch strings verändert. char,
+;;; schar sind jetzt in Lisp implementiert. (when (not ... -> (unless.
+;;; Weitere kleine Änderungen.
+;;;
 ;;; Revision 1.7  1993/06/16  15:20:38  hk
 ;;;  Copyright Notiz eingefuegt.
 ;;;
@@ -22,7 +39,7 @@
 ;;;
 ;;; Revision 1.4  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.7 $ eingefuegt
+;;; $Revision: 1.11 $ eingefuegt
 ;;;
 ;;; Revision 1.3  1992/07/06  10:15:30  hk
 ;;; STRING-CHAR vorlaeufig durch CHARACTER, (wegen CLTL2).
@@ -49,7 +66,7 @@
 ;;-----------------------------------------------------------------------------
 
 ;;------------------------------------------------------------------------------
-;; Fuer Fehlermeldungen
+;; Für Fehlermeldungen
 ;;------------------------------------------------------------------------------
 (defconstant NO_INDEX
    "The index arg ~S for the vector ~S is not a fixnum in range [~S, ~S).")
@@ -58,46 +75,37 @@
 ;; CHAR string index
 ;;-----------------------------------------------------------------------------
 (defun char (string index)
-  (when (not (stringp string))
-    (error WRONG_TYPE 'STRING string))
-  (when (not (check-integer index 0 (1- (length string))))
-    (error NO_INDEX index string 0 (length string)))
-  (rt::char-internal string index))
+  (unless (stringp string)
+    (error WRONG_TYPE string 'string))
+  (row-major-aref string index))
 
 ;;-----------------------------------------------------------------------------
 ;; (SETF CHAR) character string index
 ;;-----------------------------------------------------------------------------
 (defun (setf char) (character string index)
-  (when (not (stringp string))
-    (error WRONG_TYPE 'STRING string))
-  (when (not (characterp character))
-    (error WRONG_TYPE 'CHARACTER character))
-  (when (not (check-integer index 0 (1- (length string))))
-    (error NO_INDEX index string 0 (length string)))
-  (rt::set-char-internal character string index))
+  (unless (stringp string)
+    (error WRONG_TYPE string 'string))
+  (unless (characterp character)
+    (error WRONG_TYPE character 'character))
+  (setf (row-major-aref string index) character))
 
 ;;-----------------------------------------------------------------------------
 ;; SCHAR simple-string index
 ;;-----------------------------------------------------------------------------
 (defun schar (simple-string index)
-  (declare (simple-string simple-string))
-  (when (not (simple-string-p simple-string))
-    (error WRONG_TYPE 'SIMPLE-STRING simple-string))
-  (when (not (check-integer index 0 (1- (length simple-string))))
-    (error NO_INDEX index simple-string 0 (length simple-string)))
-  (rt::schar-internal simple-string index))
+  (unless (simple-string-p simple-string)
+    (error WRONG_TYPE simple-string 'simple-string))
+  (pvref simple-string index))
 
 ;;-----------------------------------------------------------------------------
-;; (SETF SCHAR) character string index
+;; (SETF SCHAR) character simple-string index
 ;;-----------------------------------------------------------------------------
-(defun (setf schar) (character string index)
-  (when (not (stringp string))
-    (error WRONG_TYPE 'STRING string))
-  (when (not (characterp character))
-    (error WRONG_TYPE 'CHARACTER character))
-  (when (not (check-integer index 0 (1- (length string))))
-    (error NO_INDEX index string 0 (length string)))
-  (rt::set-schar-internal character string index))
+(defun (setf schar) (character simple-string index)
+  (unless (simple-string-p simple-string)
+    (error WRONG_TYPE simple-string 'simple-string))
+  (unless (characterp character)
+    (error WRONG_TYPE character 'character))
+  (setf (pvref simple-string index) character))
 
 ;;-----------------------------------------------------------------------------
 ;; 18.2. String Comparison
@@ -112,13 +120,13 @@
   (setq string2 (string string2))
   (setq end1    (check-seq-start-end start1 end1 (length string1)))
   (setq end2    (check-seq-start-end start2 end2 (length string2)))
-
+  
   (cond
     ((= (- end1 start1) (- end2 start2))
      (do ((i start1 (1+ i))
           (j start2 (1+ j)))
          ((= i end1) t)
-       (when (not (char= (char string1 i) (char string2 j)))
+       (unless (char= (char string1 i) (char string2 j))
          (return-from string= nil))))
     (t nil)))
 
@@ -137,7 +145,7 @@
      (do ((i start1 (1+ i))
           (j start2 (1+ j)))
          ((= i end1) t)
-       (when (not (char-equal (char string1 i) (char string2 j)))
+       (unless (char-equal (char string1 i) (char string2 j))
          (return-from string-equal nil))))
     (t nil)))
 
@@ -398,12 +406,12 @@
 ;; MAKE-STRING size &KEY :initial-element
 ;;-----------------------------------------------------------------------------
 (defun make-string (size &key (initial-element #\Space))
-  (when (not (check-integer size 0 (1- array-dimension-limit)))
+  (unless (check-integer size 0 (1- array-dimension-limit))
     (error "~S is not a legal size for a string." size))
-  (when (not (typep initial-element 'CHARACTER))
+  (unless (typep initial-element 'character)
     (error "The value of INITIAL-ELEMENT, ~S, should be a CHARACTER."
            initial-element))
-  (rt::make-string-internal size initial-element))
+  (rt::make-vector-char size initial-element))
 
 ;;-----------------------------------------------------------------------------
 ;; STRING-TRIM character-bag string
@@ -415,12 +423,12 @@
          (end    length))
     (loop
       (when (= start length) (return-from string-trim ""))
-      (when (not (find (char string start) character-bag :test #'char=))
+      (unless (find (char string start) character-bag :test #'char=)
         (return))
       (incf start))
     (loop
       (when (= start (1- end)) (return))
-      (when (not (find (char string (1- end)) character-bag :test #'char=))
+      (unless (find (char string (1- end)) character-bag :test #'char=)
         (return))
       (decf end))
     (if (and (zerop start) (= end length))
@@ -436,7 +444,7 @@
         (start  0))
     (loop
       (when (= start length) (return-from string-left-trim ""))
-      (when (not (find (char string start) character-bag :test #'char=))
+      (unless (find (char string start) character-bag :test #'char=)
         (return))
       (incf start))
     (if (zerop start)
@@ -452,7 +460,7 @@
          (end    length))
     (loop
       (when (zerop end) (return-from string-right-trim ""))
-      (when (not (find (char string (1- end)) character-bag :test #'char=))
+      (unless (find (char string (1- end)) character-bag :test #'char=)
         (return))
       (decf end))
     (if (= end length)

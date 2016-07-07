@@ -5,10 +5,25 @@
  *            ------------------------------------------------------
  * Funktion : System-Funktionen (Arrays)                                
  *
- * $Revision: 1.14 $
+ * $Revision: 1.18 $
  * $Log: array.c,v $
- * Revision 1.14  1993/11/25  15:07:22  hk
- * Fehler in make_pure_array behoben.
+ * Revision 1.18  1994/04/28  09:42:57  sma
+ * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ *
+ * Revision 1.17  1994/01/05  12:45:38  sma
+ * Alle Laufzeitfunktionen mit dem Präfix rt_ versehen. make-plain-vector
+ * in fünf Funktionen make-vector-t, make-vector-fixnum,
+ * make-vector-float und make-vector-bit zerteilt.
+ *
+ * Revision 1.16  1993/12/14  12:30:37  sma
+ * Namensänderungen durch Einführung von plain-vector-Typ.
+ * simple-vector-element-code und make-simple-vector heißen jetzt
+ * plain-vector-element-code und make-plain-vector. (set-)svref wurde in
+ * (set-)pvref-internal umbenannt.
+ *
+ * Revision 1.15  1993/12/10  11:31:19  sma
+ * Neue array-Repräsentation. Weniger C, mehr Lisp. Neue Version, die
+ * meisten C-Funktionen wurden ersetzt/gelöscht. Neue Funktion shrink_smstr.
  *
  * Revision 1.13  1993/10/29  15:16:57  sma
  * Methode, den Array-Typ (inkorrekterweise) nochmals im TAG-Feld der
@@ -59,652 +74,279 @@
 #include <c_decl.h>
 #include "sys.h"
 
-#define AET_T           0
-#define AET_FIXNUM      1
-#define AET_FLOAT       2
-#define AET_STRING_CHAR 3
 
-#define GET_AET(ar_type) ((ar_type) % 4)
+/* Zusicherung: alle Parameter sind vom korrekten Typ! (ausser bei *_p) */
+/*----------------------------------------------------------------------*/
 
-/* Vorwaertsdeklarationen
-   ---------------------- */
-void Farray_total_size();
+/* lokales define */
+#define HEADER_SIZE  1
 
-/* Laufzeitfehlermeldungen
-   ----------------------- */
-char No_array[]    = "~a is not an array";
-char No_fill_ptr[] = "~a is not a vector with fill-pointer";
-char No_vector[]   = "~a is not a vector";
 
 /*------------------------------------------------------------------------------
- * Array Creation
+ * RT::PLAIN-VECTOR-ELEMENT-CODE vector
  *----------------------------------------------------------------------------*/
-
-/*------------------------------------------------------------------------------
- * Der Zeiger auf den Beginn des Array-Headers wird umgebogen
- * auf den entsprechenden Eintrag vom Array-Header
- *----------------------------------------------------------------------------*/
-void set_array_header(array_header, header_size, rank)
-CL_FORM **array_header;
-int header_size, rank;
-{
-   switch(header_size)
-   {
-   case 1:                      /* (SIMPLE-VECTOR T) */
-      break;
-   case 2:                      /* (OR SIMPLE-VECTOR */
-                                /* SIMPLE-STRING */
-                                /* (SIMPLE-ARRAY T)) */
-      if(rank != 1)
-        (*array_header) ++;
-      break;
-   case 3:                      /* SIMPLE-ARRAY */
-      (*array_header) ++;
-      break;
-   default:                     /* (OR ARRAY VECTOR STRING) */
-      (*array_header) += 2;
-   }
-}
-
-/*------------------------------------------------------------------------------
- * Alloziert einen Array-Header und ein Array.
- * Im Array-Header werden ein Zeiger auf das Array, die Anzahl
- * der Dimensionen und die Dimensionen selber eingetragen.
- * Rueckgabewert: Zeiger auf den Array-Header
- *----------------------------------------------------------------------------*/
-CL_FORM *make_pure_array(base, header_size, rank, dimensions, element_type,
-                          array_size)
-CL_FORM *base, *dimensions;
-int header_size, rank;
-long element_type, array_size;
-{
-   CL_FORM *array_header;
-   long *dims, i;
-
-   switch(element_type)
-   {
-   case AET_T:
-   {
-      CL_FORM *pure_array;
-
-      array_header = form_alloc(STACK(base, 0), header_size + array_size);
-      pure_array = array_header + header_size;
-      set_array_header(&array_header, header_size, rank);
-      for(i = 0; i < array_size; i++)
-      {
-         LOAD_NIL(OFFSET(pure_array, i));
-      }
-
-      /* Wenn es kein (SIMPLE-VECTOR T) oder (SIMPLE-ARRAY T) ist,
-       * Zeiger auf das eigentliche Array setzen.
-       */
-      if(header_size > 2 && array_size > 0)
-      {
-          LOAD_FORM_PTR(pure_array, AR_BASE(array_header));
-      }
-      break;
-   }
-   case AET_FIXNUM:
-   {
-      long *pure_array;
-
-      array_header = form_alloc(STACK(base, 0), (long)header_size);
-      set_array_header(&array_header, header_size, rank);
-      pure_array = fixnum_alloc(STACK(base, 0), array_size);
-      for(i = 0; i < array_size; i++)
-      {
-         pure_array[i] = 0;
-      }
-      LOAD_FIXNUM_PTR(pure_array, AR_BASE(array_header));
-      break;
-   }
-   case AET_FLOAT:
-   {
-      double *pure_array;
-
-      array_header = form_alloc(STACK(base, 0), (long)header_size);
-      set_array_header(&array_header, header_size, rank);
-      pure_array = float_alloc(STACK(base, 0), array_size);
-      for(i = 0; i < array_size; i++)
-      {
-         pure_array[i] = 0;
-      }
-      LOAD_FLOAT_PTR(pure_array, AR_BASE(array_header));
-      break;
-   }
-   case AET_STRING_CHAR:
-   {
-      char *pure_array;
-
-      array_header = form_alloc(STACK(base, 0), (long)header_size);
-      set_array_header(&array_header, header_size, rank);
-      pure_array = char_alloc(STACK(base, 0), array_size);
-      for(i = 0; i < array_size; i++)
-      {
-         pure_array[i] = ' ';
-      }
-      LOAD_CHAR_PTR(pure_array, AR_BASE(array_header));
-   }
-   } /*switch*/
-   if(rank != 1)
-   {
-      dims = fixnum_alloc(STACK(base, 0), (long)rank + 1);
-      AR_DIMS(array_header) = dims;
-      AR_RANK(array_header) = rank;
-      dims++;                   /* Die Laengenangabe ueberspringen */
-      for(i = 0; i <= rank; i++)
-      {
-         dims[i] = GET_FIXNUM(dimensions + i);
-      }
-   }
-   return(array_header);
-}
-
-/*------------------------------------------------------------------------------
- * make-vector-internal element-type size adjustable
- *                      fill-pointer displaced-to displaced-index-offset
- *----------------------------------------------------------------------------*/
-
-#define Element_type           STACK(base, 0) /* codiert:  z.B. T => 0 */
-#define Size                   STACK(base, 1)
-#define Adjustable             STACK(base, 2)
-#define Fill_pointer           STACK(base, 3)
-#define Displaced_to           STACK(base, 4)
-#define Displaced_index_offset STACK(base, 5)
-
-void make_vector_internal(base)
+void rt_plain_vector_element_code(base)
 CL_FORM *base;
 {
-   /* Ein Vektor, der nicht 'adjustable' ist, keinen 'fill-pointer' besitzt und
-      nicht 'displaced' ist, wird als einfacher Vektor implementiert.
-      */
-   BOOL simple = CL_NILP(Adjustable) && CL_NILP(Fill_pointer)
-      && CL_NILP(Displaced_to);
+   /* 2 Zeilen notwendig wegen Seiteneffekte in den LOAD-Makros */
+   int code = GET_VECTOR_CODE(ARG(0)); 
+   LOAD_FIXNUM(ARG(0), code, ARG(0));
+}
+
+/*------------------------------------------------------------------------------
+ * RT::MAKE-VECTOR-T size initvalue
+ *----------------------------------------------------------------------------*/
+void rt_make_vector_t(base)
+CL_FORM *base;
+{
+   long i, size = GET_FIXNUM(ARG(0));
    CL_FORM *vector;
-   TAG vector_type;
-   long vector_elem_type = GET_FIXNUM(Element_type);
-   long vector_size      = GET_FIXNUM(Size);
-
-   if(simple)
-   {
-      /* Es wird ein Array mit folgender Charakteristik erzeugt:
-         Wenn es sich um (SIMPLE-VECTOR T) handelt, hat der Array-Header die
-         Groesse 1, sonst 2.
-         Die Anzahl der Dimensionen ist 1 (=> keine Liste der Dimensionen).
-         Die Elemente des Arrays sind vom Typ 'vector_elem_type'.
-         Das Array hat insgesamt 'vector_size' Elemente.
-         */
-      vector = make_pure_array(STACK(base, 6),
-                               (vector_elem_type == AET_T ? 1 : 2),
-                                1, (CL_FORM *)NULL,
-                                vector_elem_type,
-                                vector_size);
-      vector_type = CL_SMVEC + vector_elem_type;
-      SET_AR_SIZE(vector_size, vector);
-   }
-   else
-   {
-      if(! CL_NILP(Displaced_to)) /* Ist der Vektor 'displaced' ? */
-      {
-         vector = form_alloc(STACK(base, 6), 4L) + 2;
-         COPY(Displaced_index_offset, DISPLACED_INDEX_OFFSET(vector));
-         COPY(Displaced_to,           DISPLACED_TO(vector));
-      }
-      else
-      {
-         vector = make_pure_array(STACK(base, 6), 4, 1, (CL_FORM *)NULL,
-                                   vector_elem_type, vector_size);
-         MAKE_NOT_DISPLACED(vector);
-      }
-
-      if(! CL_NILP(Fill_pointer)) /* Hat der Vektor einen Fill-pointer ? */
-      {
-         MAKE_FILL_PTR(vector);
-         SET_FILL_PTR(GET_FIXNUM(Fill_pointer), vector);
-         SET_AR_SIZE_WHEN_FP(vector_size, vector);
-      }
-      else
-      {
-         LOAD_NIL(FILL_PTR(vector));
-         SET_AR_SIZE(vector_size, vector);
-      }
-      vector_type = CL_VEC + vector_elem_type;
-   }
-   LOAD_VECTOR(vector, vector_type, STACK(base, 0));
+   
+   vector = form_alloc(ARG(2), size + HEADER_SIZE);
+   for (i = 1; i <= size; i++)
+      COPY(ARG(1), OFFSET(vector, i));
+   
+   INIT_VEC_T(vector, size);
+   LOAD_VEC_T(vector, ARG(0));
 }
 
-#undef Element_type
-#undef Size
-#undef Adjustable
-#undef Fill_pointer
-#undef Displaced_to
-#undef Displaced_index_offset
-
 /*------------------------------------------------------------------------------
- * make-array-internal element-type size adjustable
- *                     displaced-to displaced-index-offset rank dimensions
+ * RT::MAKE_VECTOR_FIXNUM size
  *----------------------------------------------------------------------------*/
-
-#define Element_type           STACK(base, 0)
-#define Size                   STACK(base, 1)
-#define Adjustable             STACK(base, 2)
-#define Displaced_to           STACK(base, 3)
-#define Displaced_index_offset STACK(base, 4)
-#define Rank                   STACK(base, 5)
-#define Dimensions             STACK(base, 6)
-
-void make_array_internal(base, nargs)
+void rt_make_vector_fixnum(base)
 CL_FORM *base;
-int nargs;
 {
-   BOOL simple = CL_NILP(Adjustable) && CL_NILP(Displaced_to);
-   CL_FORM *array;
-   TAG array_type;
-   long array_elem_type = GET_FIXNUM(Element_type);
-   long array_size      = GET_FIXNUM(Size);
-   long array_rank      = GET_FIXNUM(Rank);
+   long i, size = GET_FIXNUM(ARG(0));
+   long *data = fixnum_alloc(ARG(0), size);
+   CL_FORM *vector;
 
-   if(simple)
-   {
-      array_type = CL_SMAR + array_elem_type;
-      array = make_pure_array(STACK(base, nargs),
-                              (array_elem_type == AET_T ? 2 : 3),
-                              (int)array_rank,
-                               Dimensions,
-                               array_elem_type,
-                               array_size);
-   }
-   else
-   {
-      array_type = CL_AR + array_elem_type;
-      if(! CL_NILP(Displaced_to))
-      {
-         array = make_pure_array(STACK(base, nargs), 4,
-                                  (int)array_rank, Dimensions,
-                                  array_elem_type, 0L);
-         COPY(Displaced_index_offset, DISPLACED_INDEX_OFFSET(array));
-         COPY(Displaced_to,           DISPLACED_TO(array));
-      }
-      else
-      {
-         array = make_pure_array(STACK(base, nargs), 4,
-                                 (int)array_rank, Dimensions,
-                                  array_elem_type, array_size);
-         MAKE_NOT_DISPLACED(array);
-      }
-   }
-   SET_AR_SIZE(array_size, array);
-   LOAD_ARRAY(array, array_type, STACK(base, 0));
+   vector = form_alloc(ARG(0), 1 + HEADER_SIZE);
+   for (i = 0; i < size; i++)
+      data[i] = 0;
+   LOAD_FIXNUM_PTR(data, AR_BASE(vector));
+   INIT_VEC_FIXNUM(vector, size);
+   LOAD_VEC_FIXNUM(vector, ARG(0));
 }
 
-#undef Element_type
-#undef Size
-#undef Adjustable
-#undef Displaced_to
-#undef Displaced_index_offset
-#undef Rank
-#undef Dimensions
-
 /*------------------------------------------------------------------------------
- * 17.2. Array Access
+ * RT::MAKE_VECTOR_FLOAT size
  *----------------------------------------------------------------------------*/
-
-/*------------------------------------------------------------------------------
- * row_major_aref_internal  array row-major-index
- *------------------------------------------------------------------------------
- * Referenziert aus einem Array den Wert an der Position
- * <row_major_index> in row-major-order.
- *----------------------------------------------------------------------------*/
-void row_major_aref_internal(base)
+void rt_make_vector_float(base)
 CL_FORM *base;
 {
-   CL_FORM *array           = GET_FORM  (STACK(base, 0));
-   long     row_major_index = GET_FIXNUM(STACK(base, 1));
+   long i, size = GET_FIXNUM(ARG(0));
+   double *data = float_alloc(ARG(0), size);
+   CL_FORM *vector;
 
-   switch(TYPE_OF(STACK(base, 0))) {
-   case CL_SMVEC_T:
-   case CL_SMAR_T :
-      COPY(OFFSET(AR_BASE(array),row_major_index), STACK(base, 0));
+   vector = form_alloc(ARG(0), 1 + HEADER_SIZE);
+   for (i = 0; i < size; i++)
+      data[i] = 0.0;
+   LOAD_FLOAT_PTR(data, AR_BASE(vector));
+   INIT_VEC_FLOAT(vector, size);
+   LOAD_VEC_FLOAT(vector, ARG(0));
+}
+
+/*------------------------------------------------------------------------------
+ * RT::MAKE_VECTOR_CHAR size initvalue
+ *----------------------------------------------------------------------------*/
+void rt_make_vector_char(base)
+CL_FORM *base;
+{
+   long i, size = GET_FIXNUM(ARG(0));
+   char initvalue = GET_CHAR(ARG(1));
+   char *data = char_alloc(ARG(0), size);
+   CL_FORM *vector;
+
+   vector = form_alloc(ARG(0), 1 + HEADER_SIZE);
+   for (i = 0; i < size; i++)
+      data[i] = initvalue;
+   LOAD_CHAR_PTR(data, AR_BASE(vector));
+   INIT_VEC_CHAR(vector, size);
+   LOAD_VEC_CHAR(vector, ARG(0));
+}
+
+/*------------------------------------------------------------------------------
+ * RT::MAKE_VECTOR_BIT size
+ *----------------------------------------------------------------------------*/
+void rt_make_vector_bit(base)
+CL_FORM *base;
+{
+   long size = GET_FIXNUM(ARG(0));
+   CL_FORM *vector;
+
+   vector = form_alloc(ARG(0), 1 + HEADER_SIZE);
+   /* bits müssen nicht initialisiert werden,0/1 sind alle möglichen Werte */
+   LOAD_BITS_PTR(bits_alloc(ARG(0), size), AR_BASE(vector));
+   INIT_VEC_BIT(vector, size);
+   LOAD_VEC_BIT(vector, ARG(0));
+}
+
+
+/*------------------------------------------------------------------------------
+ * RT::PVREF vector index
+ *----------------------------------------------------------------------------*/
+void rt_pvref(base)
+CL_FORM *base;
+{
+   CL_FORM *vector = GET_FORM(ARG(0));
+   long index = GET_FIXNUM(ARG(1));
+   
+   switch (GET_VECTOR_CODE(ARG(0)))
+   {
+   case VT_T:
+      COPY(OFFSET(AR_BASE(vector), index), ARG(0));
       break;
-   case CL_SMVEC_FIXNUM:
-   case CL_SMAR_FIXNUM:
-      LOAD_FIXNUM(*(GET_FIXNUM_PTR(AR_BASE(array)) + row_major_index),
-                  STACK(base, 0));
+   case VT_FIXNUM:
+      LOAD_FIXNUM(ARG(0), FIXNUM_AR(vector)[index], ARG(0));
       break;
-   case CL_SMVEC_FLOAT:
-   case CL_SMAR_FLOAT:
-      LOAD_FLOAT(GET_FLOAT_PTR(AR_BASE(array)) + row_major_index,
-                 STACK(base, 0));
+   case VT_FLOAT:
+      LOAD_FLOAT(ARG(0), &FLOAT_AR(vector)[index], ARG(0));
       break;
-   case CL_SMSTR:
-   case CL_SMAR_CHAR:
-      LOAD_CHAR(GET_CHAR_PTR(AR_BASE(array))[row_major_index],
-                STACK(base, 0));
+   case VT_CHARACTER:
+      LOAD_CHAR(ARG(0), CHAR_AR(vector)[index], ARG(0));
+      break;
+   case VT_BIT:
+      rt_sbvref(base);
       break;
    default:
-      if (DISPLACED_P(array))
-      {
-         COPY(DISPLACED_TO(array), STACK(base, 0));
-         row_major_index += GET_FIXNUM(DISPLACED_INDEX_OFFSET(array));
-         LOAD_FIXNUM(row_major_index, STACK(base, 1));
-         row_major_aref_internal(STACK(base, 0));
-         return;
-      }
-      switch(TYPE_OF(STACK(base, 0)))
-      {
-      case CL_VEC_T:
-      case CL_AR_T:
-         COPY(OFFSET(GET_FORM(AR_BASE(array)),row_major_index), STACK(base, 0));
-         break;
-      case CL_VEC_FIXNUM:
-      case CL_AR_FIXNUM:
-         LOAD_FIXNUM(*(GET_FIXNUM_PTR(AR_BASE(array)) + row_major_index),
-                     STACK(base, 0));
-         break;
-      case CL_VEC_FLOAT:
-      case CL_AR_FLOAT:
-         LOAD_FLOAT(GET_FLOAT_PTR(AR_BASE(array)) + row_major_index,
-                    STACK(base, 0));
-         break;
-      case CL_STRING:
-      case CL_AR_CHAR:
-         LOAD_CHAR(GET_CHAR_PTR(AR_BASE(array))[row_major_index],
-                   STACK(base, 0));
-         break;
-      default:
-         Labort("unknown array type");
-      }
+      Labort("unknown array type");
    }
 }
-
+   
 /*------------------------------------------------------------------------------
- * set-row-major-aref-internal newvalue array index
- *------------------------------------------------------------------------------
- * Schreibt in ein Array einen Wert an die Position
- * 'index' bzgl. Row-Major-Order.
+ * RT::SET-PVREF value vector index
  *----------------------------------------------------------------------------*/
-void set_row_major_aref_internal(base)
+void rt_set_pvref(base)
 CL_FORM *base;
 {
-   CL_FORM *array = GET_FORM(STACK(base, 1));
-   long index = GET_FIXNUM(STACK(base, 2));
-
-   switch(TYPE_OF(STACK(base, 1)))
+   CL_FORM *vector = GET_FORM(ARG(1));
+   long index = GET_FIXNUM(ARG(2));
+   
+   switch (GET_VECTOR_CODE(ARG(1)))
    {
-   case CL_SMVEC_T:
-   case CL_SMAR_T :
-      COPY(STACK(base, 0), OFFSET(AR_BASE(array), index));
+   case VT_T:
+      COPY(ARG(0), OFFSET(AR_BASE(vector), index));
       break;
-   case CL_SMVEC_FIXNUM:
-   case CL_SMAR_FIXNUM:
-      *(FIXNUM_AR(array) + index) = GET_FIXNUM(STACK(base, 0));
+   case VT_FIXNUM:
+      FIXNUM_AR(vector)[index] = GET_FIXNUM(ARG(0));
       break;
-   case CL_SMVEC_FLOAT:
-   case CL_SMAR_FLOAT:
-      *(FLOAT_AR(array)  + index) = GET_FLOAT(STACK(base, 0));
+   case VT_FLOAT:
+      FLOAT_AR(vector)[index] = GET_FLOAT(ARG(0));
       break;
-   case CL_SMSTR:
-   case CL_SMAR_CHAR:
-      *(CHAR_AR(array)   + index) = GET_CHAR(STACK(base, 0));
+   case VT_CHARACTER:
+      CHAR_AR(vector)[index] = GET_CHAR(ARG(0));
+      break;
+   case VT_BIT:
+      rt_set_sbvref(base);
       break;
    default:
-      if (DISPLACED_P(array))
-      {
-         COPY(DISPLACED_TO(array), STACK(base, 1));
-         index += GET_FIXNUM(DISPLACED_INDEX_OFFSET(array));
-         LOAD_FIXNUM(index, STACK(base, 2));
-         set_row_major_aref_internal(STACK(base, 0));
-         return;
-      }
-      switch(TYPE_OF(STACK(base, 1)))
-      {
-      case CL_VEC_T:
-      case CL_AR_T:
-         COPY(STACK(base, 0), OFFSET(FORM_AR(array), index));
-         break;
-      case CL_VEC_FIXNUM:
-      case CL_AR_FIXNUM:
-         *(FIXNUM_AR(array) + index) = GET_FIXNUM(STACK(base, 0));
-         break;
-      case CL_VEC_FLOAT:
-      case CL_AR_FLOAT:
-         *(FLOAT_AR(array)  + index) = GET_FLOAT(STACK(base, 0));
-         break;
-      case CL_STRING:
-      case CL_AR_CHAR:
-         *(CHAR_AR(array)   + index) = GET_CHAR(STACK(base, 0));
-         break;
-      default:
-         Labort("unknown array type");
-      }
+      Labort("unknown array type");
    }
 }
 
 /*------------------------------------------------------------------------------
- * svref-internal simple-vector index
+ * RT::SBVREF bit-vector index
  *----------------------------------------------------------------------------*/
-void svref_internal(base)
+void rt_sbvref(base)
 CL_FORM *base;
 {
-   CL_FORM *simple_vector = GET_FORM(STACK(base, 0));
-   long      index        = GET_FIXNUM(STACK(base, 1));
-
-   COPY(OFFSET(AR_BASE(simple_vector), index), STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * set-svref-internal newvalue simple-vector index
- *----------------------------------------------------------------------------*/
-void set_svref_internal(base)
-CL_FORM *base;
-{
-   CL_FORM *simple_vector = GET_FORM (STACK(base, 1));
-   long index = GET_FIXNUM(STACK(base, 2));
-
-   COPY(STACK(base, 0), OFFSET(AR_BASE(simple_vector), index));
-}
-
-/*------------------------------------------------------------------------------
- * 17.3. Array Information
- *----------------------------------------------------------------------------*/
-
-/*------------------------------------------------------------------------------
- * array-element-type-internal array
- *----------------------------------------------------------------------------*/
-void array_element_type_internal(base)
-CL_FORM *base;
-{
-   TAG array_type = TYPE_OF(STACK(base, 0));
-
-   LOAD_FIXNUM(GET_AET(array_type), STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * array-rank array
- *----------------------------------------------------------------------------*/
-void Farray_rank(base)
-CL_FORM *base;
-{
-   TAG array_type = TYPE_OF(STACK(base, 0));
-
-   if(VECTORP(array_type))
-   {
-      LOAD_FIXNUM(1, STACK(base, 0));
-   }
-   else if(ARRAYP(array_type))
-   {
-      CL_FORM *array = GET_FORM(STACK(base, 0));
-      LOAD_FIXNUM(AR_RANK(array), STACK(base, 0));
-   }
-   else
-      Lerror(STACK(base, 0), No_array);
-}
-
-/*------------------------------------------------------------------------------
- * array-dimension-internal array axis-number
- *----------------------------------------------------------------------------*/
-void array_dimension_internal(base)
-CL_FORM *base;
-{
-   TAG array_type = TYPE_OF(STACK(base, 0));
-
-   if(VECTORP(array_type))
-   {
-      Farray_total_size(STACK(base, 0));
-   }
-   else if(ARRAYP(array_type))
-   {
-      CL_FORM *array       = GET_FORM  (STACK(base, 0));
-      long     axis_number = GET_FIXNUM(STACK(base, 1));
-
-      LOAD_FIXNUM(AR_DIM(array, axis_number), STACK(base, 0));
-   }
-   else
-      Lerror(STACK(base, 0), No_array);
-}
-
-/*------------------------------------------------------------------------------
- * array-total-size array
- *----------------------------------------------------------------------------*/
-void Farray_total_size(base)
-CL_FORM *base;
-{
-   TAG      array_type = TYPE_OF (STACK(base, 0));
-   CL_FORM *array      = GET_FORM(STACK(base, 0));
-
-   if(VECTOR_NS_P(array_type))
-   {
-      if(HAS_FILL_PTR(array))
-         LOAD_FIXNUM(AR_SIZE_WHEN_FP(array), STACK(base, 0));
-      else
-         LOAD_FIXNUM(AR_SIZE(array), STACK(base, 0));
-   }
-   else if(ARRAYP(array_type))
-   {
-      LOAD_FIXNUM(AR_SIZE(array), STACK(base, 0));
-   }
-   else
-      Lerror(STACK(base, 0), No_array);
-}
-/*------------------------------------------------------------------------------
- * shrink-vector array new-size
- *----------------------------------------------------------------------------*/
-void shrink_vector(base)
-CL_FORM *base;
-{
-   CL_FORM *array = GET_FORM(STACK(base, 0));
-   int new_size = GET_FIXNUM(STACK(base, 1));
+   long *bit_vector = BIT_AR(GET_FORM(ARG(0)));
+   long index = GET_FIXNUM(ARG(1));
    
-   if(!ARRAYP(TYPE_OF(STACK(base, 0))))
-      Lerror(STACK(base, 0), No_array);
-   if(!CL_FIXNUMP(STACK(base, 1)) || new_size < 0)
-      Lerror(STACK(base, 1), "~a is not a positive fixnum");
-   if(new_size > AR_SIZE(array))
-      Lerror(STACK(base, 1), "new-size ~a is bigger than old-size");
+   if (bit_vector[index / BITS_PER_FIXNUM] & (1L << (index % BITS_PER_FIXNUM)))
+      LOAD_FIXNUM(ARG(0), 1, ARG(0));
+   else
+      LOAD_FIXNUM(ARG(0), 0, ARG(0));
+}
+
+/*------------------------------------------------------------------------------
+ * RT::SET-SBVREF value bit-vector index
+ *----------------------------------------------------------------------------*/
+void rt_set_sbvref(base)
+CL_FORM *base;
+{
+   long *bit_vector = BIT_AR(GET_FORM(ARG(1)));
+   long index = GET_FIXNUM(ARG(2));
    
-   SET_AR_SIZE(new_size, array);
-}
-
-/*------------------------------------------------------------------------------
- * adjustable-array-p array
- *----------------------------------------------------------------------------*/
-void Fadjustable_array_p(base)
-CL_FORM *base;
-{
-   TAG array_type = TYPE_OF (STACK(base, 0));
-
-   if(array_type == CL_SMVEC_T || array_type == CL_SMAR_T)
-   {
-      LOAD_NIL(STACK(base, 0));
-   }
-   else if(ARRAYP(array_type))
-   {
-      LOAD_T(STACK(base, 0));
-   }
+   if (GET_FIXNUM(ARG(0)))
+      bit_vector[index / BITS_PER_FIXNUM] |= (1L << (index % BITS_PER_FIXNUM));
    else
-      Lerror(STACK(base, 0), No_array);
+      bit_vector[index / BITS_PER_FIXNUM] &=~(1L << (index % BITS_PER_FIXNUM));
 }
 
 /*------------------------------------------------------------------------------
- * 17.4. Functions on Arrays of Bits     (Nicht implementiert)
+ * RT::BITOP opcode bit-array1 bit-array2 result-bit-array
  *----------------------------------------------------------------------------*/
-
-/*------------------------------------------------------------------------------
- * 17.5. Fill Pointers
- *----------------------------------------------------------------------------*/
-
-/*------------------------------------------------------------------------------
- * array-has-fill-pointer-p array
- *----------------------------------------------------------------------------*/
-void Farray_has_fill_pointer_p(base)
+void rt_bitop(base)
 CL_FORM *base;
 {
-   TAG array_type = TYPE_OF(STACK(base, 0));
-
-   if(! ARRAYP(array_type))
-      Lerror(STACK(base, 0), No_array);
-   if(VECTOR_NS_P(array_type) && HAS_FILL_PTR(GET_FORM(STACK(base, 0))))
-      LOAD_T(STACK(base, 0));
-   else
-      LOAD_NIL(STACK(base, 0));
-}
-
-/*------------------------------------------------------------------------------
- * fill-pointer vector
- *----------------------------------------------------------------------------*/
-void Ffill_pointer(base)
-CL_FORM *base;
-{
-   TAG array_type = TYPE_OF(STACK(base, 0));
-
-   if(! VECTORP(array_type))
-      Lerror(STACK(base, 0), No_array);
-   if(! SMVECP(array_type))
+   long *a1 = BIT_AR(GET_FORM(ARG(1)));
+   long *a2 = BIT_AR(GET_FORM(ARG(2)));
+   long *a3 = BIT_AR(GET_FORM(ARG(3)));
+   long i, size = AR_SIZE(GET_FORM(ARG(1)));
+   
+   size = (size + BITS_PER_FIXNUM - 1) / BITS_PER_FIXNUM;
+   
+   switch (GET_FIXNUM(ARG(0)))
    {
-      CL_FORM *vector = GET_FORM(STACK(base, 0));
-      if(! HAS_FILL_PTR(vector))
-         Lerror(STACK(base, 0), No_fill_ptr);
-      /* Der FILL-POINTER ist dort eingetragen, wo bei einem SIMPLE-VECTOR die
-         Laenge eingetragen ist. Dies erleichtert die Programmierung der
-         Funktionen, die den FILL-POINTER beachten muessen.
-         */
-      LOAD_FIXNUM(AR_SIZE(vector), STACK(base, 0));
+   case 0:                      /* and */
+      for (i = 0; i < size; i++)
+         a3[i] = a1[i] & a2[i];
+      break;
+   case 1:                      /* ior */
+      for (i = 0; i < size; i++)
+         a3[i] = a1[i] | a2[i];
+      break;
+   case 2:                      /* xor */
+      for (i = 0; i < size; i++)
+         a3[i] = a1[i] ^ a2[i];
+      break;
+   case 3:                      /* eqv */  
+      for (i = 0; i < size; i++)
+         a3[i] = ~(a1[i] ^ a2[i]);
+      break;
+   case 4:                      /* nand */
+      for (i = 0; i < size; i++)
+         a3[i] = ~(a1[i] & a2[i]);
+      break;
+   case 5:                      /* nor */
+      for (i = 0; i < size; i++)
+         a3[i] = ~(a1[i] | a2[i]);
+      break;
+   case 6:                      /* andc1 */
+      for (i = 0; i < size; i++)
+         a3[i] = ~a1[i] & a2[i];
+      break;
+   case 7:                      /* andc2 */
+      for (i = 0; i < size; i++)
+         a3[i] = a1[i] & ~a2[i];
+      break;
+   case 8:                      /* orc1 */
+      for (i = 0; i < size; i++)
+         a3[i] = ~a1[i] | a2[i];
+      break;
+   case 9:                      /* orc2 */
+      for (i = 0; i < size; i++)
+         a3[i] = a1[i] | ~a2[i];
+      break;
+   case 10:                     /* not */
+      for (i = 0; i < size; i++)
+         a3[i] = ~a1[i];
+      break;
+   default:
+      Labort("unknown opcode for bit-op");
    }
-   else
-      Lerror(STACK(base, 0), No_fill_ptr);
+   COPY(ARG(3), ARG(0));
 }
 
 /*------------------------------------------------------------------------------
- * set-fill-pointer-internal new-fp vector
+ * RT::SHRINK-SMSTR simple-strign new-size
  *----------------------------------------------------------------------------*/
-void set_fill_pointer_internal(base)
+void rt_shrink_smstr(base)
 CL_FORM *base;
 {
-   CL_FORM *vector = GET_FORM(STACK(base, 1));
-
-   SET_FILL_PTR(GET_FIXNUM(STACK(base, 0)), vector);
-}
-
-/*------------------------------------------------------------------------------
- * displace-array array new-array
- *----------------------------------------------------------------------------*/
-void displace_array(base)
-CL_FORM *base;
-{
-   TAG array_type = TYPE_OF (STACK(base, 0));
-   CL_FORM     *array = GET_FORM(STACK(base, 0));
-   CL_FORM *new_array = GET_FORM(STACK(base, 1));
-
-   SET_AR_SIZE(AR_SIZE(new_array), array);
-   COPY(AR_BASE(new_array), AR_BASE(array));
-   if(VECTOR_NS_P(array_type))
-   {
-      MAKE_NOT_DISPLACED(array);
-      COPY(FILL_PTR(new_array), FILL_PTR(array));
-   }
-   else if(ARRAYP(array_type))
-   {
-      MAKE_NOT_DISPLACED(array);
-      AR_DIMS(array) = AR_DIMS(new_array);
-   }
+   long new_size = GET_FIXNUM(ARG(1));
+   /* Neue Endnull, falls String später in C-String verwandelt werden soll */
+   CHAR_AR(AR_BASE(GET_FORM(ARG(0))))[new_size] = '\0';
+   SET_AR_SIZE(new_size, GET_FORM(ARG(0)));
 }

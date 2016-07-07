@@ -5,8 +5,36 @@
  *            ------------------------------------------------------
  * Funktion : obrep2.h - datenrepräsentationsspezifisch
  *
- * $Revision: 1.4 $
+ * $Revision: 1.11 $
  * $Log: obrep2.h,v $
+ * Revision 1.11  1994/06/17  15:16:56  sma
+ * MAKE_FIXNUM und ALLOC_CONS rufen nur noch form_alloc auf, wenn eine GC
+ * durchgefuehrt werden muss, ansonsten geschieht das allozieren von
+ * Speicher inline. FIXN_TAG und FIXN_FIELD eingefuehrt, die
+ * vorzeichenbehaftete Zahlen in das Bitfeld fuer Groesse/Char/Fixnum
+ * schreiben.
+ *
+ * Revision 1.10  1994/05/31  14:52:22  sma
+ * CL_UNBOUND eingefuehrt, CL_LISTP verbessert (dazu Tagnummern
+ * umgestellt) und TAG_BITS-Konstante in SYM_CONST_FLAG benutzt.
+ *
+ * Revision 1.9  1994/05/26  08:49:25  sma
+ * Ein paar kosmetische Aenderungen das SIZE_TAG Makro betreffend.
+ *
+ * Revision 1.8  1994/05/25  12:45:56  uho
+ * Aufruf des undefinierten Makros FNUM in SIZE_TAG entfernt.
+ *
+ * Revision 1.7  1994/05/24  14:04:15  sma
+ * Tag-Größe mal probehalber von 8 auf 5 bits reduziert (macht die
+ * fixnums größer).
+ *
+ * Revision 1.6  1994/05/22  15:00:08  sma
+ * LOAD_SMALLFIXNUM-Makro eingefügt.
+ *
+ * Revision 1.5  1994/05/18  15:15:42  sma
+ * Komplett neu geschrieben. Funktionsfähig bis auf
+ * foreign-function-interface-Funktionen.
+ *
  * Revision 1.4  1993/11/12  13:09:42  sma
  * Neue Konstante BITS_PER_FIXNUM.
  *
@@ -21,598 +49,429 @@
  *
  *----------------------------------------------------------------------------*/
 
-
-/*------------------------------------------------------------------------------
- * Werte für UNBOUND, NIL und T
- *----------------------------------------------------------------------------*/
-#define UNBOUND_VALUE  ((long)0)
-#define NIL_VALUE      ((long)SYMBOL(Ssys, 0))
-#define T_VALUE        ((long)SYMBOL(Ssys, 1))
-
 /*------------------------------------------------------------------------------
  * Datenstruktur der LISP-Objekte
  *----------------------------------------------------------------------------*/
-typedef unsigned short TAG;
-typedef long CL_FORM;
 
-
-/*------------------------------------------------------------------------------
- * Datenstruktur und Makros zum Initialisieren von LISP-Objekten.
- *
- * Es muß gelten sizeof(long) == sizeof( Komponenten von CL_FORM ),
- * sonst kann fehlerhafter Code erzeugt werden.
- *          CL_FORM          CL_INIT
- *       long: |----|,    long:   |----|
- *       PTR:  |------|   PTR:  |------|
- *       char: |-|        char:      |-|
- *----------------------------------------------------------------------------*/
-typedef long CL_INIT;
-#define CL_INIT2(name) CL_INIT name[] __attribute__ ((aligned (8))) =
-   
+typedef union cl_form CL_FORM;
+union cl_form {
+   CL_FORM *form;
+   long d;
+   long *i;
+   double *fl;
+   char *str;
+   CLOSURE_FUN *fun;
+   DOWN_FUNARG *dfarg;
+   GLOBAL_FUNARG *gfarg;
+   FILE *file;
+};
 
 /*------------------------------------------------------------------------------
- * 
+ * Werte für UNBOUND und NIL
  *----------------------------------------------------------------------------*/
-#define T_IND 1
-#define T_SYMBOL 3
-#define T_STRUCT 5
-#define T_INSTANCE 7
-#define T_CLOSURE 11
-#define T_DOWNFUN 13
-#define T_GLOBFUN 15
-#define T_CFILE 51
-#define T_C_FOREIGN 53
-#define T_VEC_T (17+0)
-#define T_VEC_FIXNUM (17+2)
-#define T_VEC_FLOAT (17+4)
-#define T_STRING (17+6)
-#define T_SMVEC_T (81+0)
-#define T_SMVEC_FIXNUM (81 + 2)
-#define T_SMVEC_FLOAT (81 + 4)
-#define T_SMSTR (81 + 6)
-#define T_SMAR_T (97+0)
-#define T_SMAR_FIXNUM (97+2)
-#define T_SMAR_FLOAT (97+4)
-#define T_SMAR_CHAR (97+6)
-#define T_AR_T (33+0)
-#define T_AR_FIXNUM (33+2)
-#define T_AR_FLOAT (33+4)
-#define T_AR_CHAR (33+6)
 
-#define INUM(x)  (((long)(x) << 3) + 2)
-#define IFLOAT(x)  ((long)(x) + 4)
-#define ICHR(x)  (((long)(unsigned char)(x) << 16) + 6)
+extern CL_FORM nil_ob, unbound_ob;
 
+#define UNBOUND_VALUE (&unbound_ob)
+#define NIL_VALUE (&nil_ob)
 
 /*------------------------------------------------------------------------------
  * Konstruktoren für Konstantendefinitionen
  *----------------------------------------------------------------------------*/
+
+typedef CL_FORM CL_INIT;
+
 #define END_SYMDEF  0           /* Endmarkierung einer Symboltabelle */
-#define IS_END_SYMDEF(x)        (*(x) == END_SYMDEF)
+#define IS_END_SYMDEF(x)        ((x)->d == END_SYMDEF)
 
-#define MAKE_NIL                MAKE_SYMREF(NIL_VALUE)
-#define MAKE_T                  MAKE_SYMREF(T_VALUE)
-#define MAKE_UNBOUND            UNBOUND_VALUE
-#define MAKE_FIXNUM(num)        INUM(num)
-#define MAKE_FLOAT(flptr)       IFLOAT(flptr)
-#define MAKE_CHAR(chr)          ICHR(chr)
-
+#define MAKE_NIL (CL_INIT *)NIL_VALUE
+#define MAKE_UNBOUND (CL_INIT *)UNBOUND_VALUE
+#define MAKE_FIXNUM(num) (CL_INIT *)FIXN_TAG(CL_FIXNUM, num)
+#define MAKE_FLOAT(flptr) (CL_INIT *)SIZE_TAG(CL_FLOAT, 0), (CL_INIT *)(flptr)
+#define MAKE_CHAR(chr) (CL_INIT *)&char_ob[(unsigned char)(chr)]
 #define MAKE_STRING(len, str)\
-   ((long)(len) << 8) + T_SMSTR,\
-   (long)(str)
-
-#define MAKE_SYMBOL(len, name, plst, val, pkg, cf)\
-   ((long)(len) << 8) + T_SYMBOL,\
-   (long)name,\
-   plst, val, pkg, cf
-
+   (CL_INIT *)SIZE_TAG(CL_SMSTR, len), (CL_INIT *)(str)
+#define MAKE_SYMBOL(len, str, val, pkg)\
+   (CL_INIT *)SIZE_TAG(CL_SYMBOL, 0), (CL_INIT *)(val), MAKE_NIL,\
+   (CL_INIT *)(pkg), MAKE_STRING(len, str)
+#define MAKE_CONST_SYMBOL(len, str, val, pkg)\
+   (CL_INIT *)SIZE_TAG(CL_SYMBOL, 1), (CL_INIT *)(val), MAKE_NIL,\
+   (CL_INIT *)(pkg), MAKE_STRING(len, str)
 #define MAKE_CLASS(name, cpl, slotnum, slotinfo)\
-   (5L << 8) + T_INSTANCE,\
-   MAKE_NIL,\
-   MAKE_SYMREF(name),\
-   cpl,\
-   MAKE_FIXNUM(slotnum),\
-   slotinfo
+   (CL_INIT *)SIZE_TAG(CL_INSTANCE, 5), MAKE_NIL, MAKE_SYMREF(name),\
+   (CL_INIT *)(cpl), MAKE_SMALLFIXNUMREF(slotnum), (CL_INIT *)(slotinfo)
+#define MAKE_CONS (CL_INIT *)SIZE_TAG(CL_CONS, 0)
+#define MAKE_VECTOR(sz) (CL_INIT *)SIZE_TAG(CL_SMVEC_T, sz)
+#define MAKE_STRUCT(sz, type) (CL_INIT *)SIZE_TAG(CL_STRUCT, sz), type
 
-#define MAKE_INSTANCE(sz, class)\
-   ((long)(sz) << 8 + T_INSTANCE,\
-   class
-
-#define MAKE_CONS(car, cdr)     car, cdr
-#define MAKE_VECTOR(sz)         (((long)(sz) << 8) + T_SMVEC_T)
-
-#define MAKE_ARRAY(rank, dims, sz) sma_error
-   
-#define MAKE_STRREF(str)        (long)(str)
-#define MAKE_SYMREF(sym)        (long)(sym)
-#define MAKE_CLASSREF(class)    (long)(class)
-#define MAKE_LIST(list)         (long)(list)
-#define MAKE_VECREF(vec)        (long)(vec)
-#define MAKE_ARREF(ar)          (long)(ar)
-#define MAKE_STRUCTREF(str)     (long)(str)
-
-#define MAKE_GLOBFUN(fun)       (1 << 8) + T_GLOBFUN, (long)(fun) 
-
-#define CONST_SYM   MAKE_T      /* Symbol ist konstant */
-#define NORMAL_SYM  MAKE_NIL    /* Symbol ist veränderbar */
-
-
-/*-------------------------------------------------------------------------
- * Definitionen der Datentypen von LISP-Objekten
- *
- * Bei den Array-Typen ist folgendes zu beachten:
- *    - Der erste Typ sollte bei einer Zahl 16^n beginnen
- *    - Es gilt immer die Reihenfolge T, FIXNUM, FLOAT, CHAR
- *-------------------------------------------------------------------------*/
-#define CL_UNBOUND       0
-#define CL_FIXNUM        1      /* number */
-#define CL_FLOAT         2      /* number */
-#define CL_CHAR          3
-
-#define RT_FORM_PTR      4      /* Zeiger auf FORM-Array */
-#define RT_FIXNUM_PTR    5      /* Zeiger auf FIXNUM-Array */
-#define RT_FLOAT_PTR     6      /* Zeiger auf FLOAT-Array */
-#define RT_CHAR_PTR      7      /* Zeiger auf CHAR-Array (String) */
-
-#define CL_SYMBOL       13      /* symbol */
-#define CL_NIL          14      /* symbol, list,          sequence */
-#define CL_CONS         15      /*         list,          sequence */
-
-#define CL_VEC          16
-#define CL_VEC_T        16      /*         vector, array, sequence */
-#define CL_VEC_FIXNUM   17      /*         vector, array, sequence */
-#define CL_VEC_FLOAT    18      /*         vector, array, sequence */
-#define CL_STRING       19      /* string, vector, array, sequence */
-
-#define CL_SMVEC        20     
-#define CL_SMVEC_T      20      /*         vector, array, sequence */
-#define CL_SMVEC_FIXNUM 21      /*         vector, array, sequence */
-#define CL_SMVEC_FLOAT  22      /*         vector, array, sequence */
-#define CL_SMSTR        23      /* string, vector, array, sequence */
-
-#define CL_SMAR         24
-#define CL_SMAR_T       24      /*                 array, sequence */
-#define CL_SMAR_FIXNUM  25      /*                 array, sequence */
-#define CL_SMAR_FLOAT   26      /*                 array, sequence */
-#define CL_SMAR_CHAR    27      /*                 array, sequence */
-
-#define CL_AR           28
-#define CL_AR_T         28      /*                 array, sequence */
-#define CL_AR_FIXNUM    29      /*                 array, sequence */
-#define CL_AR_FLOAT     30      /*                 array, sequence */
-#define CL_AR_CHAR      31      /*                 array, sequence */
-
-#define CL_CLOSURE      32      /* function */
-#define CL_DOWNFUN      33      /* function */
-#define CL_GLOBFUN      34      /* function */
-
-#define CL_CODE         37
-#define CL_IND          38
-#define CL_STRUCT       39      /* Structure */
-#define CL_CFILE        41
-#define CL_UNIQUE_TAG   42      /* fuer automatisch generierte CATCH-Tags */
-
-#define CL_INSTANCE     50      /* CLOS Instanz */
-
-/* Die nächsten Konstanten müssen in dieser Reihenfolge stehen!! */
-#define CL_C_CHAR           60  /* char, signed-char */
-#define CL_C_SHORT          61  /* short, short-int, signed-short,
-                                   signed-short-int */ 
-#define CL_C_INT            62  /* int, signed, signed-int */
-#define CL_C_LONG           63  /* long, long-int, signed-long,
-                                   signed-long-int */
-#define CL_C_UNSIGNED_CHAR  64 
-#define CL_C_UNSIGNED_SHORT 65
-#define CL_C_UNSIGNED_INT   66  /* unsigned-int, unsigned */
-#define CL_C_UNSIGNED_LONG  67
-
-#define CL_C_FLOAT          68
-#define CL_C_DOUBLE         69
-#define CL_C_LONG_DOUBLE    70
-
-#define CL_C_STRUCT         71
-#define CL_C_UNION          72
-#define CL_C_ARRAY          73
-
-#define CL_C_CHAR_PTR            74
-#define CL_C_SHORT_PTR           75
-#define CL_C_INT_PTR             76
-#define CL_C_LONG_PTR            77
-
-#define CL_C_UNSIGNED_CHAR_PTR   78
-#define CL_C_UNSIGNED_SHORT_PTR  79
-#define CL_C_UNSIGNED_INT_PTR    80
-#define CL_C_UNSIGNED_LONG_PTR   81
-
-#define CL_C_STRUCT_PTR          82
-/* Bis hier ist die Reihenfolge wichtig */
-
+#define MAKE_SMALLFIXNUMREF(i) (CL_INIT *)&fixnum_ob[(i) + 1000]
+#define MAKE_FIXNUMREF(iptr) (CL_INIT *)(iptr)
+#define MAKE_FLOATREF(fptr) (CL_INIT *)(fptr)
+#define MAKE_STRREF(str) (CL_INIT *)(str)
+#define MAKE_SYMREF(sym) (CL_INIT *)(sym)
+#define MAKE_CLASSREF(class) (CL_INIT *)(class)
+#define MAKE_CONSREF(list) (CL_INIT *)(list)
+#define MAKE_VECREF(vec) (CL_INIT *)(vec)
+#define MAKE_STRUCTREF(str) (CL_INIT *)(str)
+#define MAKE_GLOBFUN(fun) (CL_INIT *)(fun)
 
 /*------------------------------------------------------------------------------
- * Bereiche für Sequencen, Vektoren und Arrays.
+ * Vektortyp-Codes 
  *----------------------------------------------------------------------------*/
-#define T_SEQ_LO   CL_NIL
-#define T_SEQ_HI   CL_AR_CHAR
-#define T_VEC_LO   CL_VEC_T
-#define T_VEC_HI   CL_SMSTR
-#define T_ARR_LO   CL_VEC_T
-#define T_ARR_HI   CL_AR_CHAR
-#define T_SMAR_LO  CL_SMVEC_T
-#define T_SMAR_HI  CL_SMAR_CHAR
 
+#define VT_T          0
+#define VT_FIXNUM     1
+#define VT_FLOAT      2
+#define VT_CHARACTER  3
+#define VT_BIT        4
+
+#define GET_VECTOR_CODE(loc)  (TYPE_OF(loc) - CL_SMVEC)
 
 /*------------------------------------------------------------------------------
- * Makros für den Zugriff auf die Komponenten eines LISP-Objektes
+ * Datentypen-Definition
  *----------------------------------------------------------------------------*/
-/* Tags */
-#define TYPE_OF(loc)            type_of(loc)
-#define SET_TAG(loc, value)     sma_error
+/* Reihenfolge/Nummer von NIL und CONS wichtig fuer CL_LISTP */
 
-/* Grundtypen */
-#define GET_FORM(loc)           ((long *)(*(loc)))
+#define CL_NIL               0  /* symbol, list, sequence */
+#define CL_CONS              1  /*         list, sequence */
+#define CL_FIXNUM            2  /* number */
+#define CL_FLOAT             3  /* number */
+#define CL_CHAR              4
+#define CL_SYMBOL            5  /* symbol */
 
-#define GET_FIXNUM(loc)         (*(loc) >> 3)
-#define GET_FLOAT(loc)          (*(double *)(*(loc) - 4))
-#define GET_CHAR(loc)           (*(loc) >> 16)
+#define CL_SMVEC             6 
+#define CL_SMVEC_T          (CL_SMVEC+VT_T)
+#define CL_SMVEC_FIXNUM     (CL_SMVEC+VT_FIXNUM)
+#define CL_SMVEC_FLOAT      (CL_SMVEC+VT_FLOAT)
+#define CL_SMVEC_CHARACTER  (CL_SMVEC+VT_CHARACTER)
+#define CL_SMVEC_BIT        (CL_SMVEC+VT_BIT)
+#define CL_SMSTR            CL_SMVEC_CHARACTER
 
-#define GET_FIXNUM_PTR(loc)     ((long *)*(loc))
-#define GET_FLOAT_PTR(loc)      ((double *)*(loc))
-#define GET_CHAR_PTR(loc)       ((char *)*(loc))
+#define CL_CLOSURE          11  /* function */
+#define CL_DOWNFUN          12  /* function */
+#define CL_GLOBFUN          13  /* function */
+#define CL_IND              14
 
-/* Listen */
-#define CAR(lptr)               (lptr)
-#define CDR(lptr)               ((lptr) + 1)
-#define GET_CAR(loc)            GET_FORM(loc)
-#define GET_CDR(loc)            (GET_FORM(loc) + 1)
+#define CL_STRUCT           15  /* Structure */
+#define CL_CFILE            16
+#define CL_UNIQUE_TAG       17  /* fuer automatisch generierte CATCH-Tags */
+#define CL_INSTANCE         18  /* CLOS Instanz */
 
-/* Symbol */
-#define GET_SYMBOL(loc)         GET_FORM(loc)
-
-/* Funktionen */
-#define GET_FUN(loc)            ((CLOSURE_FUN *)*(loc))
-#define GET_DFARG(loc)          ((DOWN_FUNARG *)GET_FORM(GET_CDR(loc)))
-#define GET_GFARG(loc)          ((GLOBAL_FUNARG *)GET_FORM(GET_CDR(loc)))
-
-#define INDIRECT(loc)           GET_FORM(loc)
-#define GET_CFILE(loc)          ((FILE *)GET_FORM(GET_CDR(loc)))
-
-/* Foreign Fuctions */
-#define GET_C_CHAR(loc)               0
-#define GET_C_SHORT(loc)              0
-#define GET_C_INT(loc)                0
-#define GET_C_LONG(loc)               0
-#define GET_C_UNSIGNED_CHAR(loc)      0
-#define GET_C_UNSIGNED_SHORT(loc)     0
-#define GET_C_UNSIGNED_INT(loc)       0
-#define GET_C_UNSIGNED_LONG(loc)      0
-
-#define GET_C_CHAR_PTR(loc)           0
-#define GET_C_SHORT_PTR(loc)          0
-#define GET_C_INT_PTR(loc)            0
-#define GET_C_LONG_PTR(loc)           0
-#define GET_C_UNSIGNED_CHAR_PTR(loc)  0
-#define GET_C_UNSIGNED_SHORT_PTR(loc) 0
-#define GET_C_UNSIGNED_INT_PTR(loc)   0
-#define GET_C_UNSIGNED_LONG_PTR(loc)  0
-
-#define GET_C_STRUCT(loc)             0
-#define GET_C_STRUCT_PTR(loc)         0
-
-#define GET_C_STRUCT_PTR_VALUE(loc)   0
+#define CL_UNBOUND          19
+/* foreign-Datentypen */
+/* ... */
 
 /*------------------------------------------------------------------------------
- * Prädikate zum Testen des Datentyps
+ * Zugriff auf tag und Größen/Char/Fixnum-Feld
  *----------------------------------------------------------------------------*/
-#define CL_NILP(loc)       (TYPE_OF (loc) == CL_NIL)
-#define CL_TRUEP(loc)      (TYPE_OF (loc) != CL_NIL)
-#define CL_UNBOUNDP(loc)   (TYPE_OF (loc) == CL_UNBOUND)
 
-#define CL_FIXNUMP(loc)    (TYPE_OF (loc) == CL_FIXNUM)
-#define CL_FLOATP(loc)     (TYPE_OF (loc) == CL_FLOAT)
-#define CL_CHARP(loc)      (TYPE_OF (loc) == CL_CHAR)
-#define CL_SYMBOLP(loc)    (TYPE_OF (loc) == CL_SYMBOL)
-#define CL_CONSP(loc)      (TYPE_OF (loc) == CL_CONS)
-#define CL_ATOMP(loc)      (TYPE_OF (loc) != CL_CONS)
-#define CL_SMSTRP(loc)     (TYPE_OF (loc) == CL_SMSTR)
-#define CL_STRINGP(loc)    (TYPE_OF (loc) == CL_STRING)
-#define CL_SMVEC_T_P(loc)  (TYPE_OF (loc) == CL_SMVEC_T)
-#define CL_VEC_T_P(loc)    (TYPE_OF (loc) == CL_VEC_T)
-#define CL_CLOSUREP(loc)   (TYPE_OF (loc) == CL_CLOSURE)
-#define CL_GLOBFUNP(loc)   (TYPE_OF (loc) == CL_GLOBFUN)
-#define CL_DOWNFUNP(loc)   (TYPE_OF (loc) == CL_DOWNFUN)
-#define CL_INSTANCEP(loc)  (TYPE_OF (loc) == CL_INSTANCE)
-#define CL_STRUCTP(loc)    (TYPE_OF (loc) == CL_STRUCT)
-
-#define CL_NUMBERP(obj)       (CL_FIXNUMP(obj) || CL_FLOATP(obj))
-#define CL_LISTP(loc)         (CL_CONSP(loc) || CL_NILP(loc))
-#define CL_STRING_P(loc)      (CL_SMSTRP(loc) || CL_STRINGP(loc))
-#define CL_FUNCTION_P(loc)    (CL_CLOSUREP(loc) || CL_DOWNFUNP(loc) ||\
-                               CL_GLOBFUNP(loc))
-#define CL_VECTOR_P(loc)      VECTORP(TYPE_OF(loc))
-#define CL_ARRAY_P(loc)       ARRAYP(TYPE_OF(loc))
-#define CL_SMAR_P(loc)        SMARP(TYPE_OF(loc))
-
-#define CL_C_STRUCT_P(loc) 0
-#define CL_C_CHAR_P(loc)   0
-#define CL_C_SHORT_P(loc)  0
-#define CL_C_INT_P(loc) 0
-#define CL_C_LONG_P(loc) 0
-#define CL_C_UNSIGNED_CHAR_P(loc) 0
-#define CL_C_UNSIGNED_SHORT_P(loc) 0
-#define CL_C_UNSIGNED_INT_P(loc) 0
-#define CL_C_UNSIGNED_LONG_P(loc) 0
-#define CL_C_CHAR_PTR_P(loc) 0
-#define CL_C_SHORT_PTR_P(loc) 0
-#define CL_C_INT_PTR_P(loc)    0
-#define CL_C_LONG_PTR_P(loc)   0
-#define CL_C_UNSIGNED_CHAR_PTR_P(loc) 0
-#define CL_C_UNSIGNED_SHORT_PTR_P(loc) 0
-#define CL_C_UNSIGNED_INT_PTR_P(loc)   0
-#define CL_C_UNSIGNED_LONG_PTR_P(loc) 0
-
+#define TAG_BITS 5
+#define TAG_MASK ((1 << TAG_BITS) - 1)
+#define TAG_FIELD(form) ((int)((form)->d & TAG_MASK))
+#define SIZE_FIELD(form) ((long)((form)->d >> TAG_BITS))
+#define CHAR_FIELD(form) ((unsigned char)((form)->d >> TAG_BITS))
+#define FIXN_FIELD(form) ((long)((form)->d / (1 << TAG_BITS)))
+#define SIZE_TAG(tag,sz) (((long)(sz) << TAG_BITS) + (tag))
+#define FIXN_TAG(tag,n) (((long)(n) << TAG_BITS) + (tag))
 
 /*------------------------------------------------------------------------------
- * Weitere Typtests
+ * Typtest-Prädikate
  *----------------------------------------------------------------------------*/
-#define VECTORP(ar_type)     (CL_VEC_T <= (ar_type) && (ar_type) <= CL_SMSTR)
-#define ARRAYP(ar_type)      (CL_VEC_T <= (ar_type) && (ar_type) <= CL_AR_CHAR)
-/* VECTOR AND NOT SIMPLE */
-#define VECTOR_NS_P(ar_type) (CL_VEC_T <= (ar_type) && (ar_type) <= CL_STRING)
-#define SMVECP(ar_type)      (CL_SMVEC_T <= (ar_type) && (ar_type) <= CL_SMSTR)
-#define SMARP(ar_type)       (CL_VEC_T <= (ar_type) && (ar_type)<=CL_SMAR_CHAR)
+
+#define TYPE_OF(loc) TAG_FIELD((loc)->form)
+
+#define CL_NILP(loc) ((loc)->form == NIL_VALUE)
+#define CL_TRUEP(loc) NOT(CL_NILP(loc))
+#define CL_UNBOUNDP(loc) ((loc)->form == UNBOUND_VALUE)
+#define CL_FIXNUMP(loc) (TYPE_OF(loc) == CL_FIXNUM)
+#define CL_FLOATP(loc) (TYPE_OF(loc) == CL_FLOAT)
+#define CL_CHARP(loc) (TYPE_OF(loc) == CL_CHAR)
+#define CL_CONSP(loc) (TYPE_OF(loc) == CL_CONS)
+#define CL_ATOMP(loc) NOT(CL_CONSP(loc))
+#define CL_SYMBOLP(loc) (TYPE_OF(loc) == CL_SYMBOL)
+#define CL_INSTANCEP(loc) (TYPE_OF(loc) == CL_INSTANCE)
+#define CL_STRUCTP(loc) (TYPE_OF(loc) == CL_STRUCT)
+#define CL_SMVECP(loc) \
+(TYPE_OF(loc) >= CL_SMVEC_T && TYPE_OF(loc) <= CL_SMVEC_BIT)
+#define CL_SMVEC_T_P(loc) (TYPE_OF(loc) == CL_SMVEC_T)
+#define CL_SMVEC_BIT_P(loc) (TYPE_OF(loc) == CL_SMVEC_BIT)
+#define CL_SMSTRP(loc) (TYPE_OF (loc) == CL_SMSTR)
+#define CL_CLOSUREP(loc) (TYPE_OF(loc) == CL_CLOSURE)
+#define CL_GLOBFUNP(loc) (TYPE_OF(loc) == CL_GLOBFUN)
+#define CL_DOWNFUNP(loc) (TYPE_OF(loc) == CL_DOWNFUN)
+
+/* foreign typtests */
+/* ... */
+
+#define CL_NUMBERP(loc) (CL_FIXNUMP(loc) || CL_FLOATP(loc))
+#define CL_LISTP(loc) (TYPE_OF(loc) <= CL_CONS)
+#define CL_FUNCTIONP(loc) \
+(CL_CLOSUREP(loc) || CL_DOWNFUNP(loc) || CL_GLOBFUNP(loc))
 
 /*------------------------------------------------------------------------------
- * Makros zum Laden der LISP-Objekte
+ * GET-Makros
  *----------------------------------------------------------------------------*/
-#define LOAD_NIL(loc)          (*(loc) = NIL_VALUE)
-#define LOAD_T(loc)            (*(loc) = T_VALUE)
-#define LOAD_FIXNUM(num, loc)  (*(loc) = INUM(num))
-#define LOAD_FLOAT(flptr, loc) (*(loc) = IFLOAT(flptr))
-#define LOAD_CHAR(chr, loc)    (*(loc) = ICHR(chr))
 
-#define LOAD_FORM_PTR(form,   loc) (*(loc) = (long)(form))
-#define LOAD_FIXNUM_PTR(iptr, loc) LOAD_FORM_PTR(iptr,  loc)
-#define LOAD_FLOAT_PTR(flptr, loc) LOAD_FORM_PTR(flptr, loc)
-#define LOAD_CHAR_PTR(chptr,  loc) LOAD_FORM_PTR(chptr, loc)
+#define GET_FORM(loc) ((loc)->form)
 
-#define LOAD_CONS(car, loc)      LOAD_FORM_PTR(car, loc)
-#define LOAD_SYMBOL(sym, loc)    LOAD_FORM_PTR(sym, loc)
+#define GET_FIXNUM(loc) FIXN_FIELD((loc)->form)
+#define GET_FLOAT(loc) (*((loc)->form[1].fl))
+#define GET_CHAR(loc) CHAR_FIELD((loc)->form)
+#define GET_CAR(loc) CAR((loc)->form)
+#define GET_CDR(loc) CDR((loc)->form)
+#define GET_SYMBOL(loc) GET_FORM(loc)
+#define GET_FIXNUM_PTR(loc) ((loc)->i)
+#define GET_FLOAT_PTR(loc) ((loc)->fl)
+#define GET_CHAR_PTR(loc) ((loc)->str)
+#define GET_BITS_PTR(loc) ((loc)->i)
+#define GET_FUN(loc) ((loc)->fun)
+#define GET_DFARG(loc) ((loc)->dfarg)
+#define GET_GFARG(loc) ((loc)->gfarg) 
+#define GET_CFILE(loc) ((loc)->form[1].file)
+#define INDIRECT(loc) (&(loc)->form[1])
 
-#define LOAD_MASK(loc, tag)  (*(loc) = (*(loc) & ~255 | (tag)))
+/* foreign-GETs */
+/* ... */
 
-#define LOAD_CLASS(class, loc) (LOAD_FORM_PTR(class, loc),\
-                                LOAD_MASK(class, T_INSTANCE))
-#define LOAD_STRUCT(ptr, loc) (LOAD_FORM_PTR(ptr, loc),\
-                               LOAD_MASK(ptr, T_STRUCT))
+/*------------------------------------------------------------------------------
+ * Datum auf LISP-Laufzeitstack laden
+ *----------------------------------------------------------------------------*/
 
-#define LOAD_SMSTR(strptr, loc) (LOAD_FORM_PTR(strptr, loc),\
-                                 LOAD_MASK(strptr, T_SMSTR))
-#define LOAD_STRING(strptr, loc) (LOAD_FORM_PTR(strptr, loc),\
-                                  LOAD_MASK(strptr, T_STRING))
-#define LOAD_SMVEC_T(strptr, loc) (LOAD_FORM_PTR(strptr, loc),\
-                                   LOAD_MASK(strptr, T_SMVEC_T))
-#define LOAD_SMAR_T(strptr, loc) (LOAD_FORM_PTR(strptr, loc),\
-                                  LOAD_MASK(strptr, T_SMAR_T))
+#define LOAD_NIL(loc) ((loc)->form = NIL_VALUE)
+#define LOAD_T(loc) LOAD_CHAR(loc,'T',loc)
+#define LOAD_UNBOUND(loc) ((loc)->form = UNBOUND_VALUE)
+#define LOAD_FIXNUM(top,i,loc) do { long _i = (i); \
+  if (_i >= -1000 && _i < 1000) LOAD_SMALLFIXNUM(_i, loc); \
+  else { if (((loc)->form = form_toh++) > form_eoh) \
+  (loc)->form = form_alloc(top, 1); INIT_FIXNUM((loc)->form, _i); }} while(0)
 
-#define LOAD_FUN(fun, tag, loc) {       \
-   CL_FORM *_lptr = form_alloc(loc, 2); \
-   _lptr[0] = (1 << 8) + tag;           \
-   _lptr[1] = (long)fun;                \
-   LOAD_FORM_PTR(_lptr, loc);           \
+#define LOAD_SMALLFIXNUM(i, loc) ((loc)->form = &fixnum_ob[(i) + 1000])
+#define LOAD_FLOAT(top,fl,loc) ((loc)->form = make_flt(top, fl))
+#define LOAD_CHAR(top,ch,loc) ((loc)->form = (&char_ob[(unsigned char)(ch)]))
+#define LOAD_CONS(cons,loc) ((loc)->form = (cons))
+#define LOAD_SYMBOL(sym,loc) ((loc)->form = (sym))
+#define LOAD_CLASS(class,loc) ((loc)->form = (class))
+#define LOAD_INSTANCE(inst,loc) ((loc)->form = (inst))
+#define LOAD_STRUCT(st,loc) ((loc)->form = (st))
+#define LOAD_FORM_PTR(ptr, loc) ((loc)->form = (ptr))
+#define LOAD_FIXNUM_PTR(ptr, loc) ((loc)->i = (ptr))
+#define LOAD_FLOAT_PTR(ptr, loc) ((loc)->fl = (ptr))
+#define LOAD_CHAR_PTR(ptr, loc) ((loc)->str = (ptr))
+#define LOAD_BITS_PTR(ptr, loc) ((loc)->i = (ptr))
+#define LOAD_VEC_T(vec, loc) ((loc)->form = (vec))
+#define LOAD_VEC_FIXNUM(vec, loc) ((loc)->form = (vec))
+#define LOAD_VEC_FLOAT(vec, loc) ((loc)->form = (vec))
+#define LOAD_VEC_CHAR(vec, loc) ((loc)->form = (vec))
+#define LOAD_VEC_BIT(vec, loc) ((loc)->form = (vec))
+#define LOAD_SMSTR(smstr, loc) ((loc)->form = (smstr))
+#define LOAD_CLOSURE(fun, loc) ((loc)->form = (fun))
+#define LOAD_GLOBFUN(fun, loc) ((loc)->gfarg = (fun))
+#define LOAD_DOWNFUN(fun, loc) ((loc)->dfarg = (fun))
+#define LOAD_CFILE(top,fp,loc) { \
+   CL_FORM *fd = form_alloc(top, 2); \
+   fd[0].d = SIZE_TAG(CL_CFILE, 0); \
+   fd[1].file = fp; \
+   (loc)->form = fd; \
 }
-#define LOAD_GLOBFUN(ptr, loc) LOAD_FUN(ptr, T_GLOBFUN, loc)
-#define LOAD_DOWNFUN(ptr, loc) LOAD_FUN(ptr, T_DOWNFUN, loc)
-#define LOAD_CLOSURE(ptr, loc) LOAD_FORM_PTR(ptr, loc)
+#define LOAD_UNIQUE_TAG(loc) \
+   (loc)->form = form_alloc(loc, 1); \
+   (loc)->form->d = SIZE_TAG(CL_UNIQUE_TAG, tag_counter++)
 
-#define LOAD_CFILE(ptr, loc) LOAD_FUN(ptr, T_CFILE, loc)
-      
-#define LOAD_UNBOUND(loc)        (*(loc) = UNBOUND_VALUE)
-#define LOAD_UNIQUE_TAG(loc)     LOAD_UNBOUND(loc)
-
-#define LOAD_VECTOR(vec,tag,loc) \
-    (LOAD_MASK(vec, 17+(tag>=CL_SMVEC)*64+(tag&3)*2),\
-     LOAD_FORM_PTR(vec, loc))
-#define LOAD_ARRAY(vec,tag,loc) \
-    (LOAD_MASK(vec, 33+(tag>=CL_AR)*64+(tag&3)*2),\
-     LOAD_FORM_PTR(vec, loc))
-
-#if 0
-#define LOAD_C_CHAR(chr, loc) \
-   (SET_TAG(loc, CL_C_CHAR), ((loc)->val.ch) = (unsigned long)(chr))
-#define LOAD_C_SHORT(num, loc) \
-   (SET_TAG(loc, CL_C_SHORT), ((loc)->val.i) = (long)(num))
-#define LOAD_C_INT(num, loc) \
-   (SET_TAG(loc, CL_C_INT), ((loc)->val.i) = (long)(num))
-#define LOAD_C_LONG(num, loc) \
-   (SET_TAG(loc, CL_C_LONG), ((loc)->val.i) = (long)(num))
-#define LOAD_C_UNSIGNED_CHAR(chr, loc) \
-   (SET_TAG(loc, CL_C_UNSIGNED_CHAR), ((loc)->val.ch) = (unsigned long)(chr))
-#define LOAD_C_UNSIGNED_SHORT(num, loc) \
-   (SET_TAG(loc, CL_C_UNSIGNED_SHORT), ((loc)->val.i) = (long)(num))
-#define LOAD_C_UNSIGNED_INT(num, loc) \
-   (SET_TAG(loc, CL_C_UNSIGNED_INT), ((loc)->val.i) = (long)(num))
-#define LOAD_C_UNSIGNED_LONG(num, loc) \
-   (SET_TAG(loc, CL_C_UNSIGNED_LONG), ((loc)->val.i) = (long)(num))
-
-#define LOAD_C_CHAR_PTR(ptr, loc) \
-   (SET_TAG(loc, CL_C_CHAR_PTR), ((loc)->val.ch_ptr) = (char *)(ptr))
-#define LOAD_C_SHORT_PTR(ptr, loc) \
-   (SET_TAG(loc, CL_C_SHORT_PTR), ((loc)->val.ch_ptr) = (char *)(ptr))
-#define LOAD_C_INT_PTR(ptr, loc) \
-   (SET_TAG(loc, CL_C_INT_PTR), ((loc)->val.ch_ptr) = (char *)(ptr))
-#define LOAD_C_LONG_PTR(ptr, loc) \
-   (SET_TAG(loc, CL_C_LONG_PTR), ((loc)->val.ch_ptr) = (char *)(ptr))
-#define LOAD_C_UNSIGNED_CHAR_PTR(ptr, loc) \
-   (SET_TAG(loc, CL_C_UNSIGNED_CHAR_PTR), ((loc)->val.ch_ptr) = (char *)(ptr))
-#define LOAD_C_UNSIGNED_SHORT_PTR(ptr, loc)  \
-   (SET_TAG(loc, CL_C_UNSIGNED_SHORT_PTR), ((loc)->val.ch_ptr) = (char *)(ptr))
-#define LOAD_C_UNSIGNED_INT_PTR(ptr, loc) \
-   (SET_TAG(loc, CL_C_UNSIGNED_INT_PTR), ((loc)->val.ch_ptr) = (char *)(ptr))
-#define LOAD_C_UNSIGNED_LONG_PTR(ptr, loc) \
-   (SET_TAG(loc, CL_C_UNSIGNED_LONG_PTR), ((loc)->val.ch_ptr) = (char *)(ptr))
-#define LOAD_C_STRUCT(ptr, loc) \
-   (SET_TAG(loc, CL_C_STRUCT), ((loc)->val.form) = (ptr))
-#define LOAD_C_STRUCT_PTR(ptr, loc) \
-   (SET_TAG(loc, CL_C_STRUCT_PTR), ((loc)->val.form) = (ptr))
-#endif
-
+/* foreign-loads */
+/* ... */
 
 /*------------------------------------------------------------------------------
- * Aufbau von Symbolen
+ * Cons-Zellen
  *----------------------------------------------------------------------------*/
-#define OFF_SYM_PNAME           0
-#define OFF_SYM_LEN             0
-#define OFF_SYM_C_STRING        1
-#define OFF_SYM_PLIST           2
-#define OFF_SYM_VALUE           3
-#define OFF_SYM_PACKAGE         4
-#define OFF_SYM_CONSTFLAG       5
 
-#define SYM_SIZE                6
+#define CONS_SIZE 3
+#define CAR(cons) OFFSET(cons, 1)
+#define CDR(cons) OFFSET(cons, 2)
 
-#define SYM_PLIST(sym)          (GET_FORM(sym) + OFF_SYM_PLIST)
-#define SYM_VALUE(sym)          (GET_FORM(sym) + OFF_SYM_VALUE)
-#define SYM_PACKAGE(sym)        (GET_FORM(sym) + OFF_SYM_PACKAGE)
+#define INIT_CONS(cons)  ((cons)->d = SIZE_TAG(CL_CONS, 0))
 
-#define SYM_CONSTFLAG(sym)      (GET_FORM(sym) + OFF_SYM_CONSTFLAG)
-#define SYM_IS_CONST(sym)       CL_TRUEP(SYM_CONSTFLAG(sym))
-#define SYM_SET_CONST(sym)      LOAD_T(SYM_CONSTFLAG(sym))
-#define SYM_SET_NORMAL(sym)     LOAD_NIL(SYM_CONSTFLAG(sym))
-
-#define LOAD_SYM_PNAME(sym, loc) {               \
-   CL_FORM *str = form_alloc(STACK(base, 1), 2); \
-   COPY(GET_FORM(sym), str);                     \
-   COPY(GET_FORM(sym) + 1, str + 1);             \
-   LOAD_SMSTR(str, loc);                         \
+#define ALLOC_CONS(top,car,cdr,loc) { \
+   CL_FORM *cons; \
+   if ((cons = form_toh) + CONS_SIZE > form_eoh) \
+      cons = form_alloc(top, CONS_SIZE); \
+   else form_toh += CONS_SIZE; \
+   INIT_CONS(cons); \
+   COPY(car, CAR(cons)); \
+   COPY(cdr, CDR(cons)); \
+   LOAD_CONS(cons, loc); \
 }
 
-#define SYMBOL(base, index)  (CL_FORM *)(&base[SYM_SIZE * index])
-#define SYMVAL(base, index)  ((CL_FORM *)&base[SYM_SIZE * index + OFF_SYM_VALUE])
+/*------------------------------------------------------------------------------
+ * Symbole
+ *----------------------------------------------------------------------------*/
 
-/* Erstellt neues Symbol. Parameter ist CL_FORM *, Name steht in base+0 */
-#define SYM_MAKE_SYM(sym)                          \
-   sym = form_alloc(STACK(base, 1), SYM_SIZE);     \
-   sym[0] = (OFF_SYM_LEN << 8) + T_SYMBOL;         \
-   sym[1] = (long)sm_get_c_string(STACK(base, 0)); \
-   sym[2] = sym[4] = sym[5] = NIL_VALUE;           \
-   sym[3] = UNBOUND_VALUE
+#define SYM_SIZE           6    /* Anzahl der CL_FORMs */
 
+#define OFF_SYM_VALUE      1
+#define OFF_SYM_PLIST      2
+#define OFF_SYM_PACKAGE    3
+#define OFF_SYM_NAME       4    /* eingebetteter simple-string */
+
+#define SYM_VALUE(s)    OFFSET(GET_FORM(s), OFF_SYM_VALUE)
+#define SYM_PLIST(s)    OFFSET(GET_FORM(s), OFF_SYM_PLIST)
+#define SYM_PACKAGE(s)  OFFSET(GET_FORM(s), OFF_SYM_PACKAGE)
+#define SYM_NAME(s)     OFFSET(GET_FORM(s), OFF_SYM_NAME)
+
+#define SYM_SET_NAME(name,s)  COPY(OFFSET(name,0), OFFSET(SYM_NAME(s),0));\
+                              COPY(OFFSET(name,1), OFFSET(SYM_NAME(s),1))
+
+#define SYM_CONSTFLAG      (1 << TAG_BITS)
+#define SYM_IS_CONST(s)    (GET_FORM(s)->d & SYM_CONSTFLAG)
+#define SYM_SET_CONST(s)   (GET_FORM(s)->d |= SYM_CONSTFLAG)
+#define SYM_SET_NORMAL(s)  (GET_FORM(s)->d &= ~SYM_CONSTFLAG)
+
+#define SYMBOL(base,index)  ((CL_FORM *)&base[(index)*SYM_SIZE])
+#define SYMVAL(base,index)  ((CL_FORM *)&base[(index)*SYM_SIZE] + OFF_SYM_VALUE)
+
+#define INIT_SYMBOL(sym, name) \
+   (sym)->d = SIZE_TAG(CL_SYMBOL, 0); \
+   COPY(OFFSET(GET_FORM(name), 0), OFFSET(sym, OFF_SYM_NAME + 0)); \
+   COPY(OFFSET(GET_FORM(name), 1), OFFSET(sym, OFF_SYM_NAME + 1))
 
 /*------------------------------------------------------------------------------
- * Zugriff auf Klassen
+ * Klassen
  *----------------------------------------------------------------------------*/
-#define CLASS_SIZE 6
-#define CLASS(index) ((CL_FORM *)&classes[CLASS_SIZE * index])
 
+#define CLASS_SIZE  6           /* Anzahl der CL_FORMs */
+#define CLASS(index)  ((CL_FORM *)&classes[CLASS_SIZE * index])
 
 /*------------------------------------------------------------------------------
- * Zugriff auf die Komponenten eines Strings / Vektors / Arrays
+ * Vektoren
  *----------------------------------------------------------------------------*/
-#define AR_SIZE(ar)                 (*(ar) >> 8)
-#define SET_AR_SIZE(sz, ar)         (*(ar) = ((sz) << 8) + ((*(ar)) & 255))
-#define AR_BASE(ar)                 OFFSET(ar, 1)
-#define AR_DIMS(ar)                 GET_FIXNUM_PTR(OFFSET(ar, -1))
-#define AR_DIM(ar, i)               (AR_DIMS(ar)[(i)+1])
-#define AR_RANK(ar)                 AR_DIM(ar, -1)
-#define MAKE_NOT_DISPLACED(ar)      LOAD_NIL(OFFSET(ar, -2))
-#define DISPLACED_P(ar)             CL_TRUEP(OFFSET(ar,-2))
-#define DISPLACED_TO(ar)            AR_BASE(ar)
-#define DISPLACED_INDEX_OFFSET(ar)  OFFSET(ar, -2)
 
-#define FILL_PTR(vec)               OFFSET(vec, -1)
-#define MAKE_FILL_PTR(vec)          LOAD_FIXNUM(0, FILL_PTR(vec))
-#define HAS_FILL_PTR(vec)           CL_TRUEP(FILL_PTR(vec))
-#define GET_FILL_PTR(vec)           AR_SIZE(vec)
-#define SET_FILL_PTR(sz, vec)       SET_AR_SIZE(sz, vec)
-#define AR_SIZE_WHEN_FP(vec)        GET_FIXNUM(FILL_PTR(vec))
-#define SET_AR_SIZE_WHEN_FP(sz,vec) LOAD_FIXNUM(sz, FILL_PTR(vec))
+#define AR_SIZE(ar)          SIZE_FIELD(ar)
+#define SET_AR_SIZE(sz, ar)  ((ar)->d = SIZE_TAG(TAG_FIELD(ar), sz))
+#define AR_BASE(ar)          OFFSET(ar, 1)
+#define AR_STRING(ar)        GET_CHAR_PTR(AR_BASE(ar))
 
-#define FORM_AR(ar)                 GET_FORM       (AR_BASE(ar))
-#define FIXNUM_AR(ar)               GET_FIXNUM_PTR (AR_BASE(ar))
-#define FLOAT_AR(ar)                GET_FLOAT_PTR  (AR_BASE(ar))
-#define CHAR_AR(ar)                 GET_CHAR_PTR   (AR_BASE(ar))
-
+#define FORM_AR(ar)          GET_FORM(AR_BASE(ar))
+#define FIXNUM_AR(ar)        GET_FIXNUM_PTR(AR_BASE(ar))
+#define FLOAT_AR(ar)         GET_FLOAT_PTR(AR_BASE(ar))
+#define CHAR_AR(ar)          GET_CHAR_PTR(AR_BASE(ar))
+#define BIT_AR(ar)           GET_BITS_PTR(AR_BASE(ar))
 
 /*------------------------------------------------------------------------------
- * Makro für EQ-Funktion
+ * Makro für EQ und EQL-Funktion
  *----------------------------------------------------------------------------*/
-#define EQ(x, y) (*(x) == *(y))
+#define EQ(x, y) (GET_FORM(x) == GET_FORM(y))
 
+#define EQL(x, y) (EQ(x, y) \
+|| (CL_FIXNUMP(x) && (GET_FORM(x)->d == GET_FORM(y)->d)) \
+|| (CL_FLOATP(x) && (GET_FLOAT(x) == GET_FLOAT(y))))
 
 /*------------------------------------------------------------------------------
- * Kopieren von statischen Variablen in den Heap.
- * Parameter: 1. Zeiger auf die statische Variable im Stack
- *            2. Zeiger auf Stack-Top
+ * Kopieren einer statischer Variablen in den Heap
  *----------------------------------------------------------------------------*/
-#define GEN_HEAPVAR(var, top) {        \
-   CL_FORM *_ptr = form_alloc(top, 2); \
-   _ptr[0] = *var;                     \
-   _ptr[1] = (long)0;                  \
-   LOAD_FORM_PTR(_ptr, var);           \
+#define GEN_HEAPVAR(var,top) { \
+   CL_FORM *_hptr = form_alloc(top, 2); \
+   _hptr[0].d = SIZE_TAG(CL_IND, 0); \
+   _hptr[1].d = (var)->d; \
+   (var)->form = _hptr; \
 }
 
-
 /*------------------------------------------------------------------------------
- * Makro für das Kopieren der CL_FORM-Struktur
- * Bei einigen Kompilern muss Komponentenweise kopiert werden.
+ * CLOSURE auf Heap erzeugen und Kopf ausfüllen
  *----------------------------------------------------------------------------*/
-#define COPY(source, dest) (*(dest) = *(source))
-
-/* Falls komponentenweise kopiert werden muss, dann unbedingt den Typ
- * zuerst kopieren! Denn sonst wurden Aufrufe der Form
- * COPY(SYM_VALUE(STACK(base, 1)), STACK(base, 1))
- * nicht korrekt uebersetzt werden.
- *    #define COPY(source, dest)\
- *       (dest->tag = source->tag, dest->val = source->val)
- */
-
-
-/*------------------------------------------------------------------------------
- * Closure auf Heap erzeugen und Kopf ausfüllen.
- *----------------------------------------------------------------------------*/
-#define GEN_CLOSURE(ar, top, sz, code, ps) \
-   CL_FORM *ar = form_alloc(top, sz);      \
-   ar[0] = (((sz) - 1) << 8) + T_CLOSURE;  \
-   ar[1] = (long)(code);                   \
-   ar[2] = INUM(ps)
-
-/*------------------------------------------------------------------------------
- * Speicheranforderungsfunktion
- *----------------------------------------------------------------------------*/
-#define MALLOC(size)  (PTR)malloc8(size)
-
-/*------------------------------------------------------------------------------
- * Garbage-Collector-Funktion
- *----------------------------------------------------------------------------*/
-#define SAVE_FORM(form)  save_form2(form)
-
-/*------------------------------------------------------------------------------
- * Größe der von form_alloc alloziierten Blöcke
- *----------------------------------------------------------------------------*/
-#define HEAP_ALIGN(num)  num = (num + 1) & ~1
+#define GEN_CLOSURE(ar,top,sz,code,ps) \
+     CL_FORM *ar = form_alloc(top, sz); \
+     ar[0].d = SIZE_TAG(CL_CLOSURE, (sz) - 1); \
+     ar[1].fun = code; \
+     ar[2].d = ps
 
 /*------------------------------------------------------------------------------
  * Anzahl der Bits, die für Bitvektoren in einer Fixnum genutzt werden
  *----------------------------------------------------------------------------*/
-#define BITS_PER_FIXNUM (sizeof(long) * 8)
+#define BITS_PER_FIXNUM 24
 
-/* Ende */
+/*------------------------------------------------------------------------------
+ * INITs
+ *----------------------------------------------------------------------------*/
 
-                                 
-#define TYPESWITCH(x)  switch (TYPEOF(x)) {
-#define ENDSWITCH      }
-#define ENDCASE        break;
-#define CASE_NIL       case CL_NIL:
-#define CASE_FIXNUM    case CL_FIXNUM:
-/* ... */
-#define DEFAULT        default:
+#define INIT_VEC_T(v,sz) ((v)->d = SIZE_TAG(CL_SMVEC_T, sz))
+#define INIT_VEC_FIXNUM(v,sz) ((v)->d = SIZE_TAG(CL_SMVEC_FIXNUM, sz))
+#define INIT_VEC_FLOAT(v,sz) ((v)->d = SIZE_TAG(CL_SMVEC_FLOAT, sz))
+#define INIT_VEC_CHAR(v,sz) ((v)->d = SIZE_TAG(CL_SMVEC_CHARACTER, sz))
+#define INIT_VEC_BIT(v,sz) ((v)->d = SIZE_TAG(CL_SMVEC_BIT, sz))
+#define INIT_INSTANCE(vec,sz)  ((vec)->d = SIZE_TAG(CL_INSTANCE, sz))
+#define INIT_STRUCT(st,sz)  ((st)->d = SIZE_TAG(CL_STRUCT, sz))
+#define INIT_FIXNUM(fob,n) ((fob)->d = FIXN_TAG(CL_FIXNUM, n))
 
-/*
-#define TYPESWITCH(x)  { CL_FORM *__f = (x);
-#define ENDSWITCH      }
-#define ENDCASE        } else
-#define CASE_NIL       if (CL_NILP(__f)) {
-#define CASE_FIXNUM    if (CL_FIXNUMP(__f)) {
-#define DEFAULT        {
-*/
+/*------------------------------------------------------------------------------
+ * Funktionen für Zugriff auf optimierte Restparameter
+ *----------------------------------------------------------------------------*/
+#define LOCAL(x)  STACK(local, x)
+#define REST_LENGTH(r, loc)  LOAD_FIXNUM(loc, local - (r), loc)
+#define REST_CAR(r, loc)  if ((r) == local) LOAD_NIL(loc); else COPY(r, loc)
+#define REST_CDR(r)  (((r) != local) ? (r) + 1: (r))
+#define REST_APPLY(b, n, r)  rest_apply(b, n, (local - (r)), (r))
+#define REST_NOT_EMPTY(r)  (local != (r))
 
+/*------------------------------------------------------------------------------
+ * Garbage-Collector-Funktion
+ *----------------------------------------------------------------------------*/
+#define SAVE_FORM(form)  gc_relocate(form)
+
+#define INIT_FUN init_ob()
+
+/*------------------------------------------------------------------------------
+ * Abstraktionen
+ *----------------------------------------------------------------------------*/
+#define GEN_FLOAT(top,fl,loc) { \
+   static double _float = (fl); \
+   LOAD_FLOAT(top, &_float, loc); \
+}
+#define GEN_SMSTR(len,str,loc) { \
+   CL_INIT local_string [] = { \
+   MAKE_STRING(len,str); \
+   }; \
+   LOAD_SMSTR((CL_FORM *)local_string, loc); \
+}
+#define GEN_GLOBAL_FUNARG(name,fun,par) \
+   GLOBAL_FUNARG name = { SIZE_TAG(CL_GLOBFUN, par), fun }
+#define GEN_STATIC_GLOBAL_FUNARG(name,fun,par) \
+   static GLOBAL_FUNARG name = { SIZE_TAG(CL_GLOBFUN, par), fun }
+#define INIT_DOWN_FUNARG(name,_fun,_par,_disp) \
+   name.par_spec = SIZE_TAG(CL_DOWNFUN, _par); \
+   name.fun = (_fun); \
+   name.display = (_disp)
+   
+/*------------------------------------------------------------------------------
+ * Definition und Zugriff auf funktionale Objekte
+ *----------------------------------------------------------------------------*/
+struct global_funarg
+{
+   long par_spec;
+   GLOBAL_FUN *fun;
+};
+
+struct down_funarg
+{
+   long par_spec;
+   LOCAL_FUN *fun;
+   CL_FORM **display;
+};
+
+#define GET_GLOBFUN_CODE(ptr) (*(ptr->fun))
+#define GET_GLOBFUN_PARSPEC(ptr) SIZE_FIELD((CL_FORM *)(ptr))
+
+#define GET_DOWNFUN_CODE(ptr) (*(ptr->fun))
+#define GET_DOWNFUN_PARSPEC(ptr) SIZE_FIELD((CL_FORM *)(ptr))
+#define GET_DOWNFUN_DISPLAY(ptr) (ptr->display)
+
+#define GET_CLOSURE_CODE(closure)  ((closure)->form[1].fun)
+#define GET_CLOSURE_PARSPEC(closure) ((closure)->form[2].d)
+
+/*------------------------------------------------------------------------------
+ * Extern Deklarationen
+ *----------------------------------------------------------------------------*/
+
+extern CL_FORM fixnum_ob[];
+extern CL_FORM char_ob[];
+extern CL_FORM *make_flt();
+extern CL_FORM *form_toh;
+extern CL_FORM *form_eoh;

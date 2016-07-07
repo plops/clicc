@@ -5,8 +5,33 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Startmodul zum Laden des Compilers in ein Common-LISP System
 ;;;
-;;; $Revision: 1.88 $
+;;; $Revision: 1.95 $
 ;;; $Log: clcload.lisp,v $
+;;; Revision 1.95  1994/05/22  15:05:45  sma
+;;; Neuer Key "obrep" mit dem die Datenrepräsenation eingestellt werden
+;;; kann.
+;;;
+;;; Revision 1.94  1994/05/19  07:57:22  pm
+;;; Fehler behoben
+;;;
+;;; Revision 1.93  1994/04/22  14:09:37  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Ueberfluessiges exportiertes Symbol entfernt
+;;;
+;;; Revision 1.92  1994/04/18  12:05:29  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Liste der exportierten Symbole ergaenzt
+;;;
+;;; Revision 1.91  1994/02/02  09:36:39  hk
+;;; printzs wird nicht geladen, da es sich (noch) nicht mit raw Slots
+;;; verträgt.
+;;;
+;;; Revision 1.90  1994/01/05  13:23:58  hk
+;;; Vorkommen von *init-system* entfernt.
+;;;
+;;; Revision 1.89  1993/12/22  11:10:37  pm
+;;; Inkonsistenzen in den Symbolnamen behoben.
+;;;
 ;;; Revision 1.88  1993/12/22  10:56:06  hk
 ;;; Kein (require "printzs") bei CMU17, da bug in
 ;;; pcl:class-direct-superclasses
@@ -363,26 +388,22 @@
         (make-package "RT" :use () :nicknames '("RUNTIME")))
 
 ;;------------------------------------------------------------------------------
-;; Pacakage FFI erzeugen
+;; Package FFI erzeugen
 ;;------------------------------------------------------------------------------
 (unless (find-package "FFI")
         (make-package "FFI" :use ()))
 
-(import 
- '(rt::c-char-p rt::c-short-p rt::c-int-p rt::c-long-p rt::c-unsigned-char-p
-   rt::c-unsigned-short-p rt::c-unsigned-int-p rt::c-unsigned-long-p
-   rt::c-float-p rt::c-double-p rt::c-long-double-p) 
- "FFI")
-
 (in-package "FFI" :use ())
+
 (lisp:export 
- '(load-foreign def-call-out def-call-in def-c-type foreign-package-name
-   c-char c-char-p c-short c-short-p c-int c-int-p c-long c-long-p
-   c-unsigned-char c-unsigned-char-p c-unsigned-short c-unsigned-short-p
-   c-unsigned-int c-unsigned-int-p c-unsigned-long c-unsigned-long-p c-float
-   c-float-p c-double c-double-p c-long-double c-long-double-p c-void c-vararg
-   lisp-character lisp-integer lisp-float lisp-string c-struct c-ptr c-fun
-   c-union c-array c-enum c-string)
+ '(c-array c-char c-char-p c-double c-double-p c-enum c-float c-float-p c-fun
+   c-handle c-int c-int-p c-long c-long-double c-long-double-p c-long-p c-ptr
+   c-short c-short-p c-string c-string-p c-struct c-union c-unsigned-char
+   c-unsigned-char-p c-unsigned-int c-unsigned-int-p c-unsigned-long
+   c-unsigned-long-p c-unsigned-short c-unsigned-short-p c-vararg c-void
+   copy-c-string def-c-type def-call-in def-call-out foreign-package-name
+   free lisp-character lisp-float lisp-integer load-foreign make-c-string
+   make-lisp-string)
  "FFI")
 
 (lisp:in-package "USER")
@@ -735,6 +756,7 @@
                        (memsizes         *MEMSIZES*)
                        (no-codegen       *NO-CODEGEN*)
                        (ti-level         *TI-Level*)
+                       (obrep            *OBREP*)
                        (max-lines        *C-max-line-count*)
                        (split            *SPLIT-FILES*)
                        (flat-ifs         *FLAT-IFS*))
@@ -754,6 +776,7 @@
   (setq *MEMSIZES*         memsizes)
   (setq *NO-CODEGEN*       no-codegen)
   (setq *TI-Level*         ti-level)
+  (setq *OBREP*            obrep)
   (setq *C-max-line-count* max-lines)
   (setq *SPLIT-FILES*      split)
   (setq *FLAT-IFS*         flat-ifs)
@@ -914,7 +937,6 @@
 ;;------------------------------------------------------------------------------
 (defun do-lisp-module ()
   (when (check-split "lisp" "Fread")
-    (setq *init-system* t)
     (let ((*C-max-line-count* nil)
           (*delete-verbosity* 2)
           (*default-pathname-defaults*
@@ -930,7 +952,6 @@
 ;;------------------------------------------------------------------------------
 (defun do-inline-module ()
   (when (check-split "inline" "Fconsp")
-    (setq *init-system* t)
     (let ((*delete-verbosity* 2)
           (*default-pathname-defaults*
            (make-pathname :directory *CLICC-LISP-PATH*)))
@@ -973,4 +994,4 @@
 
 ;;------------------------------------------------------------------------------
 (require "clcmain")
-#-CMU17(require "printzs")              ;bug in pcl:class-direct-superclasses
+;;;#-CMU17(require "printzs")              ;bug in pcl:class-direct-superclasses

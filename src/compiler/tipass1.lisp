@@ -9,8 +9,14 @@
 ;;;               Objekt verwendet wird,
 ;;;             o Setzen der `called-by'-Komponenten.
 ;;;
-;;; $Revision: 1.65 $
+;;; $Revision: 1.67 $
 ;;; $Log: tipass1.lisp,v $
+;;; Revision 1.67  1994/03/03  13:54:36  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;;
+;;; Revision 1.66  1994/01/27  19:08:55  kl
+;;; Anpassung an den erweiterten Typverband.
+;;;
 ;;; Revision 1.65  1993/12/09  10:34:44  hk
 ;;; provide wieder an das Dateiende
 ;;;
@@ -239,7 +245,13 @@
 ;;------------------------------------------------------------------------------
 (defun zs-type-of (anything) 
   (labels ((proper-list-p (a-list)
-             (null (rest (last a-list)))))
+             (null (rest (last a-list))))
+
+           (ti-bytep (an-integer)
+             (< (abs an-integer) 256))
+
+           (ti-wordp (an-integer)
+             (< (abs an-integer) 65536)))
   
     (typecase anything
       (null-form        null-t)
@@ -262,19 +274,24 @@
       (function         function-t)
       (literal-instance class-t)
       (number           (typecase anything
-                          (integer (if (target-fixnump anything)
-                                       fixnum-t
-                                       bignum-t))
+                          (integer (cond ((ti-bytep anything)      
+                                          byte-t)
+                                         ((ti-wordp anything)       
+                                          non-byte-word-t)
+                                         ((target-fixnump anything) 
+                                          non-word-fixnum-t)
+                                         (T bignum-t)))
                           (float   float-t)
                           (otherwise 
                            (internal-error 'zs-type-of 
                                            "~S has unknown number type." 
                                            anything)
                            number-t)))
-      (package          other-t)
-      (stream           other-t)
-      (otherwise        (clicc-message "~S has unknown type." anything)
-                        other-t))))
+      (package          package-t)
+      (stream           stream-t)
+      (otherwise        (internal-error 'zs-type-of
+                                        "~S has unknown type." anything)
+                        top-t))))
 
 
 ;;------------------------------------------------------------------------------
@@ -331,15 +348,24 @@
     (when (constant-value-p sym)
       (preset-types constant-value))))
 
-(defmethod preset-types :after ((a-named-const named-const))
-  (let ((value (?value a-named-const)))
+(defmethod preset-types :after ((a-defined-named-const defined-named-const))
+  (let ((value (?value a-defined-named-const)))
     (case value
       (:forward (internal-error 'preset-types
-                                ":forward in named-const ~S."
-                                a-named-const))
+                                ":forward in defined-named-const ~S."
+                                a-defined-named-const))
       (:unknown)
       (otherwise (preset-types value)
-                 (setf (?type a-named-const) (?type value))))))
+                 (setf (?type a-defined-named-const) (?type value))))))
+
+(defmethod preset-types :after ((an-imported-named-const imported-named-const))
+   (setf (?type an-imported-named-const)
+         (case (?value-zs-type an-imported-named-const)
+           (:cons cons-t)
+           (:string string-t)
+           (:vector vector-t)
+           (:array array-t)
+           (:literal-instance class-t))))
 
 ;;------------------------------------------------------------------------------
 ;; Setze die Typkomponenten der Nicht-Literale auf das Bottom-Element des 
@@ -358,10 +384,10 @@
   (dolist (var (?var-list a-let*))
     (setf (?type var) bottom-t)))
 
-(defmethod reset-type-annotation ((a-named-const named-const))
-  (let ((value (?value a-named-const)))
+(defmethod reset-type-annotation ((a-defined-named-const defined-named-const))
+  (let ((value (?value a-defined-named-const)))
     (when (or (eq value :unknown) (eq value :forward))
-      (setf (?type a-named-const) bottom-t))))
+      (setf (?type a-defined-named-const) bottom-t))))
 
 (defmethod reset-type-annotation ((a-literal literal)))
 

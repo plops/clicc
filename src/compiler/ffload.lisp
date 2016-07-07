@@ -5,8 +5,33 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Lader-Parser fuer FFI-Beschreibungsdateien.
 ;;; 
-;;; $Revision: 1.18 $
+;;; $Revision: 1.25 $
 ;;; $Log: ffload.lisp,v $
+;;; Revision 1.25  1994/06/08  12:04:21  hk
+;;; use-package und unuse-package in einem LET versteckt, damit CLISP es
+;;; nicht bereits zur "Ubersetzungszeit auswertet.
+;;;
+;;; Revision 1.24  1994/05/17  08:33:17  pm
+;;; Fehler korrigiert
+;;;
+;;; Revision 1.23  1994/04/27  16:36:10  pm
+;;; Merkwuerdigen Fehler behoben.
+;;; Koennte ein Fehler in Allegro sein.
+;;;
+;;; Revision 1.22  1994/04/22  14:10:53  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Packages korrigiert.
+;;;
+;;; Revision 1.21  1994/04/18  12:07:48  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - NOCH ZU UEBERARBEITEN: Package immer noch nicht richtig durchdacht.
+;;;
+;;; Revision 1.20  1993/12/17  11:28:59  pm
+;;; Member wird jetzt auf eine liste und nicht auf eine queue angewendet.
+;;;
+;;; Revision 1.19  1993/12/16  16:32:27  pm
+;;; Kommentare eingefuegt.
+;;;
 ;;; Revision 1.18  1993/11/03  11:45:30  pm
 ;;; Inkonsistenzen in den Symbolnamen behoben.
 ;;;
@@ -67,92 +92,104 @@
 ;;------------------------------------------------------------------------------
 ;; Globale Variablen
 ;;------------------------------------------------------------------------------
-(defvar *interface-file-stream* NIL)    ; aktuelle Definitions-Datei
+(defvar *interface-file-stream*)
 (defvar *interface-file-queue* (empty-queue)) 
                                         ; Liste der geladenen Definitionsdateien
-
+(defvar *ffi-signatures* '())
 ;;------------------------------------------------------------------------------
 ;; p1-load-foreign
 ;; Analysiert eine Beschreibungsdatei.
 ;; Folgende Konstrukte werden erkannt:
-;;  - foreign-package-name
-;;  - def-call-out
-;;  - def-call-in
-;;  - def-c-type
+;;  - def-call-out           Definition einer Call-Out-Funktion,
+;;  - def-call-in            Definition einer Call-In-Funktion,
+;;  - def-c-type             Definition eines C-Types.
 ;;------------------------------------------------------------------------------
 (defun p1-load-foreign (all-args)
-  (let* ((name-of-file (first all-args))
+  (let* ((old-package-use-list (package-use-list *package*))
+         (name-of-file (first all-args))
          (file-name (pathname-name name-of-file))
          (extension (pathname-type name-of-file))
          (directory (directory-namestring name-of-file))
-         (*PACKAGE* (find-package "FFI"))
+         (*package* *package*)          ; Wird lokal fuer diese F. geaendert
          definition-file
-         interface-file
          form)
-    
+
+    ;;-------------------------------------------
+    #+CLISP(let ((x "FFI")) (use-package x)) ; do not execute at compile time
+    #-CLISP(use-package "FFI")
+
     ;; Den Filenamen bei Bedarf mit der Endung ".def" versehen
     ;;--------------------------------------------------------
     (unless (or (equal extension "def") (equal extension 'nil))
       (clicc-error "Wrong extension for LOAD-FOREIGN: ~A." extension))
     
     (setq definition-file (concatenate 'string directory file-name ".def"))
-    (setq interface-file (concatenate 'string directory file-name "-ffi.h"))
     
     ;; Ist die Beschreibungsdatei nicht vorhanden, Fehler ausgeben
     ;;------------------------------------------------------------
     (unless (probe-file definition-file)
       (clicc-error "Unknown file: ~A." definition-file))
-    
+
     ;; Die Definitionsdatei nur bearbeiten, wenn sie nicht schon einmal
     ;; bearbeitet wurde.
     ;;------------------
-    (unless (member interface-file *interface-file-queue* :test #'string=)
+    (unless 
+        (member definition-file
+                (queue2list *interface-file-queue*) 
+                :test #'string=)
       
       ;; File oeffnen und bearbeiten
       ;;----------------------------
       (with-open-file (def-file definition-file :direction :input)
         
-        ;; C-Header-Datei oeffnen
-        ;;-----------------------
-        (with-open-file (*interface-file-stream* 
-                         interface-file
-                         :direction :output
-                         :if-exists :supersede)
-          
-          (clicc-message "Load definition-file ~A" definition-file)
-          
-          (loop
-           (setq form (clicc-read def-file))
-           (if (or (eq '|eof| form)
-                   #+allegro-v4.1 (eq 'EOF form) ;little bug in acl
-                   )
-               (return)
+        (clicc-message "Load definition-file ~A" definition-file)
+        
+        ;; Solange S-Ausdruecke lesen, bis Datei zuende
+        ;;---------------------------------------------
+        (loop
+         (setq form (clicc-read def-file))
+         (if (or (eq '|eof| form)
+                 ;; Kleiner Fehler in Allegro
+                 ;; Manchmal wird kein '|eof| gesendet
+                 ;;-----------------------------------
+                 #+allegro-v4.1 (eq 'EOF form)
+                 )
+             (return)
+             
+             ;; Die Eintraege abarbeiten.
+             ;;--------------------------
+             (case (first form)
+
+               (ffi:foreign-package-name
+                (let* ((package-name (second form)))
+                  (setq *package* 
+                        (let ((package (find-package package-name)))
+                          (if package
+                              package
+                              (make-package package-name
+                                            :use '("FFI")))))))
                
-               ;; Die Eintraege abarbeiten.
-               ;;--------------------------
-               (case (first form)
-                 (ffi:foreign-package-name
-                  (let ((package-name (second form)))
-                    (setq *package* (find-package package-name))
-                    (unless *package* 
-                      (setq *package* (make-package package-name)))
-                    (use-package "FFI" *package*)
-                    (when (third form)
-                      (clicc-warning "skipping extra arguments"))))
-                 
-                 (ffi:def-call-out
-                     (export (p1-def-call-out (rest form)) *package*))
-                 
-                 (ffi:def-call-in
-                     (p1-def-call-in (rest form)))
-                 
-                 (ffi:def-c-type
-                     (p1-def-c-type (rest form) *package*))
-                 
-                 (t
-                  (clicc-error "Not implemented: ~A" (car form))))))
-          
-          (add-q interface-file *interface-file-queue*))))))
+               (ffi:def-call-out
+                   (p1-def-call-out (rest form)))
+               
+               (ffi:def-call-in
+                   (p1-def-call-in (rest form)))
+               
+               (ffi:def-c-type
+                   (p1-def-c-type (rest form)))
+               
+               (t
+                (clicc-error "Unknown identifier in Signature: ~A" 
+                             form)))))
+        
+        ;; Definitionsdatei in die Queue einhaengen, und damit
+        ;; fuer eine weitere Benutzung sperren.
+        ;;-------------------------------------
+        (add-q definition-file *interface-file-queue*)))
+
+    #+CLISP(let ((x "FFI")) (unuse-package x)) ; do not execute at compile time
+    #-CLISP(unuse-package "FFI")
+    (use-package old-package-use-list)))
 
 ;;------------------------------------------------------------------------------
 (provide "ffload")

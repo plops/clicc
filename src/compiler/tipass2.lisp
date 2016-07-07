@@ -8,8 +8,29 @@
 ;;;            und die entsprechenden Ausdruecke mit Typinformationen 
 ;;;            versehen.
 ;;;
-;;; $Revision: 1.42 $
+;;; $Revision: 1.48 $
 ;;; $Log: tipass2.lisp,v $
+;;; Revision 1.48  1994/05/16  12:03:06  hk
+;;; Schreibfehler behoben
+;;;
+;;; Revision 1.47  1994/05/16  11:12:43  hk
+;;; SC-mapcar vereinfacht. SC-mapcan korrigiert, der Resultattyp ist keine
+;;; Liste von Funktionsresultaten wie bei mapcar sondern das
+;;; Funktionsresultat oder NULL.
+;;;
+;;; Revision 1.46  1994/02/21  10:24:57  kl
+;;; Bei Applikationen mit falscher Argumentanzahl kann es nun nicht mehr
+;;; zum Abbruch der Typinferenz kommen.
+;;;
+;;; Revision 1.45  1994/01/26  14:44:30  ft
+;;; Letzter Feinschliff an der eben gemachten Änderung.
+;;;
+;;; Revision 1.44  1994/01/26  13:37:43  ft
+;;; Änderung der Darstellung von ungebundenen Slots.
+;;;
+;;; Revision 1.43  1994/01/15  20:28:42  kl
+;;; Destruktives Bearbeiten der Variablen *ti-workset* korrigiert.
+;;;
 ;;; Revision 1.42  1993/12/09  10:35:16  hk
 ;;; provide wieder an das Dateiende
 ;;;
@@ -222,21 +243,23 @@
              (update-type-f (?result-type a-defined-fun) new-result-type))
 
             (types-are-unchanged
-             (setf *ti-workset* (nunion *successor-workset*
+             (setf *ti-workset* (union *successor-workset*
                                         *ti-workset*)))
             (T
              (setf (?result-type a-defined-fun) new-result-type)
-             (setf *ti-workset* (nunion 
-                                 (union *successor-workset*
-                                        (union (?called-by a-defined-fun)
-                                               (list a-defined-fun)))
-                                 *ti-workset* )))))))
+             (setf *ti-workset* (union (union *successor-workset*
+                                              (union (?called-by a-defined-fun)
+                                                     (list a-defined-fun)))
+                                       *ti-workset* )))))))
 
 
 ;;------------------------------------------------------------------------------
 (defmethod analyse-object ((a-class-def class-def) &optional no-iteration)
   (declare (ignore no-iteration))
-  (mapc #'analyse-types (mapcar #'?initform (?slot-descr-list a-class-def))))
+  (dolist (a-slot-desc (?slot-descr-list a-class-def))
+    (unless (or (null (?initform a-slot-desc))
+                (eq (?initform a-slot-desc) :unbound))
+      (analyse-types (?initform a-slot-desc)))))
 
 
 ;;------------------------------------------------------------------------------
@@ -348,12 +371,13 @@
 ;; ist den entsprechenden Resultattyp, das Top-Element des Typverbandes sonst.
 ;;------------------------------------------------------------------------------
 (defmethod analyse-function-app ((an-imp-fun imported-fun) argument-types)
-  (let ((type-abstraction-function (?type-abstraction-function an-imp-fun)))
-
-    (if (null type-abstraction-function)
-        (?result-type an-imp-fun)
-        (apply type-abstraction-function argument-types))))
-
+  (if (number-of-args-is-not-ok (?par-spec an-imp-fun) (length argument-types))
+      bottom-t
+      (let ((type-abstraction-function (?type-abstraction-function an-imp-fun)))
+        
+        (if (null type-abstraction-function)
+            (?result-type an-imp-fun)
+            (apply type-abstraction-function argument-types)))))
 
 
 ;;------------------------------------------------------------------------------
@@ -454,8 +478,6 @@
  
 
 ;;------------------------------------------------------------------------------
-;; 
-;;------------------------------------------------------------------------------
 (defun SC-funcall (a-fun argument-list)
   (analyse-function-app a-fun (mapcar #'?type (rest argument-list))))
 
@@ -475,47 +497,53 @@
       
 
 ;;------------------------------------------------------------------------------
-(defun SC-mapcar (a-fun argument-list)
+;; Hilfsfunktion f"ur mapcar, mapc und mapcan
+;;------------------------------------------------------------------------------
+(defun mapcxx (a-fun argument-list)
   (let* ((list-types (mapcar #'?type (rest argument-list)))
          (arg-types  (mapcar #'list-component list-types))
          (result     (analyse-function-app a-fun arg-types)))
-    (if (some #'(lambda (list-type) 
-                  (types-are-conform list-type null-t))
-              list-types)
-        (list-of result)
-        (list-cons-of result))))
+    result))
 
-
-(defun SC-maplist (a-fun argument-list)
+;;------------------------------------------------------------------------------
+;; Hilfsfunktion f"ur maplist, mapl und mapcon
+;;------------------------------------------------------------------------------
+(defun maplxx (a-fun argument-list)
   (let* ((list-types (mapcar #'?type (rest argument-list)))
          (arg-types  (mapcar #'(lambda (lt) (type-join null-t lt)) list-types))
          (result     (analyse-function-app a-fun arg-types)))
-    (if (some #'(lambda (list-type) 
-                  (types-are-conform list-type null-t))
-              list-types)
-        (list-of result)
-        (list-cons-of result))))
+    result))
+
+;;------------------------------------------------------------------------------
+(defun SC-mapcar (a-fun argument-list)
+  (list-of (mapcxx a-fun argument-list)))
+
+;;------------------------------------------------------------------------------
+(defun SC-maplist (a-fun argument-list)
+  (list-of (maplxx a-fun argument-list)))
 
 
+;;------------------------------------------------------------------------------
 (defun SC-mapcan (a-fun argument-list)
-  (SC-mapcar a-fun argument-list))
+  (type-join null-t (mapcxx a-fun argument-list)))
 
+;;------------------------------------------------------------------------------
 (defun SC-mapcon (a-fun argument-list)
-  (SC-maplist a-fun argument-list))
+  (type-join null-t (maplxx a-fun argument-list)))
 
 ;;------------------------------------------------------------------------------
 (defun SC-mapc (a-fun argument-list)
-  (SC-mapcar a-fun argument-list)
+  (mapcxx a-fun argument-list)
   (?type (second argument-list)))
 
+;;------------------------------------------------------------------------------
 (defun SC-mapl (a-fun argument-list)
-  (SC-maplist a-fun argument-list)
+  (maplxx a-fun argument-list)
   (?type (second argument-list)))
 
                  
 ;;------------------------------------------------------------------------------
-;; Die Applikationen der folgenden Funktionen werden in `appfuns',
-;; `static-effect' und in der Typinferenz gesondert behandelt.
+;; Die Applikationen der folgenden Funktionen sehr speziell behandelt.
 ;;------------------------------------------------------------------------------
 (p0-special-funs
  (?tipass "TI")
@@ -523,13 +551,15 @@
  clicc-lisp::concatenate)
 
 ;;------------------------------------------------------------------------------
-(defun ti-coerce (object result-type)
-  (declare (ignore object))
-  (get-intern-type result-type))
+(defun ti-coerce (&rest arguments)
+  (if (< (length arguments) 2)
+      bottom-t
+      (get-intern-type (second arguments))))
 
-(defun ti-concatenate (sequence-type &rest arguments)
-  (declare (ignore arguments))
-  (type-meet sequence-t (get-intern-type sequence-type)))
+(defun ti-concatenate (&rest arguments)
+  (if (rest arguments)
+      (type-meet sequence-t (get-intern-type (first arguments)))
+      bottom-t))
  
 
 ;;------------------------------------------------------------------------------

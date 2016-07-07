@@ -6,8 +6,24 @@
 ;;; Funktion : Initialisierung des Compilers,
 ;;;            Initialisierung des Uebersetzungsumgebung.
 ;;;
-;;; $Revision: 1.64 $
+;;; $Revision: 1.68 $
 ;;; $Log: p0init.lisp,v $
+;;; Revision 1.68  1994/05/19  08:00:54  pm
+;;; <file>-ffi.h wird nun nur noch bei Bedarf angelegt.
+;;; Alle diese Relikte duerfen geloescht werden
+;;;
+;;; Revision 1.67  1994/04/22  14:13:31  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Erzeugte Include-Datei heisst jetzt <datei-name>-ffi.h
+;;;
+;;; Revision 1.66  1994/04/18  12:12:39  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Initialisierung des FFI
+;;;
+;;; Revision 1.65  1994/02/02  12:36:39  hk
+;;; aref wird nicht mehr als compiler Macro definiert, das verursachte
+;;; Probleme, wenn aref in Macroexpansionsfunktionen vorkam.
+;;;
 ;;; Revision 1.64  1993/12/22  09:22:29  hk
 ;;; Für CMU17 müssen bei make-instance Symbole statt Klassen verwendet
 ;;; werden.
@@ -231,6 +247,7 @@
   (setq *runtime-package* (find-package "RUNTIME"))
   (setq *ffi-package* (find-package "FFI"))
   (setq *interface-file-queue* (empty-queue))
+  (setq *ffi-signatures* '())
   (setq *c-name-prefix* 0)
 
   (init-pass1)
@@ -263,6 +280,7 @@
   (cg-set-special-funs)
 
   (p0-init-bq-funs)
+  (p0-init-fftypes)
 
   (clicc-message "Initialize Evaluator")
   (init-zw-sym-fun-hash-table)
@@ -351,6 +369,11 @@
                                   :symbol 'L::T)
                    NIL NIL)) 
 
+;;------------------------------------------------------------------------------
+;; Vordefinieren einiger Typen.
+;;------------------------------------------------------------------------------
+(defun p0-init-fftypes ())
+  
 ;;------------------------------------------------------------------------------
 ;; Macro zum Initialisieren der globalen Umgebung
 ;;------------------------------------------------------------------------------
@@ -478,8 +501,7 @@
 ;;------------------------------------------------------------------------------
 (def-global-op compiler-macro
   L::typep
-  L::make-instance
-  L::aref)                              ; (setf aref) in simplifier.lisp
+  L::make-instance)
 
 ;;------------------------------------------------------------------------------
 (provide "p0init")

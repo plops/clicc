@@ -5,8 +5,25 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Hauptprogramm des Compilers
 ;;;
-;;; $Revision: 1.11 $
+;;; $Revision: 1.16 $
 ;;; $Log: clicc.lisp,v $
+;;; Revision 1.16  1994/05/22  15:07:49  sma
+;;; Neuer Kommandoswitch -R zum Einstellen der Datenrepräsentation.
+;;;
+;;; Revision 1.15  1994/05/19  07:57:02  pm
+;;; Fehler behoben
+;;;
+;;; Revision 1.14  1994/05/17  08:21:28  pm
+;;; Abgleich der FFI-Exports mit clcload.lisp
+;;;
+;;; Revision 1.13  1994/04/22  14:09:54  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Ueberfluessiges exportiertes Symbol entfernt
+;;;
+;;; Revision 1.12  1994/04/18  12:05:56  pm
+;;; Foreign Function Interface voellig ueberarbeitet.
+;;; - Liste der exportierten Symbole ergaenzt
+;;;
 ;;; Revision 1.11  1993/12/21  09:29:59  hk
 ;;; Schreibfehler in Usage behoben.
 ;;;
@@ -51,13 +68,16 @@
 (lisp:in-package "RT" :nicknames '("RUNTIME") :use ())
 (lisp:in-package "FFI" :use ())
 (lisp:export
- '(load-foreign def-call-out def-call-in def-c-type foreign-package-name
-   c-char c-char-p c-unsigned-char c-unsigned-char-p c-short c-short-p c-int
-   c-int-p c-long c-long-p c-unsigned-short c-unsigned-short-p c-unsigned-int
-   c-unsigned-int-p c-unsigned-long c-unsigned-long-p c-float c-float-p
-   c-double c-double-p c-long-double c-long-double-p c-void c-vararg
-   lisp-character lisp-integer lisp-float lisp-string c-struct c-ptr c-fun
-   c-union c-array c-enum c-string))
+ '(c-array c-char c-char-p c-double c-double-p c-enum c-float c-float-p c-fun
+   c-handle c-int c-int-p c-long c-long-double c-long-double-p c-long-p c-ptr
+   c-short c-short-p c-string c-string-p c-struct c-union c-unsigned-char
+   c-unsigned-char-p c-unsigned-int c-unsigned-int-p c-unsigned-long
+   c-unsigned-long-p c-unsigned-short c-unsigned-short-p c-vararg c-void
+   copy-c-cstring def-c-type def-call-in def-call-out foreign-package-name
+   free lisp-character lisp-float lisp-integer load-foreign make-c-string
+   make-lisp-string)
+ "FFI")
+
 (lisp:in-package "CLICC" :use '("LISP"))
 
 ;;------------------------------------------------------------------------------
@@ -71,6 +91,7 @@
                                  (#\s . *SPLIT-FILES*)
                                  (#\f . *FLAT-IFS*)
                                  (#\t *TI-LEVEL*)
+                                 (#\R *OBREP*)
                                  (#\O *ITERATIONS*)
                                  (#\c *C-max-line-count*)
                                  (#\o *OUT-FILENAME*)))
@@ -82,7 +103,7 @@
       ((usage ()
          (format
           t
-"Usage: clicc [-lmsvV] [-c count] [-t 0|1|2|3] [-O level] [-o name] name~%~
+"Usage: clicc [-lmsvV] [-c count] [-t 0-3] [-O level] [-R 1-3] [-o name] name~%~
                   ~A-c: Maximum line count of C file~%~
                   ~A-f: Flat IFs~%~
                   ~A-i: Inline Module~%~
@@ -90,12 +111,13 @@
                   ~A-m: Module-Compiler~%~
                   ~A-O: Number of optimization cycles~%~
                   ~A-s: Split Files~%~
-                  ~A-t: Type Inference Level~%~
+                  ~A-t: Type Inference Level 0, 1, 2 or 3~%~
+                  ~A-R: Data Representation schema 1, 2 or 3~%~
                   ~A-v: Verbose~%~
                   ~A-V: Show Version~%~
                   ~A-o: Output file~%~
                   ~Aname: The Lisp File~%"
-#\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab)
+#\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab #\Tab)
          (return-from clicc-main)))
        
     (setq *MODULE-COMPILER* nil
@@ -117,6 +139,9 @@
            (when (stringp *TI-LEVEL*)
              (let ((l (digit-char-p (character *TI-LEVEL*))))
                (if l (setq *TI-LEVEL* l) (usage))))
+           (when (stringp *OBREP*)
+             (let ((o (digit-char-p (character *OBREP*))))
+               (if (and o (<= 1 o 3)) (setq *OBREP* o) (usage))))
            (when (stringp *C-max-line-count*)
              (setq *C-max-line-count* (read-from-string *C-max-line-count*))
              (unless (integerp *C-max-line-count*) (usage)))

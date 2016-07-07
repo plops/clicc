@@ -6,8 +6,17 @@
  * Funktion : Laufzeitsystem
  *            - FUNCALL, APPLY
  *
- * $Revision: 1.10 $
+ * $Revision: 1.13 $
  * $Log: funcall.c,v $
+ * Revision 1.13  1994/05/18  15:19:04  sma
+ * Makros für Zugriff auf funktionale Objekte nach obrepX verlagert.
+ *
+ * Revision 1.12  1994/02/03  17:34:08  sma
+ * Änderungen für Optimierung von &rest-Paramtern.
+ *
+ * Revision 1.11  1994/01/25  15:15:21  sma
+ * STACK(base, x) -> ARG(x)
+ *
  * Revision 1.10  1993/06/16  14:43:22  hk
  * Copyright Notiz eingefuegt.
  *
@@ -45,28 +54,7 @@
 
 char TOO_FEW_ARGS[] = "too few arguments";
 
-/*-------------------------------------------------------------------------*
- * Zugriff auf die Komponenten einer Closure
- *-------------------------------------------------------------------------*/
-#define GET_CLOSURE_CODE(closure)  (*(GET_FUN(GET_FORM(closure) + 1)))
-#define GET_CLOSURE_PARSPEC(closure) ((int)GET_FIXNUM(GET_FORM(closure) + 2))
-
-/*-------------------------------------------------------------------------*
- * Zugriff auf die Komponenten eines Downfunargs
- *-------------------------------------------------------------------------*/
-
-#define GET_DOWNFUN_CODE(ptr) (*(ptr->fun))
-#define GET_DOWNFUN_PARSPEC(ptr) (ptr->par_spec)
-#define GET_DOWNFUN_DISPLAY(ptr) (ptr->display)
-
-/*-------------------------------------------------------------------------*
- * Zugriff auf die Komponenten eines Globfunargs
- *-------------------------------------------------------------------------*/
-
-#define GET_GLOBFUN_CODE(ptr) (*(ptr->fun))
-#define GET_GLOBFUN_PARSPEC(ptr) (ptr->par_spec)
-
-/*-------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------*/
 #define CHK_GENAU(parspec) ((parspec) >= 0)
 #define CHK_MIN(parspec) ((parspec) < 0)
 #define GET_GENAU(parspec) ((parspec))
@@ -74,9 +62,9 @@ char TOO_FEW_ARGS[] = "too few arguments";
 #define CREATE_GENAU(count) (count)
 #define CREATE_MIN(count) (- (count) - 1)
 
-/*-------------------------------------------------------------------------*
- * funcall fn &rest arguments
- *-------------------------------------------------------------------------*
+/*------------------------------------------------------------------------------
+ * FUNCALL fn &rest arguments
+ *------------------------------------------------------------------------------
  * Moegliche Typen:
  * - CL_CLOSURE: (zeigt auf eine Folge von LISP-Daten)
  *   - Laenge
@@ -93,19 +81,18 @@ char TOO_FEW_ARGS[] = "too few arguments";
  *   - Parameter-Spezifikation
  *   - Zeiger auf Display-Array
  * - CL_UNIQUE_TAG: (Zahl, die eine Continuation eindeutig identifiziert)
- *-------------------------------------------------------------------------*/
-void
-Ffuncall(base, nargs)
+ *----------------------------------------------------------------------------*/
+void Ffuncall(base, nargs)
 CL_FORM *base;
 int nargs;
 {
    int par_spec;
 
    nargs--;
-   switch (TYPE_OF(STACK(base, 0)))
+   switch (TYPE_OF(ARG(0)))
    {
       case CL_GLOBFUN:
-         par_spec = GET_GLOBFUN_PARSPEC(GET_GFARG(STACK(base, 0)));
+         par_spec = GET_GLOBFUN_PARSPEC(GET_GFARG(ARG(0)));
          if (CHK_GENAU(par_spec))
          {
             /* feste Anzahl von Parametern
@@ -113,8 +100,7 @@ int nargs;
             if (nargs != GET_GENAU(par_spec))
                Labort(ILLEGAL_ARGS);
             /* Aufruf der Funktion, Parameter sind geprueft */
-            GET_GLOBFUN_CODE(GET_GFARG(STACK(base, 0)))
-               (STACK(base, 1));
+            GET_GLOBFUN_CODE(GET_GFARG(ARG(0))) (ARG(1));
          }
          else
          {
@@ -122,16 +108,15 @@ int nargs;
             if (nargs < GET_MIN(par_spec))
                Labort(TOO_FEW_ARGS);
             /* Aufruf der Funktion, Mindest-Parameter-Zahl ist geprueft */
-            GET_GLOBFUN_CODE(GET_GFARG(STACK(base, 0)))
-               (STACK(base, 1), nargs);
+            GET_GLOBFUN_CODE(GET_GFARG(ARG(0))) (ARG(1), nargs);
          }
          /* das Resultat an die Stelle kopieren, wo es von der aufrufenden
           * Funktion erwartet wird.*/
-         COPY(STACK(base, 1), STACK(base, 0));
+         COPY(ARG(1), ARG(0));
          break;
 
       case CL_CLOSURE:
-         par_spec = GET_CLOSURE_PARSPEC(STACK(base, 0));
+         par_spec = GET_CLOSURE_PARSPEC(ARG(0));
          if (CHK_GENAU(par_spec))
          {
             /* feste Anzahl von Parametern
@@ -140,7 +125,7 @@ int nargs;
                Labort(ILLEGAL_ARGS);
             /* Aufruf der Funktion, Parameter sind geprueft
              * Zeiger auf die Closure-Datenstruktur als 1. Parameter */
-            GET_CLOSURE_CODE(STACK(base, 0)) (STACK(base, 0));
+            GET_CLOSURE_CODE(ARG(0)) (ARG(0));
          }
          else
          {
@@ -152,14 +137,14 @@ int nargs;
             /* Aufruf der Funktion, Mindest-Parameter-Zahl ist geprueft
              * Zeiger auf die Closure-Datenstruktur als 1. Parameter
              *-------------------------------------------------------*/
-            GET_CLOSURE_CODE(STACK(base, 0)) (STACK(base, 0), nargs);
+            GET_CLOSURE_CODE(ARG(0)) (ARG(0), nargs);
          }
          /* Resultat wurde schon an der richtigen Position erzeugt
           *-------------------------------------------------------*/
          break;
 
       case CL_DOWNFUN:
-         par_spec = GET_DOWNFUN_PARSPEC(GET_DFARG(STACK(base, 0)));
+         par_spec = GET_DOWNFUN_PARSPEC(GET_DFARG(ARG(0)));
          if (CHK_GENAU(par_spec))
          {
             /* feste Anzahl von Parametern
@@ -170,9 +155,8 @@ int nargs;
 
             /* Aufruf der Funktion, Parameter sind geprueft
              *----------------------------------------------*/
-            GET_DOWNFUN_CODE(GET_DFARG(STACK(base, 0)))
-               (STACK(base, 1),
-                GET_DOWNFUN_DISPLAY(GET_DFARG(STACK(base, 0))));
+            GET_DOWNFUN_CODE(GET_DFARG(ARG(0)))
+               (ARG(1), GET_DOWNFUN_DISPLAY(GET_DFARG(ARG(0))));
          }
          else
          {
@@ -183,40 +167,37 @@ int nargs;
 
             /* Aufruf der Funktion, Mindest-Parameter-Zahl ist geprueft
              *----------------------------------------------------------*/
-            GET_DOWNFUN_CODE(GET_DFARG(STACK(base, 0)))
-               (STACK(base, 1),
-                GET_DOWNFUN_DISPLAY(GET_DFARG(STACK(base, 0))),
-                nargs);
+            GET_DOWNFUN_CODE(GET_DFARG(ARG(0)))
+               (ARG(1), GET_DOWNFUN_DISPLAY(GET_DFARG(ARG(0))), nargs);
 
          }
          /* das Resultat an die Stelle kopieren, wo es von der aufrufenden
           * Funktion erwartet wird.
           *-------------------------*/
-         COPY(STACK(base, 1), STACK(base, 0));
+         COPY(ARG(1), ARG(0));
          break;
 
       case CL_UNIQUE_TAG:
          if (nargs != 1)
             Labort(ILLEGAL_ARGS);
-         call_cont(STACK(base, 0));
+         call_cont(ARG(0));
 
       case CL_SYMBOL:
-         Lerror(STACK(base, 0), "Symbol ~A is not a function");
+         Lerror(ARG(0), "Symbol ~A is not a function");
 
       default:
-         Lerror(STACK(base, 0), "~A is not a function");
+         Lerror(ARG(0), "~A is not a function");
    }
 }
 
-/*-------------------------------------------------------------------------*
- * apply function arg &rest more-args
- *-------------------------------------------------------------------------*/
-void
-Fapply(base, nargs)
+/*------------------------------------------------------------------------------
+ * APPLY function arg &rest more-args
+ *----------------------------------------------------------------------------*/
+void Fapply(base, nargs)
 CL_FORM *base;
 int nargs;
 {
-   CL_FORM *last = STACK(base, nargs - 1);
+   CL_FORM *last = ARG(nargs - 1);
    CL_FORM *list = last;
 
    nargs--;
@@ -226,6 +207,25 @@ int nargs;
       list = GET_CAR(list);
       COPY(list, last);
       list++;
+      last++;
+      nargs++;
+   }
+   Ffuncall(base, nargs);
+}
+
+/*------------------------------------------------------------------------------
+ * rest_apply
+ *----------------------------------------------------------------------------*/
+void rest_apply(base, nargs, len, rest)
+CL_FORM *base;
+int nargs, len;
+CL_FORM *rest;
+{
+   CL_FORM *last = ARG(nargs);
+   while (len-- > 0)
+   {
+      COPY(rest, last);
+      rest++;
       last++;
       nargs++;
    }

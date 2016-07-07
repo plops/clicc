@@ -5,8 +5,44 @@
 ;;;            ------------------------------------------------------
 ;;; Funktion : Definition der Zwischensprachenimplementation
 ;;;
-;;; $Revision: 1.134 $
+;;; $Revision: 1.143 $
 ;;; $Log: zsdef.lisp,v $
+;;; Revision 1.143  1994/06/11  00:24:38  hk
+;;; Typ des Slots inline in defined-fun korrigiert
+;;;
+;;; Revision 1.142  1994/05/27  09:16:04  hk
+;;; "Uberfl"ussige Slots in special-sys-fun gestrichen.
+;;;
+;;; Revision 1.141  1994/03/14  13:58:10  jh
+;;; Importierte Funktionen haben jetzt einen Slot local-funs. Der Slot
+;;; local-funs von defined-funs ist nicht mehr raw-Slot, da man dann das initarg
+;;; :local-funs nicht benutzen kann.
+;;;
+;;; Revision 1.140  1994/03/03  13:57:43  jh
+;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;; Annotation export-id fuer den Export von Funktionsruempfen eingefuehrt.
+;;;
+;;; Revision 1.139  1994/02/21  09:56:52  ft
+;;; Änderungen an Klassen und gen. Funktionen für die Modulübersetzung.
+;;;
+;;; Revision 1.138  1994/02/08  13:16:14  sma
+;;; init-form -> initform; Annotation my-last-arg-may-be-rest-var bei
+;;; funs, die angibt, daß das letzte Argument der hiermit annotierten
+;;; Funktion auch ein rest-listen Parameter sein kann. Die Annotation
+;;; enthält in diesem Falle den Namen (als Keyword) ihrer Funktion.
+;;;
+;;; Revision 1.137  1994/02/03  07:57:42  hk
+;;; :raw t bei :has-funs-as-args hinzugefügt.
+;;;
+;;; Revision 1.136  1994/02/02  09:15:56  hk
+;;; :raw Slot-Optionen eingefügt. Einige Slots in Subklassen von fun
+;;; verschoben, z.B. used nach defined fun.
+;;;
+;;; Revision 1.135  1994/01/06  17:31:32  sma
+;;; Neuen Slot need-no-stack in imported-fun eingefügt. Dient dazu, in der
+;;; Codegeneration mehr COPY-Befehle einzusparen. Siehe log message von
+;;; 1.45 von cgfuns.
+;;;
 ;;; Revision 1.134  1993/12/18  06:17:32  hk
 ;;; Definition von empty-list mit defparameter statt defconstant, um
 ;;; Probleme mit make-load-form zu vermeiden
@@ -599,7 +635,8 @@
   (offset :type integer)                ; Offset im Stack Frame
   (level :type integer)                 ; Statische Tiefe
   (closure                              ; Kommt frei in einer Closure vor
-   :initform nil :type bool))
+   :initform nil :type bool)
+  (export-id :type integer :raw t))
 
 ;;------------------------------------------------------------------------------
 ;; Global definierte statische Variable
@@ -638,21 +675,24 @@
 ;; Benannte Konstanten von Eulisp
 ;;------------------------------------------------------------------------------
 (defzws named-const (form)
+  ;; Annotation
+  ;;-----------
+  (symbol :type symbol))                ; Name im Quelltext
+
+;;------------------------------------------------------------------------------
+(defzws defined-named-const (named-const)
   (exported :initform nil :type bool)
   (value                                ; literal || :unknown || :forward
    :initform :unknown)
   ;; Annotation
   ;;-----------
   (read                                 ; Anzahl der lesenden Zugriffe
-   :initform 0 :type integer)
-  (symbol :type symbol))                ; Name im Quelltext
+   :initform 0 :type integer))
 
 ;;------------------------------------------------------------------------------
-(defzws defined-named-const (named-const))
-
-;;------------------------------------------------------------------------------
-(defzws imported-named-const (named-const))
-
+(defzws imported-named-const (named-const)
+  (value-zs-type :type symbol)
+  (adr :type string))
 
 ;;------------------------------------------------------------------------------
 ;; Oberklasse der Literale
@@ -793,7 +833,16 @@
   (order  :initform 0 :type integer))   ; def. totale Ordnung auf Klassen
 
 ;;------------------------------------------------------------------------------
-(defzws defined-class (class-def))
+;; Die Annotation export-goals enthält eine Liste von keywords, welche die
+;; Verwendungsmöglichkeiten von exportierten Klassen einschränken. Gültige
+;; Einträge in diese Liste sind:
+;; :full-subclassable :full-instanceable :full-specializable
+;; :shadow-specializable
+;;------------------------------------------------------------------------------
+(defzws defined-class (class-def)
+  (exported :initform nil :type bool)
+  ;; Annotation
+  (export-goals :initform nil :type list)) 
 
 ;;------------------------------------------------------------------------------
 (defzws imported-class (class-def))
@@ -849,40 +898,9 @@
 ;; Der Typ 'function' ist in CL reserviert.
 ;;------------------------------------------------------------------------------
 (defzws fun (form)
-  (params :type params)
   ;; Annotation
   ;;-----------
-  (read-list                            ; Liste der gelesenen globalen Variablen
-   :initform nil 
-   :type (or list integer))            
-  (write-list                           ; Liste der veraenderten Variablen    
-   :initform nil                        
-   :type (or list integer))            
-  (data-effects                         ; Welche Operationen auf Daten ?
-   :initform nil
-   :type symbol)
-  (symbol :type (or symbol cons))       ; Name im Quelltext
-  (used                                 ; Anzahl der Funktionsaufrufe
-   :initform 0 :type integer)
-  (closure                              ; Closure gebildet, Art
-   :initform nil
-   :type (member nil t :closure :downfun))
-  (downward-args                        ; Position der 'downward' Param.
-   :initform () :type list)
-  (adr :type string)                    ; Adresse der Funktion im Zielcode
-  (mv-spec                              ; Anzahl Multipler Werte
-   :initform nil
-   :type (or (member nil t :jump) integer))
-  (par-spec :type integer)              ; (mindest) Parameterzahl
-  (unknown-caller                       ; Gibt es unbekannte Aufrufstellen?
-   :initform nil
-   :type bool)
-  (result-type :initform bottom-t)      ; Resultattyp der Funktion
-  (inline :type bool :initform nil)     ; Funktion inline-compilieren?
-  (syntactically-exported               ; Markierung, ob Funktion syntaktisch
-   :initform nil                        ; exportiert wird
-   :type bool)
-  source)                               ; Quellcode der Funktion
+  (symbol :type (or symbol cons)))      ; Name im Quelltext
 
 ;;------------------------------------------------------------------------------
 ;; Dummy ?result-type fuer null definieren, damit bei der
@@ -895,27 +913,88 @@
 ;; Einfache Funktion (nicht generisch)
 ;;------------------------------------------------------------------------------
 (defzws simple-fun (fun)
+  ;; Annotation
+  ;;-----------
+  (adr :type string)                    ; Adresse der Funktion im Zielcode
+  (par-spec :type integer)              ; (mindest) Parameterzahl
+  (mv-spec                              ; Anzahl Multipler Werte
+   :initform 1 :raw t
+   :type (or (member nil t :jump) integer))
+  (read-list                            ; Liste der gelesenen globalen Variablen
+   :initform nil 
+   :type (or list integer))            
+  (write-list                           ; Liste der veraenderten Variablen    
+   :initform nil                        
+   :type (or list integer))            
+  (data-effects                         ; Welche Operationen auf Daten ?
+   :initform nil
+   :type symbol)
+  (closure                              ; Closure gebildet, Art
+   :initform nil :raw t
+   :type (member nil t :closure :downfun))
+  (downward-args                        ; Position der 'downward' Param.
+   :initform () :type list :raw t)
   (has-funs-as-args                     ; ob Parameter nur an Funktions-
-   :initform nil                        ; posotion steht.
-   :type list)
-  body)
+   :initform nil :type list :raw t)     ; position steht.
+  (result-type :initform bottom-t)      ; Resultattyp der Funktion
+  (simp-when-n-args                     ; Wert: (<n> <simp-fun>)
+   :initform nil :raw t)                ; (fun a1 .. an) -> (simp-fun a1 .. an)
+  (simp-when-no-result                  ; Wert: <simp-fun>
+   :initform nil :raw t)                ; (fun ...) -> (simp-fun ...)
+                                        ; wenn Resultat nicht verwendet wird
+  (simp-when-arg-n=cons                 ; Wert: (<n> <fun>)
+   :initform nil :raw t)                ; (fun .. an ..) -> (simp-fun .. an ..)
+                                        ; wenn an vom Typ cons
+  (simp-when-some-arg-not-cons/pathn/string/bitv ; Wert: <simp-fun>
+    :initform nil :raw t)               ; (fun ...) -> (simp-fun ...)
+                                        ; wenn mindestens ein Arg. nicht vom Typ
+                                        ; cons, pathname, string, bitvector ist.
+  (simp-when-some-arg-not-num/char      ; Wert: <simp-fun>
+    :initform nil :raw t)               ; (fun ...) -> (simp-fun ...)
+                                        ; wenn mindestens ein Arg. nicht vom Typ
+                                        ; number, char ist.
+  (simp-test-fun-when-not-testnot       ; Wert: (test-on-pos #non-key-args
+   :initform nil :raw t)                ; test-keyword default test-not-keyword)
+                                        ; (fun non-key-args .. :test fun ..)
+                                        ; (fun non-key-args .. :test opt-fun ..)
+  (simp-when-only-test=value            ; Wert: (#non-key-args keyword value
+                                        ; simp-fun)
+   :initform nil :raw t)                ; (fun non-key-args :test value) ->
+                                        ; (simp-fun non-key-args)
+  (my-last-arg-may-be-rest-var          ; letztes Argument kann rest-liste sein
+   :initform nil :raw t))               ; dann Name der Fnk im keyw-pck.
 
 ;;------------------------------------------------------------------------------
 ;; Definierte einfache Funktion
 ;;------------------------------------------------------------------------------
 (defzws defined-fun (simple-fun)
+  (params :type params)
+  body
   ;; Annotation
   ;;-----------
-  (const-list      :type list)              ; Direkt im Rumpf vork. struct-lit.
-  (local-funs      :type list :initform ()) ; Direkt im Rumpf lokal def. Funkt.
-  (max-level       :type integer)           ; max. stat. Niveau lok. def. Funkt.
+  (const-list                           ; Direkt im Rumpf vork. struct-lit.
+   :initform () :type list :raw t) 
+  (local-funs                           ; Direkt im Rumpf lokal def. Funkt.
+   :initform () :type list)             ; kein raw-slot, da initarg :local-funs
+                                        ; benoetigt wird.
+  (used                                 ; Anzahl der Funktionsaufrufe
+   :initform 0 :type integer)
+  (max-level                            ; max. stat. Niveau lok. def. Funkt.
+   :initform 0 :type integer :raw t) 
+  (deeper-level-calls                   ; Aufrufe lok. Fkt. hoeheren Niveaus
+   :initform () :type list :raw t)
   (mv-calls        :type list :initform ()) ; mv-spec haengt von diesen Fkt. ab
   (mv-called-by    :type list :initform ()) ; Diese Fkt. benutzen mv-spec
   (called-by       :type list :initform ()) ; Liste der Aufrufer dieser Funktion
+  (unknown-caller                       ; Gibt es unbekannte Aufrufstellen?
+   :initform nil :type bool :raw t)
   (pred-type-env   :type list :initform ()) ; Eintrittstypumgebung
   (result-type-env :type list :initform ()) ; Ergebnistypumgebung
-  (deeper-level-calls                       ; Aufrufe lok. Fkt. hoeheren Niveaus
-   :initform ()  :type list))
+  (inline                               ; Funktion inline-compilieren?
+   :type symbol :initform nil :raw t)   ; NIL, T, COPYABLE
+  (syntactically-exported               ; Markierung, ob Funktion syntaktisch
+   :initform nil :type bool :raw t)     ; exportiert wird
+  source)                               ; Quellcode der Funktion
 
 ;;------------------------------------------------------------------------------
 ;; Globale definierte einfache Funktion
@@ -924,8 +1003,9 @@
   (exported :initform nil :type bool)
   ;; Annotation
   ;;----------
-  (call-in :type list :initform ()))    ; Informationen ueber den Call-In-
-                                        ; Aufruf der Funktion.
+  (call-in                              ; Informationen ueber den Call-In-
+   :type list :initform () :raw t))     ; Aufruf der Funktion.
+                                      
 
 ;;------------------------------------------------------------------------------
 ;; Dummy-Funktionen fuer global-fun definieren, damit bei der
@@ -958,15 +1038,16 @@
   (as-global-fun                        ; Kann globalisiert werden
    :initform t :type bool)
   (same-level-calls                     ; Aufrufe lok. Fkt. mit gleichem Niveau
-   :initform () :type list)
+   :initform () :type list :raw t)
   (free-local-funs                      ; im Rumpf aufgerufene lokale Funktionen
-   :initform () :type list)
+   :initform () :type list :raw t)
   (free-in                              ; kommt in diesen Funktionen frei vor
-   :initform () :type list)
+   :initform () :type list :raw t)
   (free-lex-vars                        ; freie statisch geb. lokale Variablen
    :initform () :type list)
   (num-free-lex-vars :type integer)     ; Laenge von 'free-lex-vars'
-  (closure-offset :type integer))       ; Offset des Closure-Objekts im Stack
+  (closure-offset :type integer)        ; Offset des Closure-Objekts im Stack
+  (export-id :type integer :raw t))
 
 ;;------------------------------------------------------------------------------
 ;; importierte einfache Funktion
@@ -978,11 +1059,19 @@
   (exported :initform nil :type bool)
   ;; Annotation
   ;;-----------
-  (mv-spec                              ; Anzahl Multipler Werte
-   :initform 1                          ; 1 ist Default, nur Ausnahmen angeben
-   :type (or (member nil t :jump) integer))
+  (params :initform nil :raw t)         ; Parameterliste fuer Inlining
+  (body :initform nil :raw t)           ; Rumpf fuer Inlining
+  (local-funs :initform nil :raw t)     ; wird vom Inlining benoetigt
+  (opti-pass       :initform nil :raw t)
+  (pass3           :initform nil :raw t)
+  (tipass          :initform nil :raw t)
+  (weight-c-inline :initform nil :raw t)
+  (c-inline        :initform nil :raw t)
+  (special-caller  :initform nil :raw t)
+  (need-no-stack :raw t                 ; Codegeneration: Fkt verändert höchstns
+   :initform nil :type bool)            ; eigene Paramter auf Lisp-Stack
   (type-abstraction-function            ; Bildet Argumenttypen auf Resultattypen
-   :initform nil                        ; ab.
+   :initform nil :raw t                 ; ab.
    :type (or null function))
   (result-type                          ; Ergebnistyp der Funktion
    :initform top-t)
@@ -995,15 +1084,7 @@
 ;; Systemfunktion, die in gewissen Phasen des Compilers einer speziellen
 ;; Behandlung beduerfen.
 ;;------------------------------------------------------------------------------
-(defzws special-sys-fun (imported-fun)
-  ;; Annotation
-  ;;-----------
-  (opti-pass       :initform nil)
-  (pass3           :initform nil)
-  (tipass          :initform nil)
-  (weight-c-inline :initform nil)
-  (c-inline        :initform nil)
-  (special-caller  :initform nil))
+(defzws special-sys-fun (imported-fun))
 
 ;;------------------------------------------------------------------------------
 ;; Systemfunktion, die einer speziellen Behandlung bedarf und Multiple Werte
@@ -1013,6 +1094,7 @@
 
 ;;------------------------------------------------------------------------------
 (defzws generic-fun (fun)
+  (params :type params)
   (method-list
    :initform () :type list)             ; Instanzen von method-def
   (argument-precedence-order
@@ -1027,20 +1109,11 @@
    :initform '(nil nil) :type list))    ; spezialisierten Parameters
 
 ;;------------------------------------------------------------------------------
-(defzws defined-generic-fun (generic-fun))
-
-;;------------------------------------------------------------------------------
-(defzws global-generic-fun (defined-generic-fun)
+(defzws defined-generic-fun (generic-fun)
   (exported :initform nil :type bool))
 
 ;;------------------------------------------------------------------------------
-(defzws imported-generic-fun (generic-fun)
-  (exported :initform nil :type bool)
-  ;; Annotation
-  ;;-----------
-  (mv-spec                              ; Anzahl Multipler Werte
-   :initform 1                          ; 1 ist Default, nur Ausnahmen angeben
-   :type (or (member nil t :jump) integer)))
+(defzws imported-generic-fun (generic-fun))
 
 ;;------------------------------------------------------------------------------
 (defzws method-def (zws-object)
@@ -1121,17 +1194,18 @@
   ;; Annotation
   ;;------------
   (mv-position :type bool)              ; auf Pos., die MV benoetigt ?
-  (fn-on-mv-pos  :type bool)            ; auf Pos., die MV + Fkt. Obj. ben.
+  (fn-on-mv-pos                         ; auf Pos., die MV + Fkt. Obj. ben.
+   :initform nil :type bool :raw t)
   (binding-stack-level :type integer)   ; Relative Hoehe des Binding-Stacks
   (mv-spec                              ; Anzahl Multipler Werte
-   :initform nil
+   :initform 1 :raw t
    :type (or (member nil t :jump) integer))
   (mv-calls                             ; Fkt. von denen mv-spec abhaengt
    :initform () :type list)
-  (only-local :type bool)               ; Nur lokale Anwendungen der Contin. ?
+  (only-local                           ; Nur lokale Anwendungen der Contin. ?
+   :type bool :initform t :raw t)
   (unknown-caller                       ; Gibt es unbekannte Aufrufstellen?
-   :initform nil
-   :type bool)
+   :initform nil :type bool :raw t)
   (result-type :initform bottom-t)      ; Ergebnistyp der Continuation
   (type-env                             ; Vereinigung der Typumgebungen bei
    :initform nil                        ; Applikationen der Continuation.
@@ -1146,7 +1220,8 @@
   ;; Annotation
   ;;-----------
   (level :type integer)                 ; statisches Niveau
-  (binding-stack-level :type integer))  ; relative Hoehe des Binding-Stacks
+  (binding-stack-level :type integer)   ; relative Hoehe des Binding-Stacks
+  (export-id :type integer :raw t))
 
 ;;------------------------------------------------------------------------------
 ;; tagged-form repraesentiert zugleich das Tag und
@@ -1162,7 +1237,8 @@
   (pred-type-env                        ; Vereinigung der Typumgebungen aller
    :type list                           ; Sprungstellen zu dieser tagged-form.
    :initform ())
-  (adr           :type string))         ; Die Adresse im Zielcode
+  (adr           :type string)          ; Die Adresse im Zielcode
+  (export-id :type integer :raw t))
 
 ;;------------------------------------------------------------------------------
 ;; Konstrukt zum Ausdruecken der Special Forms multiple-value-call und
@@ -1176,7 +1252,7 @@
   arg                                   ; generiert evtl. multiple Werte
   ;; Annotation
   ;;-----------
-  (mv-spec :initform nil                ; Anzahl Multipler Werte
+  (mv-spec                              ; Anzahl Multipler Werte
    :type (or (member nil t :jump) integer))
   (mv-calls :initform () :type list))   ; mv-spec haengt von diesen Fkt. ab
 

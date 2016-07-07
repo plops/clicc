@@ -12,8 +12,26 @@
 ;;;            - GENSYM, GENTEMP
 ;;;            - KEYWORDP
 ;;;
-;;; $Revision: 1.4 $
+;;; $Revision: 1.8 $
 ;;; $Log: sym.lisp,v $
+;;; Revision 1.8  1994/01/21  13:29:17  sma
+;;; make-symbol aufgrund erneuter Änderung der Symbolrepäsentation
+;;; verändert. Neuen Typ "rt::sym" eingeführt, der ein not-nil-symbol
+;;; repräsentiert. Für diesen kann effizient in cginline ein Typtest
+;;; generiert werden. Entsprechende Funktionen umgeschrieben.
+;;;
+;;; Revision 1.7  1994/01/13  16:46:55  sma
+;;; Änderungen an Funktionen für symbols. Mehr Lisp, weniger C.
+;;; rt::(set)-struct-ref-internal heißt jetzt rt::structure-ref. Die
+;;; set-Variante wird jetzt mit setf definiert.
+;;;
+;;; Revision 1.6  1994/01/05  12:43:04  sma
+;;; Namensänderung: rt::make-symbol-internal -> rt::make-symbol
+;;;
+;;; Revision 1.5  1993/12/09  17:18:59  sma
+;;; rt::make-symbol-internal eingefügt, welches nur simple-strings
+;;; akzeptiert. make-symbol ist jetzt eine Lisp-Funktion.
+;;;
 ;;; Revision 1.4  1993/06/16  15:20:38  hk
 ;;;  Copyright Notiz eingefuegt.
 ;;;
@@ -26,7 +44,7 @@
 ;;;
 ;;; Revision 1.2  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.4 $ eingefuegt
+;;; $Revision: 1.8 $ eingefuegt
 ;;;
 ;;; Revision 1.1  1992/03/24  17:12:55  hk
 ;;; Initial revision
@@ -36,7 +54,8 @@
 
 (export
  '(get remprop getf get-properties copy-symbol gensym *gensym-counter*
-   gentemp keywordp))
+   gentemp keywordp
+   symbol-value set symbol-plist symbol-name symbol-package boundp makunbound))
 
 (export '(rt::set-prop rt::remf-internal) "RT")
 
@@ -126,6 +145,15 @@
     ((member (car list) indicator-list) (values (car list) (cadr list) list))
     (t (get-properties (cddr list) indicator-list)))) 
 
+;;------------------------------------------------------------------------------
+;; make-symbol print-name
+;;------------------------------------------------------------------------------
+(defun make-symbol (print-name)
+  (let ((sym (rt::make-symbol (string-to-simple-string print-name))))
+    (setf (rt::symbol-plist sym) nil)
+    (setf (rt::symbol-package sym) nil)
+    (makunbound sym)))              ;liefert sym zurück
+
 ;;--------------------------------------------------------------------------
 ;; copy-symbol sym &optional copy-props
 ;;--------------------------------------------------------------------------
@@ -178,3 +206,106 @@
 ;;--------------------------------------------------------------------------
 (defun keywordp (object)
   (and (symbolp object) (eq (symbol-package object) *keyword-package*)))
+
+;;------------------------------------------------------------------------------
+;;------------------------------------------------------------------------------
+(defconstant SYM_EXPECTED "~a is not a symbol")
+(defconstant TRY_CHANGE_CONST "cannot change value of ~a, which is a constant")
+
+(deftype rt::sym () '(satisfies rt::symp))
+(defvar *nil-plist*)
+(defvar *nil-package*)
+
+;;------------------------------------------------------------------------------
+;; SYMBOL-VALUE symbol
+;;------------------------------------------------------------------------------
+(defun symbol-value (sym)
+  (typecase sym
+    (rt::sym (rt::symbol-value sym))
+    (null nil)
+    (T (error SYM_EXPECTED sym))))
+
+;;------------------------------------------------------------------------------
+;; SET sym value
+;;------------------------------------------------------------------------------
+(defun set (sym value)
+  (typecase sym
+    (rt::sym (if (rt::constant-flag-p sym)
+                 (error TRY_CHANGE_CONST sym)
+                 (setf (rt::symbol-value sym) value)))
+    (null (error TRY_CHANGE_CONST sym))
+    (T (error SYM_EXPECTED sym))))
+
+;;------------------------------------------------------------------------------
+;; SYMBOL-PLIST symbol
+;;------------------------------------------------------------------------------
+(defun symbol-plist (sym)
+  (typecase sym
+    (rt::sym (rt::symbol-plist sym))
+    (null *nil-plist*)
+    (T (error SYM_EXPECTED sym))))
+
+;;------------------------------------------------------------------------------
+;; (SETF SYMBOL-PLIST) value sym
+;;------------------------------------------------------------------------------
+(defun (setf symbol-plist) (value sym)
+  (typecase sym
+    (rt::sym (setf (rt::symbol-plist sym) value))
+    (null (setf *nil-plist* value))
+    (T (error SYM_EXPECTED sym))))
+
+;;------------------------------------------------------------------------------
+;; SYMBOL-NAME symbol
+;;------------------------------------------------------------------------------
+(defun symbol-name (sym)
+  (typecase sym
+    (rt::sym (rt::symbol-name sym))
+    (null "NIL")
+    (T (error SYM_EXPECTED sym))))
+  
+;;------------------------------------------------------------------------------
+;; SYMBOL-PACKAGE symbol
+;;------------------------------------------------------------------------------
+(defun symbol-package (sym)
+  (typecase sym
+    (rt::sym (rt::symbol-package sym))
+    (null *nil-package*)
+    (T (error SYM_EXPECTED sym))))
+
+;;------------------------------------------------------------------------------
+;; SYMBOL-PACKAGE-INDEX symbol
+;;------------------------------------------------------------------------------
+(defun symbol-package-index (sym)
+  (typecase sym
+    (rt::sym (rt::symbol-package sym))
+    (null *nil-package*)
+    (T nil)))
+
+;;------------------------------------------------------------------------------
+;; SET-SYMBOL-PACKAGE symbol package
+;;------------------------------------------------------------------------------
+(defun set-symbol-package (sym package)
+  (typecase sym
+    (rt::sym (setf (rt::symbol-package sym) package))
+    (null (setf *nil-package* package))))
+
+;;------------------------------------------------------------------------------
+;; BOUNDP object
+;;------------------------------------------------------------------------------
+(defun boundp (object)
+  (typecase object
+    (rt::sym (not (rt::unbound-value-p (rt::symbol-value object))))
+    (null T)
+    (T (error SYM_EXPECTED object))))
+
+;;------------------------------------------------------------------------------
+;; MAKUNBOUND sym
+;;------------------------------------------------------------------------------
+(defun makunbound (sym)
+  (typecase sym
+    (rt::sym (if (rt::constant-flag-p sym)
+                 (error TRY_CHANGE_CONST sym)
+                 (setf (rt::symbol-value sym) (rt::unbound-value))))
+    (null (error TRY_CHANGE_CONST sym))
+    (T (error SYM_EXPECTED sym)))
+  sym)

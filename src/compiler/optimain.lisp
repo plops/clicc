@@ -5,8 +5,38 @@
 ;;;            Optimierungen eines einzelnen Ausdrucks oder rekursiv eines
 ;;;            Ausdrucks und aller seiner Komponenten.
 ;;;
-;;; $Revision: 1.15 $
+;;; $Revision: 1.23 $
 ;;; $Log: optimain.lisp,v $
+;;; Revision 1.23  1994/05/02  11:34:37  pm
+;;; Fehler behoben
+;;; *optimize -> *optimize*
+;;;
+;;; Revision 1.22  1994/05/01  22:46:18  hk
+;;; Kein Gewicht berechnen, wenn *OPTIMIZE* = nil
+;;;
+;;; Revision 1.21  1994/04/06  11:45:31  jh
+;;; Statistik erweitert.
+;;;
+;;; Revision 1.20  1994/02/18  13:57:49  hk
+;;; Typ-Optimierung der If-Ausdr"ucke erfolgt nun von au"sen nach innen,
+;;; die zu eliminierenden Zweigen sollen nicht optimiert werden, um die
+;;; Statistik nicht zu verf"alschen und keine "uberfl"ussigen Warnungen zu
+;;; erhalten.
+;;;
+;;; Revision 1.19  1994/02/02  09:33:36  hk
+;;; Statistik an die Änderungen in simplifier angepaßt.
+;;; Weigt wird nur bestimmt, wenn Inlining angeschaltet ist.
+;;;
+;;; Revision 1.18  1994/01/26  14:22:55  sma
+;;; Änderung (von jh) damit auf ohne Optimierungen die Funcalls von
+;;; inline-compilierten setf-funs aufgelöst werden.
+;;;
+;;; Revision 1.17  1994/01/15  22:01:46  kl
+;;; Liste der Statistikmeldungen erweitert.
+;;;
+;;; Revision 1.16  1994/01/14  14:32:43  sma
+;;; Neuer Text für Optimierung von mehr- in 2-stellige Funktionen ergänzt.
+;;;
 ;;; Revision 1.15  1993/11/26  12:24:38  jh
 ;;; Statistik erweitert (equal-to-eql).
 ;;;
@@ -112,12 +142,28 @@
     (tag-elis       . "~D useless tags eliminated.")
     (tagbody-elis   . "~D useless tagbody-forms eliminated.")
     (mv-lambda-elis . "~D useless mv-lambda-forms eliminated.")
+    (if-if-split    . "~D times if-form on predicate position splitted.")
+    (to-n-arg-fun   . "~D times function simplified in call with n arguments.")
+    (to-noresult-fun .
+     "~D times function simplified in call with unused result.")
+    (fun-to-%fun    .
+     "~D times function simplified in call with nth argument of type cons.")
+    (equal-to-eql   .
+     "~D times function simplified in call with some argument not of type 
+cons, pathname, string or bitvector.")
+    (eql-to-eq      .
+     "~D times function simplified in call with some argument not of type
+number or character.")
+    (only-test-optis .
+     "~D times function simplified in call with only one specified 
+keyword arg.")
+    (test-fun-optis .
+     "~D times function simplified in call with test function applied
+to nth argument.")
     (funcall-elis   . "~D funcall applications eliminated.")
     (apply-elis     . "~D apply applications eliminated.")
     (eq-elis        . "~D times eq evaluated.")
     (eq-to-not      . "~D times (eq nil x) substituted by (not x).")
-    (eql-to-eq      . "~D times eql substituted by eq.")
-    (equal-to-eql   . "~D times equal substituted by eql.")
     (not-elis       . "~D times not evaluated.")
     (fun-evals      . "~D forms evaluated.")
     (set-elis       . "~D times (set sym x) substituted by (setq dyn x).")
@@ -130,12 +176,7 @@
     (+-to-1+        . "~D times (+ 1 x) substituted by (1+ x).")
     (+-evals        . "~D times + evaluated.")
     (--to-1-        . "~D times (- x 1) substituted by (1- x).")
-    (aref-to-vref   . "~D times (aref a i) substituted by (vref a i).")
-    (assoc-optis    . "~D times assoc substituted by simple-assoc.")
-    (mapcar-mapc    . "~D times mapcar substituted by mapc.")
-    (maplist-mapl   . "~D times maplist substituted by mapl.")
-    (mapcan-mapc    . "~D times mapcan substituted by mapc.")
-    (mapcon-mapl    . "~D times mapcon substituted by mapl.")))
+    ))
 
 (defun write-optimize-statistics ()
   (when (> *optimize-verbosity* 0)
@@ -143,8 +184,8 @@
     (dolist (counter *optimize-statistics*)
       (clicc-message (cdr (assoc (car counter) statistics-output :test #'eq))
                      (cdr counter)))
-    (clicc-message "The weight of the module is ~D"
-                   (weight-module))))
+    (unless (or *no-inlining* (not *optimize*))
+      (clicc-message "The weight of the module is ~D" (weight-module)))))
 
 (defun inc-stats (stats-id)
   (let ((assoc (assoc stats-id *optimize-statistics* :test #'eq)))
@@ -156,7 +197,6 @@
 ;; optimize-field optimiert einen Ausdruck und schreibt das Ergebnis an dieselbe
 ;; Stelle zurueck.
 ;;------------------------------------------------------------------------------
-
 (defmacro optimize-field (field)
   `(setf ,field (optimize-form ,field)))
 
@@ -164,7 +204,6 @@
 ;; optimize-module optimiert die im Modul definierten Funktionen sowie die
 ;; toplevel-forms.
 ;;------------------------------------------------------------------------------
-
 (defun optimize-module (a-module)
   (optimize-fun-def-list (?all-global-funs a-module)))
 
@@ -204,6 +243,13 @@
 ;;------------------------------------------------------------------------------
 
 (defmethod optimize-form ((a-form form))
+
+  ;; Die If-Ausdr"ucke von Au"sen nach innen optimieren, da evtl. schon viele
+  ;; Zweige eliminiert werden.
+  ;;--------------------------
+  (unless *no-to*
+    (setq a-form (to-1form a-form)))
+  
   ;; Wegen der Ersetzungen muessen die Bestandteile eines Zwischensprachknotens
   ;; vor dem Zwischensprachknoten selbst analysiert werden. (Da noch Ersetzungen
   ;; innerhalb der form einer setq-form mit den alten Bindungen moeglich sind,
@@ -230,16 +276,20 @@
       ;; Zwischensprachausdruck zurueckgeliefert.
       (unless (eq new-form a-form)
         (return-from optimize-1form new-form)))
-    (unless *no-to*
-      (setq new-form (to-1form a-form))
-      (unless (eq new-form a-form)
-        (return-from optimize-1form new-form)))
     (unless *no-seo*
       (setq new-form (seo-1form a-form))
       (unless (eq new-form a-form)
         (return-from optimize-1form new-form)))
-    (unless *no-simp*
-      (setq new-form (simplify-1form a-form)))
+    (if *no-simp*
+        (setq new-form
+              (if (and (app-p a-form)
+                       (eq (?form a-form) (get-global-fun 'L::funcall)))
+                  (let ((arg-list (?arg-list a-form)))
+                    (setf (?form a-form) (first arg-list))
+                    (setf (?arg-list a-form) (rest arg-list))
+                    a-form)
+                  a-form))
+        (setq new-form (simplify-1form a-form)))
     new-form))
 
 (defmethod optimize-parts ((a-form form))

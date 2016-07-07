@@ -11,8 +11,23 @@
 ;;;            EFFEKT : {(read-list,write-list)/ 
 ;;;                       read-list , write-list Mengen von Variablen }
 ;;;
-;;; $Revision: 1.70 $
+;;; $Revision: 1.75 $
 ;;; $Log: static-effect.lisp,v $
+;;; Revision 1.75  1994/02/08  11:12:13  sma
+;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
+;;;
+;;; Revision 1.74  1994/01/28  13:19:35  ft
+;;; Ausnahmetest in analyse-form auf nil erweitert.
+;;;
+;;; Revision 1.73  1994/01/26  13:37:17  ft
+;;; Änderung der Darstellung von ungebundenen Slots.
+;;;
+;;; Revision 1.72  1994/01/17  14:10:21  hk
+;;; Fehler in combine-level-list behoben.
+;;;
+;;; Revision 1.71  1994/01/10  09:17:30  hk
+;;; apply #'max (mapcar  --> reduce
+;;;
 ;;; Revision 1.70  1993/12/22  11:16:27  atr
 ;;; Die Tail-Rekursion direkt in clcmain als erste Optimierung verschoben.
 ;;; Es werden jetzt zwei Iterationen der Voranalyse gemacht. (die zweite
@@ -356,8 +371,7 @@
   (unless *no-let-optimizing*
     (let-optimizing))
   
-  (clicc-message "---------------------------------------------------------------------------"))
-
+  (clicc-message-line))
 
 ;;;-----------------------------------------------------------------------
 ;;; Has-top-effect "uberpr"uft ob der Seiteneffekt einer Funktion schon 
@@ -452,7 +466,9 @@
 ;;; -------------------------------------------------------------------------
 (defmethod analyse-form ((one-class-def class-def) effect)
   (dolist (one-slot-descr (?slot-descr-list one-class-def))
-    (analyse-form (?initform one-slot-descr) effect)))
+    (unless (or (null (?initform one-slot-descr))
+                (eq (?initform one-slot-descr) :unbound))
+      (analyse-form (?initform one-slot-descr) effect))))
 
 ;;;--------------------------------------------------------------------------
 ;;; Analyse von Variablen:
@@ -789,9 +805,9 @@
 ;;; und "LEVEL".
 ;;;----------------------------------------------------------------------------
 (defun combine-level-list (level list)
-  (apply #'max (cons level (mapcar #'?level 
-                                   (remove-if-not #'static-p list 
-                                                  )))))
+  (reduce #'(lambda (x var) (if (static-p var) (max x (?level var)) x))
+          list
+          :initial-value level))
 
 ;;;--------------------------------------------------------------------------
 ;;; union-all-effects wird benutzt, um die Effekte einer Applikation 

@@ -10,7 +10,7 @@
 #            Dependencies:
 #            start -> rtl(startup.o) -> program -> rtl -> rtc
 #
-# $Source: /home3/apply/public/clicc-0.6.2a/lib/RCS/makefile.cl,v $
+# $Source: /home3/apply/public/clicc-0.6.4/lib/RCS/makefile.cl,v $
 # $Author: hk $
 # $Revision: 1.13 $
 # $Date: 1993/11/18 16:00:56 $

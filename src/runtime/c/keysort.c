@@ -8,8 +8,12 @@
  *            Ueberzaehlige Key-parameter in Abhaengigkeit von
  *            :ALLOW-OTHER-KEYS abweisen
  *
- * $Revision: 1.7 $
+ * $Revision: 1.8 $
  * $Log: keysort.c,v $
+ * Revision 1.8  1994/01/05  12:49:17  sma
+ * Namensänderung: init_keysort mit dem Präfix rt_ versehen.
+ * STACK(base, x) -> ARG(x).
+ *
  * Revision 1.7  1993/06/16  14:43:22  hk
  * Copyright Notiz eingefuegt.
  *
@@ -51,10 +55,10 @@ CL_FORM *other_key_sym;
 /*------------------------------------------------------------------------------
  * Aufruf in startup mit (init-keysort ':ALLOW-OTHER-KEYS)
  *----------------------------------------------------------------------------*/
-void init_keysort (base)
+void rt_init_keysort (base)
 CL_FORM *base;
 {
-   other_key_sym = GET_SYMBOL(STACK(base, 0));
+   other_key_sym = GET_SYMBOL(ARG(0));
 }
 
 /*------------------------------------------------------------------------------

@@ -5,8 +5,18 @@
 ;;;            ------------------------------------------------------
 ;;; Inhalt   : Laufzeitfunktionen des Objektsystems
 ;;;
-;;; $Revision: 1.31 $
+;;; $Revision: 1.34 $
 ;;; $Log: clos.lisp,v $
+;;; Revision 1.34  1994/01/21  13:25:26  sma
+;;; rt::set-slot-unbound gelöscht und Lisp-Code ersetzt.
+;;;
+;;; Revision 1.33  1994/01/13  12:20:04  ft
+;;; rt:typep-class optimiert, indem statt T der erste Parameter
+;;; zurueckgeliefert wird.
+;;;
+;;; Revision 1.32  1994/01/05  12:37:36  sma
+;;; Namensänderung: rt::make-instance-internal -> rt::make-instance
+;;;
 ;;; Revision 1.31  1993/09/27  12:14:54  hk
 ;;; Argumentreihenfolge beim Aufruf von rt::set-slot-unbound korrigiert.
 ;;;
@@ -96,7 +106,7 @@
 ;;;
 ;;; Revision 1.5  1993/02/16  14:34:20  hk
 ;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.31 $ eingefuegt
+;;; $Revision: 1.34 $ eingefuegt
 ;;;
 ;;; Revision 1.4  1993/01/25  09:59:15  kl
 ;;; Funktion no-applicable-method, die eine entsprechende Meldung ausgibt
@@ -181,7 +191,7 @@
                    these have been restricted to classes."
                   "~S is not a valid class-argument.")
               class))
-  (let ((instance (rt::make-instance-internal 
+  (let ((instance (rt::make-instance
                    (+ (num-o-slots class) 1)))
         (slot-pos 0)) 
     (set-direct-class-of instance class)
@@ -224,8 +234,9 @@
 (defun rt:typep-class (object class)
   (if (rt::instancep object)
       (if (eq class (direct-class-of object))
-          T
-          (simple-member class (class-precedence-list (direct-class-of object))))
+          object
+          (simple-member class
+                         (class-precedence-list (direct-class-of object))))
       nil))
 
 (defun simple-member (item list)
@@ -280,9 +291,10 @@
       ((slot-infos (slot-infos (class-of instance)))
        (slot-pos   (position slot-name slot-infos :key #'third)))
     (if slot-pos
-        (rt::set-slot-unbound instance slot-pos)
+        (rt::instance-set (rt::unbound-value) instance slot-pos)
         (slot-missing (class-of instance) instance 
-                      slot-name 'SLOT-MAKUNBOUND))))
+                      slot-name 'SLOT-MAKUNBOUND)))
+  instance)
 
 ;;------------------------------------------------------------------------------
 ;; CLASS-OF instance
