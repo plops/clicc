@@ -1,0 +1,103 @@
+
+
+In CommonLisp ist die Special Form 'multiple-value-call' DAS Mittel,
+um auf Multiple Werte zuzugreifen.
+
+In der Zwischensprache wird diese Aufgabe durch das Konstrukt
+'mv-lambda' "ubernommen ein, das sehr "ahnlich zu dem CommonLisp Makro
+'multiple-value-bind' ist.
+
+konkrete Syntax: (wird nie benutzt)
+((mv-lambda <Parameter-Liste> <Rumpf>)
+           <Ausdruck-der-Multiple-Werte-generiert>)
+
+Definition der Struktur f"ur die Zwischensprache:
+(defzws mv-lambda ()
+  (params :type params)
+  body
+  arg)
+
+Semantik:
+Der Ausdruck wird ausgewertet und die multiplen Werte werden an die
+Parameter der Parameterliste gebunden. Der Rumpf wird in der
+erweiterten Umgebung ausgewertet.
+
+
+Begr"undung:
+
+'multiple-value-setq' und 'multiple-value-bind' sollen effizient in
+der Zwischensprache ausgedr"uckt werden k"onnen. 'multiple-value-call'
+ist zu ineffizient da es zu einem Aufruf einer Funktion f"uhrt. Als
+Ausweg bliebe, spezielle Anwendungen von 'multiple-value-call'
+w"ahrend der Codegenerierung so zu "ubersetzen, da"s der
+Funktionsaufruf inline kompiliert wird. Dieses Vorgehen widerspricht
+aber unserer Intention, m"oglichst viele Optimierungen in der
+Zwischensprache ausdr"ucken zu k"onnen.
+
+
+Beispiele der Verwendung von 'mv-lambda':
+
+(multiple-value-bind (x y) <mv-form> <body>)
+--> 
+((mv-lambda (x y) <body>) <mv-form>)
+
+
+(multiple-value-setq (x y) <mv-form>)
+-->
+((mv-lambda (x' y') (setq x x') (setq y y')) <mv-form>)
+
+
+(multiple-value-call #'f <mv-form>)
+-->
+((mv-lambda (&rest args) (apply #'f args)) <mv-form>)
+
+
+(multiple-value-call #'f <mv-form1> <mv-form2>)
+-->
+((mv-lambda (&rest args1)
+   ((mv-lambda (&rest args2) (apply #'f (append args1 args2))) <mv-form2>))
+   <mv-form1>)
+
+
+(multiple-value-call <exp> <mv-form>)
+-->
+((mv-lambda (&rest args) (apply <exp> args)) <mv-form>)
+
+
+(multiple-value-call #'(lambda <params> <body>) <mv-form>)
+-->
+((mv-lambda <params> <body>) <mv-form>)
+
+
+(multiple-value-call #'(lambda <params> <body>) <mv-form1> <mv-form2>)
+-->
+((mv-lambda (&rest args1)
+   ((mv-lambda (&rest args2)
+     (apply #'(lambda <params> <body>) (append args1 args2)))
+     <mv-form2>))
+   <mv-form1>)
+
+
+(multiple-value-prog1 <form1> <body>)
+-->
+((mv-lambda (&rest args)
+  (progn <body> (apply #'values args)))
+  <form1>)
+
+Bemerkungen zur effizienten Implementierbarkeit:
+
+Der Aufruf einer benannten oder berechneten Funktion erfolgt durch die
+Funktion 'apply'. In einer naiven Implementierung f"uhrt dies zu der
+Bildung einer Rest-Liste aus den multiplen Werten, die dann wiederum
+zu den Argumenten f"ur die Funktion aufgeteilt wird. Eine einfache
+Analyse kann hier jedoch erkennen, da"s auf die explizite Bildung der
+Rest-Liste verzichtet werden kann und die multiplen Werte direkt als
+Argumente f"ur 'apply' verwendet werden k"onnen.
+
+Der Aufruf von 'multiple-value-call' mit mehr als einem multiple Werte
+liefernden Argument kann mit 'mv-lambda' nicht effizient ausgedr"uckt
+werden. Audr"ucke dieser Gestalt kommen aber in realen Programmen
+(fast) nie vor. Aber durch sehr intelligente Analysen k"onnte man
+herausbekommen, da"s die konkatenierte Liste '(append args1 args2)'
+schon auf dem Stack vorliegt und direkt f"ur 'apply' verwendet werden
+kann.

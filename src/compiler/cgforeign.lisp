@@ -1,85 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Foreign Functions - codegeneration
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.24 $
-;;; $Log: cgforeign.lisp,v $
-;;; Revision 1.24  1994/05/17  08:20:15  pm
-;;; type-of in typecase umgewandelt, da CLiCC kein type-of kennt.
-;;; Codegenerierung an Aenderungen angepasst.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.23  1994/04/26  12:34:42  sma
-;;; Direkte Benutzung von C-MacroCall LOAD_NIL bzw LOAD_INTEGER durch
-;;; Funktionen C-nil bzw C-integer ersetzt.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Foreign Functions - codegeneration
 ;;;
-;;; Revision 1.22  1994/04/22  14:08:22  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Fehlende Funktionalitaet eingebaut.
-;;;
-;;; Revision 1.21  1994/04/18  12:02:15  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Alle Funktionen neu ueberarbeitet
-;;; - SICHERHEITS-CHECK: noch nicht die ganze Funktionalitaet eingebaut!
-;;;
-;;; Revision 1.20  1994/01/05  13:15:30  hk
-;;; In cg-call-in-interface #+CMU17(declare (notinline C-blockend))
-;;; eingefügt, um einen Fehler in CMU-CL 17.c zu umgehen
-;;;
-;;; Revision 1.19  1993/12/17  11:16:41  pm
-;;; Fehler behoben: get_c_string statt GET_C_STRING aufrufen
-;;;
-;;; Revision 1.18  1993/12/16  16:28:40  pm
-;;; Codegenerator bereinigt.
-;;; Call-In -Codegenerator.
-;;;
-;;; Revision 1.16  1993/11/03  11:44:22  pm
-;;; Inkonsistenzen in den Symbolnamen behoben.
-;;;
-;;; Revision 1.15  1993/08/24  11:18:54  pm
-;;; Erweiterungen um C-Pointer
-;;;
-;;; Revision 1.14  1993/07/26  16:49:36  pm
-;;; Erweiterungen um C_Strukturen.
-;;;
-;;; Revision 1.13  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.12  1993/06/04  13:44:10  pm
-;;; cg-call-in-interface eingebaut
-;;;
-;;; Revision 1.11  1993/05/31  17:01:13  pm
-;;; Schreibfehler beseitigt
-;;;
-;;; Revision 1.10  1993/05/23  17:46:06  pm
-;;; Codegenerierung fuer die C-Funktionen basierend auf den
-;;; primitven C-Typen implementiert
-;;;
-;;; Revision 1.9  1993/05/21  13:55:49  pm
-;;; c-int in int umbenannt
-;;;
-;;; Revision 1.8  1993/05/12  14:11:29  pm
-;;; packages verstanden und korrigiert.
-;;;
-;;; Revision 1.7  1993/03/10  12:46:56  pm
-;;; Kleinigkeiten geaendert
-;;;
-;;; Revision 1.6  1993/02/16  16:07:31  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.5  1993/01/12  14:09:45  pm
-;;; Fehler behoben
-;;;
-;;; Revision 1.4  1992/12/01  15:11:33  pm
-;;; c-char* eingebaut
-;;;
-;;; Revision 1.3  1992/11/25  12:36:55  pm
-;;; Codegenerator fuer das Foreign Function Interface
-;;;
-;;; Revision 1.2  1992/11/05  12:55:19  pm
-;;; initial revision
+;;; $Revision: 1.28 $
+;;; $Id: cgforeign.lisp,v 1.28 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -97,15 +41,27 @@
 (defmethod cg-app ((fun foreign-fun) args app)
   (declare (ignore app))
 
-  (let* ((arg-list (cg-ffi-args (cdr args) fun))
-         (typesymbol (first args)))
+  (let* ((return-type (?return-type fun))
+         arg-list
+         typesymbol)
+    (multiple-value-bind (key old-name old-type)
+        (select-type return-type return-type return-type)
+      (declare (ignore old-name old-type))
+      (case key
+        ((old-struct old-union old-array old-handle ptr)
+         (setq arg-list (cg-ffi-args (cdr args) fun))
+         (setq typesymbol (first args)))
+        (otherwise
+         (setq arg-list (cg-ffi-args args fun))
+         (setq typesymbol nil)))
 
-    ;; Aktuellen stack-top retten fuer eventuelle Call-Ins
-    ;;----------------------------------------------------
-    (C-assign "save_stack" (CC-Stack *stack-top*))
-
-    (C-ForeignCall fun *stack-top* arg-list typesymbol)
-    (stacktop-to-result-loc)))
+      ;; Aktuellen stack-top retten fuer eventuelle Call-Ins
+      ;;----------------------------------------------------
+      (when *ffi-need-savestack*
+        (C-assign "save_stack" (CC-Stack *stack-top*)))
+      
+      (C-ForeignCall fun *stack-top* arg-list typesymbol)
+      (stacktop-to-result-loc))))
 
 ;;------------------------------------------------------------------------------
 ;; Pendant zu cg-args. 
@@ -126,11 +82,11 @@
           (declare (ignore old-name))
           (case key
             (string     (cg-ff-string arg arglist-queue))
-            (old-handle (cg-ff-handle-old arg arglist-queue))
             (primitive  (cg-ff-primitive old-type arg arglist-queue))
-            (old-struct (cg-ff-struct-old arg arglist-queue))
-            (old-union  (cg-ff-union-old arg arglist-queue))
-            (old-array  (cg-ff-array-old arg arglist-queue))
+            (old-struct (cg-ff-struct-old type arg arglist-queue))
+            (old-union  (cg-ff-union-old type arg arglist-queue))
+            (old-array  (cg-ff-array-old type arg arglist-queue))
+            (old-handle (cg-ff-handle-old arg arglist-queue))
             (ptr        (cg-ff-ptr old-type arg arglist-queue))
             
             (otherwise  (cg-ff-error 'cg-ffi-args old-type))))))
@@ -144,7 +100,8 @@
 ;;------------------------------------------------------------------------------
 (defun C-ForeignCall (fun base arg-list typesymbol)
   (let* ((return-type (?return-type fun))
-         (stack (CC-Stack base)))
+         (stack (CC-Stack base))
+         (top (CC-Stack *stack-top*)))
     (multiple-value-bind (key old-name old-type)
         (select-type return-type return-type return-type)
       (declare (ignore old-name))
@@ -152,63 +109,73 @@
         (void
          (C-Cmd (CC-ForeignCallArgs fun arg-list))
          (C-nil stack))
-
+        
         (string
-         (C-MacroCall "LOAD_C_STRING"
-                      (CC-ForeignCallArgs fun arg-list)
-                      stack))
+         (C-blockstart)
+         (C-VarDeclInit "char *" "var" (CC-ForeignCallArgs fun arg-list))
+         (C-MacroCall "LOAD_C_STRING" top "var" stack)
+         (C-blockend))
+        
         (primitive
+         (C-blockstart)
+         (C-VarDeclInit (convert-c-type-to-string old-type)
+                        "var" (CC-ForeignCallArgs fun arg-list))
          (C-MacroCall (concatenate 'string "LOAD_" (c-macro-string old-type))
-                      (CC-ForeignCallArgs fun arg-list)
-                      stack))
-
-        (old-array
-         (C-Call "_make_c_array_ptr"
-                 stack
-                 (CC-Symbol typesymbol)
-                 (CC-Cast "char *" (CC-ForeignCallArgs fun arg-list))))
-
-        (old-handle
-         (C-Call "_make_c_handle"
-                 stack
-                 (CC-Symbol typesymbol)
-                 (CC-Cast "char *" (CC-ForeignCallArgs fun arg-list))))
-
+                      top "var" stack)
+         (C-blockend))
+        
         (old-struct
          (let* ((c-type (convert-c-type-to-string return-type)))
            (C-blockstart)
-           (C-VarDeclInit (format nil "~A *" c-type) "__ptr"
-                          (format nil "malloc(sizeof(~A))" c-type))
-           (C-Call "_make_c_struct_ptr"
-                 stack
-                 (CC-Symbol typesymbol)
-                 "(char *)__ptr")
-           (C-Cmd (format nil "*__ptr = ~A" (CC-ForeignCallArgs fun arg-list)))
+           (C-VarDeclInit "void *"
+                          "ptr"
+                          (format nil "(void *)malloc(sizeof(~A))" c-type))
+           (C-MacroCall "LOAD_C_STRUCT"
+                        top "ptr" stack (CC-Symbol typesymbol))
+           (C-Cmd 
+            (format nil
+                    "*((~A *)ptr) = ~A"
+                    c-type
+                    (CC-ForeignCallArgs fun arg-list)))
            (C-blockend)))
 
         (old-union
          (let* ((c-type (convert-c-type-to-string return-type)))
            (C-blockstart)
-           (C-VarDeclInit (format nil "~A *" c-type) "__ptr"
-                          (format nil "malloc(sizeof(~A))" c-type))
-           (C-Call "_make_c_union_ptr"
-                 stack
-                 (CC-Symbol typesymbol)
-                 "(char *)__ptr")
-           (C-Cmd (format nil "*__ptr = ~A" (CC-ForeignCallArgs fun arg-list)))
+           (C-VarDeclInit "void *"
+                          "ptr"
+                          (format nil "(void *)malloc(sizeof(~A))" c-type))
+           (C-MacroCall "LOAD_C_UNION"
+                        top "ptr" stack (CC-Symbol typesymbol))
+           (C-Cmd
+            (format nil
+                    "*((~A *)ptr) = ~A"
+                    c-type
+                    (CC-ForeignCallArgs fun arg-list)))
            (C-blockend)))
 
         (old-array
          (let* ((c-type (convert-c-type-to-string return-type)))
            (C-blockstart)
-           (C-VarDeclInit (format nil "~A *" c-type) "__ptr"
-                          (format nil "malloc(sizeof(~A))" c-type))
-           (C-Call "_make_c_array_ptr"
-                 stack
-                 (CC-Symbol typesymbol)
-                 "(char *)__ptr")
-           (C-Cmd (format nil "*__ptr = ~A" (CC-ForeignCallArgs fun arg-list)))
+           (C-VarDeclInit "void *"
+                          "ptr"
+                          (format nil "(void *)malloc(sizeof(~A))" c-type))
+           (C-MacroCall "LOAD_C_ARRAY"
+                        top "ptr" stack (CC-Symbol typesymbol))
+           (C-Cmd
+            (format nil
+                    "*((~A *)ptr) = ~A"
+                    c-type
+                    (CC-ForeignCallArgs fun arg-list)))
            (C-blockend)))
+
+        (old-handle
+         (C-blockstart)
+         (C-VarDeclInit "void *"
+                        "var" (CC-ForeignCallArgs fun arg-list))
+         (C-MacroCall "LOAD_C_HANDLE"
+                      top "var" stack (CC-Symbol typesymbol))
+         (C-blockend))
 
         (ptr
          (let* ((ptr-type (second old-type)))
@@ -216,31 +183,73 @@
                (select-type ptr-type ptr-type ptr-type)
              (declare (ignore old-ptr-type old-ptr-name))
              (case key
-               (string
-                (C-MacroCall "LOAD_C_STRING"
-                             (concatenate 
-                              'string "*" (CC-ForeignCallArgs fun arg-list))
-                             stack))
                (old-struct
-                (C-Call "_make_c_struct_ptr"
-                        stack
-                        (CC-Symbol typesymbol)
-                        (CC-Cast "char *" (CC-ForeignCallArgs fun arg-list))))
+                (C-blockstart)
+                (C-VarDeclInit 
+                 "void *" "ptr" 
+                 (CC-Cast "void *" (CC-ForeignCallArgs fun arg-list)))
+                (C-MacroCall "LOAD_C_STRUCT"
+                             top "ptr" stack (CC-Symbol typesymbol))
+                (C-Blockend))
+
                (old-union
-                (C-Call "_make_c_union_ptr"
-                        stack
-                        (CC-Symbol typesymbol)
-                        (CC-Cast "char *" (CC-ForeignCallArgs fun arg-list))))
+                (C-blockstart)
+                (C-VarDeclInit 
+                 "void *" "ptr" 
+                 (CC-Cast "void *" (CC-ForeignCallArgs fun arg-list)))
+                (C-MacroCall "LOAD_C_UNION"
+                             top "ptr" stack (CC-Symbol typesymbol))
+                (C-Blockend))
+
                (old-array
-                (C-Call "_make_c_array_ptr"
-                        stack
-                        (CC-Symbol typesymbol)
-                        (CC-Cast "char *" 
-                                  (CC-ForeignCallArgs fun arg-list))))
-               (otherwise
-                (internal-error 
-                 'C-ForeignCall "FATAL ERROR: unknown Pointer-type: ~A"
-                 return-type))))))
+                (C-blockstart)
+                (C-VarDeclInit 
+                 "void *" "ptr" 
+                 (CC-Cast "void *" (CC-ForeignCallArgs fun arg-list)))
+                (C-MacroCall "LOAD_C_ARRAY"
+                             top "ptr" stack (CC-Symbol typesymbol))
+                (C-Blockend))))))
+
+        (lisp
+         (C-blockstart)
+         (cond 
+           ((eq return-type :integer)
+            (C-VarDeclInit 
+             "long" "var" 
+             (CC-Cast "long" (CC-ForeignCallArgs fun arg-list)))
+            (C-MacroCall "LOAD_FIXNUM" top "var" stack))
+
+           ((eq return-type :short)
+            (C-VarDeclInit 
+             "short" "var" 
+             (CC-Cast "short" (CC-ForeignCallArgs fun arg-list)))
+            (C-MacroCall "LOAD_FIXNUM" top "var" stack))
+
+           ((eq return-type :int)
+            (C-VarDeclInit 
+             "int" "var" 
+             (CC-Cast "int" (CC-ForeignCallArgs fun arg-list)))
+            (C-MacroCall "LOAD_FIXNUM" top "var" stack))
+
+           ((eq return-type :long)
+            (C-VarDeclInit 
+             "long" "var" 
+             (CC-Cast "long" (CC-ForeignCallArgs fun arg-list)))
+            (C-MacroCall "LOAD_FIXNUM" top "var" stack))
+
+           ((eq return-type :character)
+            (C-VarDeclInit 
+             "char" "var" 
+             (CC-Cast "char" (CC-ForeignCallArgs fun arg-list)))
+            (C-MacroCall "LOAD_CHARACTER" top "var" stack))
+
+           ((eq return-type :float)
+            (C-VarDeclInit 
+             "double" "var" 
+             (CC-Cast "double" (CC-ForeignCallArgs fun arg-list)))
+            (C-MacroCall "LOAD_FLOAT" top "var" stack))
+           )
+         (C-blockend))
 
         (otherwise
          (internal-error 'C-ForeignCall "FATAL ERROR: unknown Pointer-type: ~A"
@@ -318,51 +327,78 @@
 ;;------------------------------------------------------------------------------
 ;; 
 ;;------------------------------------------------------------------------------
-(defun cg-ff-struct-old (arg queue)
+(defun cg-ff-struct-old (type arg queue)
   (let* ((*result-spec* (stacktop-result-location))
-         (stack (CC-Stack *stack-top*)))
+         (stack (CC-Stack *stack-top*))
+         (c-type (convert-c-type-to-string type)))
 
     (typecase arg
       (var-ref 
-       (add-q (CC-MacroCall "GET_C_STRUCT" (cc-dest (?var arg))) queue))
+       (add-q 
+        (format nil "*((~A *)~A)"
+                c-type
+                (CC-MacroCall "GET_C_STRUCT_PTR" (cc-dest (?var arg))))
+        queue))
       
       (otherwise
        (cg-form arg)
-       (add-q (CC-MacroCall "GET_C_STRUCT" stack) queue)
+       (add-q 
+        (format nil "*((~A *)~A)"
+                c-type
+                (CC-MacroCall "GET_C_STRUCT_PTR" stack))
+        queue)
        (incf *stack-top*)
        (incf (?offset *result-spec*))))))
   
 ;;------------------------------------------------------------------------------
 ;; 
 ;;------------------------------------------------------------------------------
-(defun cg-ff-union-old (arg queue)
+(defun cg-ff-union-old (type arg queue)
   (let* ((*result-spec* (stacktop-result-location))
-         (stack (CC-Stack *stack-top*)))
+         (stack (CC-Stack *stack-top*))
+         (c-type (convert-c-type-to-string type)))
 
     (typecase arg
       (var-ref 
-       (add-q (CC-MacroCall "GET_C_UNION" (cc-dest (?var arg))) queue))
+       (add-q 
+        (format nil "*((~A *)~A)"
+                c-type
+                (CC-MacroCall "GET_C_UNION_PTR" (cc-dest (?var arg))))
+        queue))
       
       (otherwise
        (cg-form arg)
-       (add-q (CC-MacroCall "GET_C_UNION" stack) queue)
+       (add-q 
+        (format nil "*((~A *)~A)"
+                c-type
+                (CC-MacroCall "GET_C_UNION_PTR" stack))
+        queue)
        (incf *stack-top*)
        (incf (?offset *result-spec*))))))
   
 ;;------------------------------------------------------------------------------
 ;; 
 ;;------------------------------------------------------------------------------
-(defun cg-ff-array-old (arg queue)
+(defun cg-ff-array-old (type arg queue)
   (let* ((*result-spec* (stacktop-result-location))
-         (stack (CC-Stack *stack-top*)))
+         (stack (CC-Stack *stack-top*))
+         (c-type (convert-c-type-to-string type)))
 
     (typecase arg
       (var-ref 
-       (add-q (CC-MacroCall "GET_C_ARRAY" (cc-dest (?var arg))) queue))
+       (add-q 
+        (format nil "*((~A *)~A)"
+                c-type
+                (CC-MacroCall "GET_C_ARRAY_PTR" (cc-dest (?var arg))))
+        queue))
       
       (otherwise
        (cg-form arg)
-       (add-q (CC-MacroCall "GET_C_ARRAY" stack) queue)
+       (add-q 
+        (format nil "*((~A *)~A)"
+                c-type
+                (CC-MacroCall "GET_C_ARRAY_PTR" stack))
+        queue)
        (incf *stack-top*)
        (incf (?offset *result-spec*))))))
   
@@ -482,23 +518,25 @@
          (make-args ()
            (let* ((count 0))
              (dolist (arg arguments)
-               (make-one-arg arg count)
+               (make-one-arg arg (CC-Stack count) count)
                (incf count))))
          
-         (make-one-arg (type count)
+         (make-one-arg (type stack count)
            (multiple-value-bind (key old-name old-type)
                (select-type type type type)
              (case key
                (string
                 (C-MacroCall "LOAD_C_STRING"
-                              (format nil "arg~A" count)
-                              (CC-Stack count)))
+                             stack
+                             (format nil "arg~A" count)
+                             stack))
                
                (primitive
                 (C-MacroCall 
                  (concatenate 'string "LOAD_" (c-macro-string type)) 
+                 stack
                  (format nil "arg~A" count)
-                 (CC-Stack count)))
+                 stack))
                
                (void
                 ;; Do nothing!
@@ -507,83 +545,108 @@
                
                (old-struct
                 (let* ((typesymbol old-name))
-                  (C-Call 
-                   "_make_c_struct_ptr"
-                   (CC-Stack count)
-                   (CC-Symbol typesymbol)
-                   (format nil "(char *)&arg~A" count))))
+                  (C-MacroCall "LOAD_C_STRUCT"
+                               stack 
+                               (format nil "(void *)&arg~A" count)
+                               stack 
+                               (CC-Symbol typesymbol))))
                
                (old-union
                 (let* ((typesymbol old-name))
-                  (C-Call 
-                   "_make_c_union_ptr"
-                   (CC-Stack count)
-                   (CC-Symbol typesymbol)
-                   (format nil "(char *)&arg~A" count))))
+                  (C-MacroCall "LOAD_C_UNION"
+                               stack 
+                               (format nil "(void *)&arg~A" count)
+                               stack 
+                               (CC-Symbol typesymbol))))
                
                (old-array
                 (let* ((typesymbol old-name))
-                  (C-Call 
-                   "_make_c_union_ptr"
-                   (CC-Stack count)
-                   (CC-Symbol typesymbol)
-                   (format nil "(char *)&arg~A" count))))
+                  (C-MacroCall "LOAD_C_ARRAY"
+                               stack 
+                               (format nil "(void *)&arg~A" count)
+                               stack 
+                               (CC-Symbol typesymbol))))
                
                (old-handle
                 (let* ((typesymbol old-name))
-                  (C-Call
-                   "_make_c_handle"
-                   (CC-Stack count)
-                   (CC-Symbol typesymbol)
-                   (format nil "(char *)arg~A" count))))
+                  (C-MacroCall "LOAD_C_HANDLE"
+                               stack 
+                               (format nil "(void *)arg~A" count)
+                               stack 
+                               (CC-Symbol typesymbol))))
+               
+               (lisp
+                (cond
+                  ((eq type :integer)
+                   (C-MacroCall "LOAD_FIXNUM" 
+                                stack 
+                                (format nil "arg~A" count)
+                                stack))
+                  ((eq type :short)
+                   (C-MacroCall "LOAD_FIXNUM" 
+                                stack 
+                                (format nil "arg~A" count)
+                                stack))
+                  ((eq type :int)
+                   (C-MacroCall "LOAD_FIXNUM" 
+                                stack 
+                                (format nil "arg~A" count)
+                                stack))
+                  ((eq type :long)
+                   (C-MacroCall "LOAD_FIXNUM" 
+                                stack 
+                                (format nil "arg~A" count)
+                                stack))
+                  ((eq type :character)
+                   (C-MacroCall "LOAD_CHARACTER" 
+                                stack 
+                                (format nil "arg~A" count)
+                                stack))
+                  ((eq type :float)
+                   (C-MacroCall "LOAD_FLOAT" 
+                                stack 
+                                (format nil "arg~A" count)
+                                stack))))
                
                (ptr
-                (let* ((ptr-type (second old-type))
-                       (typesymbol old-name))
+                (let* ((ptr-type (second old-type)))
                   (multiple-value-bind (key old-ptr-name old-ptr-type)
                       (select-type ptr-type ptr-type ptr-type)
-                    (declare (ignore old-ptr-name old-ptr-type))
-                    (case key
-                      (old-struct
-                       (C-Call 
-                        "_make_c_struct_ptr"
-                        (CC-Stack count)
-                        (CC-Symbol typesymbol)
-                        (format nil "(char *)arg~A" count)))
-                      
-                      (old-union
-                       (C-Call 
-                        "_make_c_union_ptr"
-                        (CC-Stack count)
-                        (CC-Symbol typesymbol)
-                        (format nil "(char *)arg~A" count)))
-                    
-                      (old-array
-                       (C-Call 
-                        "_make_c_union_ptr"
-                        (CC-Stack count)
-                        (CC-Symbol typesymbol)
-                        (format nil "(char *)arg~A" count)))))))
-               
-               ((new-struct new-union new-array new-handle)
-                ;; *** to do ***
-                )
-               
-               (t 
-                (internal-error 'C-ForeignCall
-                                NOT-IMPLEMENTED-YET type)))))
-             
+                    (declare (ignore old-ptr-type))
+                    (let* ((typesymbol old-ptr-name))
+                      (case key
+                        (old-struct
+                         (C-MacroCall "LOAD_C_STRUCT"
+                                      stack
+                                      (format nil "(void *)arg~A" count)
+                                      stack
+                                      (CC-Symbol typesymbol)))
+                        (old-union
+                         (C-MacroCall "LOAD_C_UNION"
+                                      stack
+                                      (format nil "(void *)arg~A" count)
+                                      stack
+                                      (CC-Symbol typesymbol)))
+
+                        (old-array
+                         (C-MacroCall "LOAD_C_ARRAY"
+                                      stack
+                                      (format nil "(void *)arg~A" count)
+                                      stack
+                                      (CC-Symbol typesymbol)))))))))))
+         
          (make-call ()
-           (if (eq (first arguments) 'ffi:c-void)
-               (C-Call gen-fun-name)
-               (C-Lispcall gen-fun-name (CC-Stack 0) nil)))
+           (C-Lispcall gen-fun-name (CC-Stack 0) nil))
          
          (make-return-value (type)
            (multiple-value-bind (key old-name old-type)
                (select-type type type type)
-             (declare (ignore old-name))
              (case key
                (primitive
+                ;; Wandle Das Ergebnis in ein C-Datum um.
+                (let* ((fun (cdr (get-operator-def old-name))))
+                  (C-Call (?adr fun) (CC-Stack 0)))
+
                 (C-Call
                  "return"                
                  (CC-MacroCall 
@@ -594,13 +657,28 @@
                 (C-Call "return" (CC-MacroCall "GET_C_STRING" (CC-Stack 0))))
                
                (old-struct
-                (C-Call "return" (CC-MacroCall "GET_C_STRUCT" (CC-Stack 0))))
+                (let* ((c-type (convert-c-type-to-string type)))
+                  (C-Call 
+                   "return" 
+                   (format nil "*((~A *)~A)"
+                           c-type
+                           (CC-MacroCall "GET_C_STRUCT_PTR" (CC-Stack 0))))))
                
                (old-union
-                (C-Call "return" (CC-MacroCall "GET_C_UNION" (CC-Stack 0))))
+                (let* ((c-type (convert-c-type-to-string type)))
+                  (C-Call 
+                   "return" 
+                   (format nil "*((~A *)~A)"
+                           c-type
+                           (CC-MacroCall "GET_C_UNION_PTR" (CC-Stack 0))))))
                
                (old-array
-                (C-Call "return" (CC-MacroCall "GET_C_ARRAY" (CC-Stack 0))))
+                (let* ((c-type (convert-c-type-to-string type)))
+                  (C-Call 
+                   "return" 
+                   (format nil "*((~A *)~A)"
+                           c-type
+                           (CC-MacroCall "GET_C_ARRAY_PTR" (CC-Stack 0))))))
                
                (old-handle
                 (C-Call "return" (CC-MacroCall "GET_C_HANDLE" (CC-Stack 0))))
@@ -627,15 +705,7 @@
                (void
                 ;; do nothing!
                 ;;------------
-                )
-               
-               ((new-struct new-union new-array new-handle)
-                ;; *** to do ***
-                )
-               
-               (t 
-                (internal-error 'C-ForeignCall
-                                NOT-IMPLEMENTED-YET type))))))
+                )))))
       
       (C-newline)
       (make-type)
@@ -650,6 +720,7 @@
       (C-Newline)
       (make-args)
       (make-call)
+      (C-Assign "save_stack" "base")
       (make-return-value return-type)
       (C-blockend))))
 

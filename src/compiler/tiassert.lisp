@@ -1,66 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Funktionen und Makros zum Gewinnen von Typzusicherungen aus
 ;;;            Ausdruecken, die an Praedikatsposition von Konditionalen stehen.
 ;;;
-;;; $Revision: 1.18 $
-;;; $Log: tiassert.lisp,v $
-;;; Revision 1.18  1994/06/09  12:07:14  hk
-;;; Typ von rt::struct-typp eingetragen
-;;;
-;;; Revision 1.17  1994/01/27  19:23:55  kl
-;;; Anpassungen an den erweiterten Typverband vorgenommen.
-;;;
-;;; Revision 1.16  1994/01/26  19:16:29  kl
-;;; Typisierung der Typprädikate erweitert.
-;;;
-;;; Revision 1.15  1993/12/09  10:34:05  hk
-;;; provide wieder an das Dateiende
-;;;
-;;; Revision 1.14  1993/11/21  22:05:00  kl
-;;; provide anders plaziert.
-;;;
-;;; Revision 1.13  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.12  1993/06/10  10:23:12  kl
-;;; Typsierung der Strukturen verbessert.
-;;;
-;;; Revision 1.11  1993/06/08  12:00:59  kl
-;;; Typisierung der Funktion instancep eingefuegt.
-;;;
-;;; Revision 1.10  1993/05/23  15:58:24  kl
-;;; Anpassung an den neuen Typverband.
-;;;
-;;; Revision 1.9  1993/05/14  15:43:19  kl
-;;; Typzusicherungen erweitert.
-;;;
-;;; Revision 1.8  1993/04/22  11:25:32  hk
-;;; declare-typepred-assertion rt::check-integer gestrichen.
-;;;
-;;; Revision 1.7  1993/04/18  15:59:38  kl
-;;; Debugschalter entfernt.
-;;;
-;;; Revision 1.6  1993/03/04  09:10:19  kl
-;;; Typzusicherungen fuer car- und cdr-Zugriffe verbessert.
-;;;
-;;; Revision 1.5  1993/02/16  16:11:30  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.4  1993/02/02  09:41:27  kl
-;;; Zu starke Typzusicherungen bei Zahlvergleichen entfernt.
-;;;
-;;; Revision 1.3  1993/01/25  13:19:06  kl
-;;; Typzusicherungen der Typtests an den neuen Typverband angepasst.
-;;;
-;;; Revision 1.2  1993/01/19  11:30:17  kl
-;;; get-type-assertions-from-predicate-position aus tipass1 hierhin verlegt.
-;;;
-;;; Revision 1.1  1993/01/19  09:44:13  kl
-;;; Initial revision
+;;; $Revision: 1.20 $
+;;; $Id: tiassert.lisp,v 1.20 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -154,7 +118,7 @@
   (dec-typepred-assertion rt::symp            non-null-sym-t not-non-null-sym-t)
   (dec-typepred-assertion L::atom             atom-t         cons-t)
   (dec-typepred-assertion L::consp            cons-t         atom-t)
-  (dec-typepred-assertion L::listp            list-t         not-list-t)
+  (dec-typepred-assertion L::listp            all-list-t     not-all-list-t)
 
   (dec-typepred-assertion L::zerop            byte-t         number-t)
   (dec-typepred-assertion rt::fixnump         fixnum-t       not-fixnum-t)

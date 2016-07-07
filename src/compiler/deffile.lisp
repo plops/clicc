@@ -1,178 +1,32 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Bearbeiten der Interface-Beschreibungen fuer Modulkompilation
 ;;;            (.def Dateien)
 ;;;            - exportierte Funktionen
 ;;;            - exportierte Symbole
 ;;;
-;;; $Revision: 1.42 $
-;;; $Log: deffile.lisp,v $
-;;; Revision 1.42  1994/06/13  13:52:57  hk
-;;; export-body darf nur aufgerufen werden, wenn *optimize* nicht nil ist
-;;;
-;;; Revision 1.41  1994/06/07  14:46:45  jh
-;;; *max-export-weight* eingefuehrt. Symbole lokaler Variablen werden
-;;; nicht rausgeschrieben. prepare-export-write nach clcmain.lisp verlegt.
-;;;
-;;; Revision 1.40  1994/05/05  15:15:46  hk
-;;; Raw-Slots deaktiviert, damit sich CLiCC wieder selbst "ubersetzten
-;;; kann.
-;;;
-;;; Revision 1.39  1994/05/05  14:39:04  hk
-;;; - Fehler behoben in export-cont-def: level wird geschrieben, read und
-;;;   adr wurden falsch geschrieben, obwohl sie gar nicht ben"otigt wurden.
-;;; - find-class auf Symbole angewendet, da apply #'make-instance nicht mit
-;;;   Symbolen umgehen kann.
-;;; - Funktionsr"umpfe werden nur in die .def Datei eingetragen, wenn
-;;;   Inlining angeschaltet ist.
-;;;
-;;; Revision 1.38  1994/04/05  15:17:56  jh
-;;; Export von Funktionsruempfen und benannten Konstanten eingebaut.
-;;;
-;;; Revision 1.37  1994/02/10  09:54:45  sma
-;;; my-last-arg-may-be-rest-var wird jetzt auch exportiert.
-;;;
-;;; Revision 1.36  1994/02/08  13:30:09  hk
-;;; Aufrufe von get-global-fun durch name2fun ersetzt.
-;;;
-;;; Revision 1.35  1994/02/08  13:15:06  sma
-;;; Annotation my-last-arg-may-be-rest-var bei funs, die angibt, daß das
-;;; letzte Argument der hiermit annotierten Funktion auch ein rest-listen
-;;; Parameter sein kann. Die Annotation enthält in diesem Falle den Namen
-;;; (als Keyword) ihrer Funktion.
-;;;
-;;; Revision 1.34  1994/02/03  07:53:55  hk
-;;; Fehler beim Einlesen von :has-funs-as-args behoben.
-;;;
-;;; Revision 1.33  1994/02/02  09:17:35  hk
-;;; import- und export-fun lesen und schreiben zusätzliche Annotationen.
-;;;
-;;; Revision 1.32  1993/12/22  09:22:14  hk
-;;; Für CMU17 müssen bei make-instance Symbole statt Klassen verwendet
-;;; werden.
-;;;
-;;; Revision 1.31  1993/12/19  14:08:46  hk
-;;; In import-fun stellt nun sicher, daß wirklich alle :mv-spec :t zu
-;;; :mv-spec T werden.
-;;;
-;;; Revision 1.30  1993/12/16  09:36:53  hk
-;;; In das .def File wird nicht das Symbol T sondern das Keyword :T
-;;; geschrieben, um Probleme mit packages zu vermeiden. Beim Einlesen wird
-;;; wieder zu T übergegangen.
-;;;
-;;; Revision 1.29  1993/12/09  14:36:42  hk
-;;; Beim Lesen eines .def Files mittels import-read wird sichergestellt,
-;;; daß das verwendete Package bei Bedarf mit make-package generiert wird.
-;;;
-;;; Revision 1.28  1993/12/03  09:59:37  ft
-;;; Aufrufe von make-instance in import-fun und import-sym optimiert.
-;;;
-;;; Revision 1.27  1993/08/19  15:22:11  hk
-;;; get-symbol-bind statt eines expliziten find in *GLOBAL-ENVIRONMENT*
-;;; verwendet.
-;;;
-;;; Revision 1.26  1993/08/19  10:34:16  hk
-;;; Auch Funktionen mit Namen (setf xxx) könne special-sys-fun sein.
-;;;
-;;; Revision 1.25  1993/07/27  14:12:14  atr
-;;; Import-fun leicht geaendert.
-;;;
-;;; Revision 1.24  1993/07/20  13:26:49  uho
-;;; 'import-read' auf 'imported-module'-Zwischensprachkonstrukt
-;;; umgestellt.
-;;;
-;;; Revision 1.23  1993/07/20  12:09:58  atr
-;;; In der Beschreibung einer Funktion stehen unter dem Key
-;;; :has-funs-as-args nicht defined-syms sondern die Symbole (lisp symbole).
-;;; Beim Importieren werden die defined-syms in der *global-environment* gesucht.
-;;;
-;;; Revision 1.22  1993/07/19  15:04:22  uho
-;;; In .def-Files wird jetzt unter dem Schluesselwort :NAME zusaetzlich
-;;; zum Namen des Moduls auch der Namen seiner Initialisierungsfunktion
-;;; und die Symbol-base (der Name der Tabelle fuer die Symbole)
-;;; abgelegt. 'import-read' liefert diese drei Namen nun als multiplen
-;;; Wert und der Modul-Slot 'loaded-modules' enthaelt nun eine Liste
-;;; dreielementiger Listen der Form: (Modulname, Initfunktionsname, Symbolbase).
-;;;
-;;; Revision 1.21  1993/07/19  11:28:26  atr
-;;; Slot HAS-FUNS-AS-ARGS steht in der fun-descr einer
-;;; exportierten Funktion. Der Slot wird bei der Seiteneffektanalyse
-;;; gebraucht.
-;;;
-;;; Revision 1.20  1993/07/14  17:17:26  atr
-;;; In der .def Datei werden die Symbole zunaechst ausgeschrieben,
-;;; und dann die Funktionen.
-;;; Einlesen der Beschreibungen von Funktionen korrigiert.
-;;;
-;;; Revision 1.19  1993/06/27  12:14:33  atr
-;;; READ und WRITE-LIST bei imported-fun sind jetzt
-;;; Listen von Variablen und nicht mehr von Symbolen der Variablen.
-;;;
-;;; Revision 1.18  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.17  1993/06/12  15:57:01  atr
-;;; Tippfehler korrigiert data-effect --> data-effects.
-;;;
-;;; Revision 1.16  1993/06/09  12:16:56  ft
-;;; Fehlende find-class bei make-instance eingefügt.
-;;;
-;;; Revision 1.15  1993/06/07  07:24:25  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.14  1993/06/05  21:38:54  hk
-;;; Fehler in export-fun behoben.
-;;;
-;;; Revision 1.13  1993/06/04  14:49:53  hk
-;;; :unknown von read- und write-list kann unveraendert geschrieben werden.
-;;;
-;;; Revision 1.12  1993/06/04  11:10:43  hk
-;;; In :read-list und :write-list werden nun Symbole und nicht
-;;; Zwischensprachausdruecke angegeben.
-;;;
-;;; Revision 1.11  1993/06/04  08:32:42  hk
-;;; In export-fun: '@ -> ,@ und ' -> ,
-;;;
-;;; Revision 1.10  1993/05/30  13:59:57  atr
-;;; Jetzt werden die Slots read-list , write-list und
-;;; data-effects auch ausgeschrieben.
-;;;
-;;; Revision 1.9  1993/05/14  12:15:59  hk
-;;; In .def Files wird ein 2-zeiliger Kommentar geschrieben.
-;;;
-;;; Revision 1.8  1993/05/14  09:11:00  hk
-;;; *package* nicht mit NIL initialisieren.
-;;;
-;;; Revision 1.7  1993/04/22  12:20:40  hk
-;;; export-write beruecksichtigt *OUT-FILENAME*.
-;;; Verschiedenartige Eintraege in .def-Files werden durch Keywords
-;;; eingeleitet. import-fun beruecksichtigt special-sys-funs.
-;;; Bei importierten Symbolen wird Slot base gesetzt.
-;;; Neuer Eintrag :sys fuer sys.def: keinen Aufruf von
-;;; Initialisierungsfunktion generieren. Neuer Eintrag :package, der
-;;; den Namen des package des Moduls angibt.
-;;;
-;;; Revision 1.6  1993/04/15  16:09:56  hk
-;;; Fehler behoben.
-;;;
-;;; Revision 1.5  1993/04/14  12:20:46  hk
-;;; Nur Funktionen mit ?exported = T werden geschrieben.
-;;;
-;;; Revision 1.4  1993/04/14  10:26:12  hk
-;;; import-fun: beruecksichtigt (setf f).
-;;;
-;;; Revision 1.3  1993/04/08  07:37:39  hk
-;;; (provide DEFFILE) -> (provide deffile).
-;;;
-;;; Revision 1.2  1993/04/03  09:53:08  hk
-;;; Alten Dateinamen entfernt.
-;;;
-;;; Revision 1.1  1993/04/03  09:49:12  hk
-;;; Initial revision
-;;;
+;;; $Revision: 1.46 $
+;;; $Id: deffile.lisp,v 1.46 1994/12/13 16:04:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")     
@@ -204,31 +58,8 @@
 ;;------------------------------------------------------------------------------
 ;; Berechnet den Namen der .def Datei aus dem Namen eines Moduls 
 ;;------------------------------------------------------------------------------
-(defun calc-def-filename (name)
-  (concatenate 'string name ".def"))
-
-;;------------------------------------------------------------------------------
-;; Kodiert die Liste der Variablen im Slot has-funs-as-args einer exported-fun.
-;; Keyword Parameter werden durch das Keyword Symbol ersetzt , required
-;; und optional Parameter werden durch ihre Position in der Parameterliste 
-;; ersetzt.
-;;------------------------------------------------------------------------------
-(defun update-and-encode (function)
-  (when (?has-funs-as-args function)
-    (let ((code-list nil)
-          (all-vars (?all-vars (?params function)))
-          (key-var-list (mapcar #'?var (?key-list (?params function)))))
-      (dolist (one-spec-var (?has-funs-as-args function))
-        (when (and (static-p one-spec-var)
-                   (member one-spec-var all-vars
-                           :test #'eq)
-                   (not (eq (?rest (?params function)) one-spec-var)))
-          (if (member one-spec-var key-var-list :test #'eq)
-              (push (?symbol (?sym (find one-spec-var (?key-list 
-                                              (?params function))
-                                         :key #'?var))) code-list)
-              (push (position one-spec-var all-vars :test #'eq) code-list))))
-      (setf (?has-funs-as-args function) code-list))))
+(defun calc-def-file (pathname)
+  (make-pathname :type "def" :defaults pathname))
 
 ;;------------------------------------------------------------------------------
 ;; Beschreibung einer exportierten Funktion in die .def Datei schreiben
@@ -236,7 +67,6 @@
 ;;------------------------------------------------------------------------------
 (defun export-fun (fun)
   (when (?exported fun)
-    (update-and-encode fun)
     (print `(,(?symbol fun) :par-spec ,(?par-spec fun) :adr ,(?adr fun)
              ,@(unless (eql (?mv-spec fun) 1)
                        `(:mv-spec ,(if (eq (?mv-spec fun) 'T)
@@ -256,7 +86,14 @@
              ,@(when (?data-effects fun)
                      `(:data-effects ,(?data-effects fun)))
              ,@(when (?has-funs-as-args fun)
-                     `(:has-funs-as-args ,(?has-funs-as-args fun)))
+                     `(:has-funs-as-args
+                       ,(let ((x (?has-funs-as-args fun)))
+                             (if (and (consp x) (listp (car x)))
+                                 (cons (car x)
+                                       (cons (car (cdr x))
+                                             (mapcar #'?symbol
+                                                     (cdr (cdr x)))))
+                                 x))))
              ,@(when (?simp-when-n-args fun)
                      `(:simp-when-n-args
                        (,(first (?simp-when-n-args fun))
@@ -569,7 +406,7 @@
 ;; also ohne Package-Qualifizierer ausgegeben.
 ;;------------------------------------------------------------------------------
 (defun export-write ()
-  (with-open-file (*standard-output* (calc-def-filename *OUT-FILENAME*)
+  (with-open-file (*standard-output* (calc-def-file *OUT-FILENAME*)
                                      :direction :output
                                      :if-exists :supersede)
     (let ((*package* (?package *module*))
@@ -661,10 +498,10 @@
            (:need-no-stack (raw-case))
            (:has-funs-as-args
             (raw-case
-             (lambda (list)
-               (mapcar #'(lambda (elem)
-                           (if (integerp elem) elem (get-symbol-bind elem)))
-                       list))))
+             (lambda (x)
+               (when (and (consp x) (listp (car x)))
+                 (setf (cdr (cdr x)) (mapcar #'get-symbol-bind (cdr (cdr x)))))
+               x)))                    
            (:mv-spec (raw-case (lambda (v) (if (eq v :T) 'T v))))
            (:simp-when-n-args
             (raw-case
@@ -921,8 +758,8 @@
 ;; Die Symbole zur Benennung der Beschreibungen werden in das Package des Moduls
 ;; eingelesen.
 ;;------------------------------------------------------------------------------
-(defun import-read (module-name)
-  (with-open-file (*standard-input* (calc-def-filename module-name)
+(defun import-read (module-pathname)
+  (with-open-file (*standard-input* (calc-def-file module-pathname)
                                     :direction :input)
     
     ;; Package wird spaeter durch :package spezifiziert, waehle zunaechst
@@ -955,7 +792,7 @@
                    (internal-error
                     "import-read"
                     ":NAME must preceede :SYM in ~A~%"
-                    (calc-def-filename module-name))
+                    (calc-def-file module-pathname))
                    (do ((sym-descr (read) (read)))
                        ((atom sym-descr) (setq type sym-descr))
                      (import-sym sym-descr symbol-base))))

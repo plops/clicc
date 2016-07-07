@@ -1,171 +1,31 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Repraesentation des Typverbandes, Implementation der 
 ;;;            Typverbandsoperatoren und Deklaration der Elemente
 ;;;            des Typverbandes
 ;;;
-;;; $Revision: 1.51 $
-;;; $Log: titypes.lisp,v $
-;;; Revision 1.51  1994/01/27  19:22:52  kl
-;;; Typverband erweitert.
-;;;
-;;; Revision 1.50  1994/01/26  19:15:07  kl
-;;; Typbenennungen für non-null-symbol eingeführt.
-;;;
-;;; Revision 1.49  1993/12/18  06:16:43  hk
-;;; In dem Makro declare-zs-type: defparameter statt defconstant, um
-;;; Probleme mit make-load-form zu vermeiden
-;;;
-;;; Revision 1.48  1993/12/09  10:29:58  hk
-;;; provide wieder an das Dateiende
-;;;
-;;; Revision 1.47  1993/12/03  12:46:23  jh
-;;; Funktion types-are-disjoined eingefuegt.
-;;;
-;;; Revision 1.46  1993/11/12  14:24:44  kl
-;;; Neue Typbenennungen für package-t, stream-t, u. a. eingeführt.
-;;;
-;;; Revision 1.45  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.44  1993/06/07  11:07:57  kl
-;;; Ausgabe der Listentypen geringfuegig umgestellt.
-;;;
-;;; Revision 1.43  1993/05/23  15:58:01  kl
-;;; Typverband verkleinert und nicht verwendete Typbenennungen entfernt.
-;;;
-;;; Revision 1.42  1993/05/18  16:14:02  kl
-;;; Typen der Typinferenz werden jetzt durch Strukturen repraesentiert.
-;;;
-;;; Revision 1.41  1993/05/15  13:40:23  kl
-;;; Unnoetige Funktionen entfernt und Ausgabe des Typs string-t geaendert.
-;;;
-;;; Revision 1.40  1993/05/14  15:43:01  kl
-;;; Zwei weitere not-Typen eingefuehrt.
-;;;
-;;; Revision 1.39  1993/04/19  12:23:08  kl
-;;; Ausgabe der Typen an den geaenderten Verband angepasst.
-;;;
-;;; Revision 1.38  1993/04/14  14:59:52  kl
-;;; Weitere Umbennungen durchgefuehrt.
-;;;
-;;; Revision 1.37  1993/04/14  14:46:13  kl
-;;; package-t entfernt und Typen umbenannt.
-;;;
-;;; Revision 1.36  1993/02/17  07:46:27  kl
-;;; Inline-Deklaration fuer (das Makro) not-type entfernt.
-;;;
-;;; Revision 1.35  1993/02/16  16:09:22  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.34  1993/02/02  09:28:25  kl
-;;; Makros zs-typecase und update-type-f hierhin verlegt.
-;;;
-;;; Revision 1.33  1993/01/24  16:38:45  kl
-;;; Die Const-funs werden nicht mehr definiert.
-;;;
-;;; Revision 1.32  1993/01/21  12:05:29  kl
-;;; Typen werden wieder durch Integers repraesentiert. Typverband aufgeraumt.
-;;;
-;;; Revision 1.31  1993/01/19  12:00:03  kl
-;;; Typkonstruktor list-of eingefuehrt. Typen werden jetzt durch Instanzen
-;;; der Klassen zs-type repraesentiert.
-;;;
-;;; Revision 1.30  1993/01/17  16:06:14  kl
-;;; ratio-t und complex-t und die dazu gehoerenden Vereinigungstypen entfernt.
-;;; Dafuer other-t eingefuehrt.
-;;;
-;;; Revision 1.29  1993/01/15  18:26:10  kl
-;;; Reihenfolge der Definitionen und Deklarationen geaendert.
-;;; Praedikat primitive-type-p eingefuehrt.
-;;;
-;;; Revision 1.28  1993/01/08  19:18:39  kl
-;;; Typ cons in list-cons und non-list-cons aufgetrennt.
-;;;
-;;; Revision 1.27  1993/01/06  13:11:29  kl
-;;; multiple-type-join entfernt und Kommentare angepasst.
-;;;
-;;; Revision 1.26  1993/01/02  17:06:21  kl
-;;; Fehler behoben und truth-t in bool-t umbenannt.
-;;;
-;;; Revision 1.25  1992/12/31  12:36:47  kl
-;;; Neuen Typen t-t und truth-t eingefuegt.
-;;;
-;;; Revision 1.24  1992/12/28  16:53:32  kl
-;;; output-type verbessert.
-;;;
-;;; Revision 1.23  1992/12/21  09:01:57  kl
-;;; Typverband verfeinert. Umstellung der Repraesentation auf Fixnums.
-;;;
-;;; Revision 1.22  1992/12/16  09:21:18  kl
-;;; Zurueck zur Mengenrepraesentation der Typen. Type-eq verbessert.
-;;;
-;;; Revision 1.21  1992/12/10  10:13:41  kl
-;;; Umstellung der Repraesentation des Typverbands auf simple-bit-vectors.
-;;;
-;;; Revision 1.20  1992/12/08  14:13:54  kl
-;;; Typverband um die Typen byte-t und non-byte-fix-t erweitert.
-;;;
-;;; Revision 1.19  1992/12/02  13:26:32  kl
-;;; Funktion output-type aus timain.lisp hierhin verlegt.
-;;;
-;;; Revision 1.18  1992/12/02  09:31:23  kl
-;;; Typverband um den Typ non-nil-symbol-t erweitert.
-;;;
-;;; Revision 1.17  1992/12/01  10:15:38  kl
-;;; Einige Makros in inline-deklarierte Funktionen ueberfuehrt.
-;;;
-;;; Revision 1.16  1992/12/01  10:09:39  kl
-;;; type-meet eingefuegt und Kommentierung erweitert.
-;;;
-;;; Revision 1.15  1992/11/26  11:08:33  kl
-;;; Neuen Typ atom-t eingefuegt.
-;;;
-;;; Revision 1.14  1992/11/26  07:13:12  kl
-;;; zs-type-of voruebergehend nach tipass1.lisp verlegt. list-type verbessert.
-;;;
-;;; Revision 1.13  1992/11/24  15:26:54  kl
-;;; list-type als Listentypkonstruktor implementiert.
-;;;
-;;; Revision 1.12  1992/11/20  09:07:59  kl
-;;; Makros not-type und type-eq eingefuehrt.
-;;;
-;;; Revision 1.11  1992/11/17  13:56:31  kl
-;;; Makros und Funktionen umbenannt und verbessert. Kommentare angepasst.
-;;;
-;;; Revision 1.10  1992/11/04  14:04:11  kl
-;;; Kommentare verbessert.
-;;;
-;;; Revision 1.9  1992/11/04  13:22:30  kl
-;;; Kommentare verbessert und erweitert. Internal-error eingebunden.
-;;;
-;;; Revision 1.8  1992/11/02  12:15:00  kl
-;;; Schreibfehler korrigiert.
-;;;
-;;; Revision 1.7  1992/11/02  08:12:14  kl
-;;; Dokumentation erweitert und zs-type-of verallgemeinert.
-;;;
-;;; Revision 1.6  1992/10/30  09:43:34  kl
-;;; Typverband umgestellt. Datei an CMU- und Lucid-Lisp angepasst.
-;;;
-;;; Revision 1.5  1992/10/27  12:07:57  kl
-;;; Typverband auf Vereinigungstypen umgestellt. Operationen beschleunigt.
-;;;
-;;; Revision 1.4  1992/10/15  19:16:42  kl
-;;; Verbandsoperationen beschleunigt.
-;;;
-;;; Revision 1.3  1992/10/02  14:25:15  kl
-;;; Funktionen types-are-... eingefuegt.
-;;;
-;;; Revision 1.2  1992/10/01  17:00:16  kl
-;;; Typverbandsoperationen als generische Funktionen implementiert.
-;;;
-;;; Revision 1.1  1992/09/25  16:41:51  kl
-;;; Initial revision
-;;;
+;;; $Revision: 1.54 $
+;;; $Id: titypes.lisp,v 1.54 1994/11/25 13:36:15 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -411,7 +271,7 @@
 (declare-joined-type non-null-sym-t t-symbol-t   other-symbol-t)
 (declare-joined-type list-t         null-t       list-cons-t)
 (declare-joined-type cons-t         list-cons-t  non-list-cons-t)
-(declare-joined-type all-list-t     list-t       cons-t)
+(declare-joined-type all-list-t     null-t       cons-t)
 
 (declare-joined-type vector-t       string-t     non-string-vector-t)
 (declare-joined-type array-t        vector-t     non-vector-array-t)
@@ -448,7 +308,7 @@
 ;;------------------------------------------------------------------------------
 ;; Deklaration der NOT-Typen:
 ;;------------------------------------------------------------------------------
-(declare-not-types (null-t list-t
+(declare-not-types (null-t list-t all-list-t
                     byte-t word-t fixnum-t bignum-t integer-t float-t number-t
                     symbol-t non-null-sym-t
                     character-t string-t vector-t array-t
@@ -508,35 +368,36 @@
 ;;------------------------------------------------------------------------------
 ;; Menge der primitiven Typen.
 ;;------------------------------------------------------------------------------
-(defconstant primitive-types (list bottom-t 
-                                   byte-t non-byte-word-t non-word-fixnum-t
-                                   fixnum-t bignum-t
-                                   float-t
-                                   null-t
-                                   t-symbol-t
-                                   other-symbol-t 
-                                   list-cons-t 
-                                   non-list-cons-t
-                                   character-t
-                                   string-t 
-                                   non-string-vector-t 
-                                   non-vector-array-t
-                                   function-t
-                                   structure-t
-                                   class-t
-                                   package-t
-                                   stream-t
-                                   hash-table-t
-                                   readtable-t
-                                   pathname-t
-                                   random-state-t))
+(defparameter primitive-types
+  (list bottom-t 
+        byte-t non-byte-word-t non-word-fixnum-t
+        fixnum-t bignum-t
+        float-t
+        null-t
+        t-symbol-t
+        other-symbol-t 
+        list-cons-t 
+        non-list-cons-t
+        character-t
+        string-t 
+        non-string-vector-t 
+        non-vector-array-t
+        function-t
+        structure-t
+        class-t
+        package-t
+        stream-t
+        hash-table-t
+        readtable-t
+        pathname-t
+        random-state-t))
 
 
 ;;------------------------------------------------------------------------------
 ;; Einfache Typen sind die primitiven Typen und die Listentypen von prim. Typen.
 ;;------------------------------------------------------------------------------
-(defconstant simple-types (append primitive-types 
-                                 (mapcar #'list-cons-of primitive-types)))
+(defparameter simple-types
+  (append primitive-types (mapcar #'list-cons-of primitive-types)))
 
 
 ;;------------------------------------------------------------------------------
@@ -610,7 +471,8 @@
                  ;; NOT-Typen:
                  (,not-null-t          not-null)
                  (,atom-t              atom-t)
-                 (,not-list-t          not-list)
+                 (,not-all-list-t      not-list)
+                 (,not-list-t          not-proper-list)
                  (,not-byte-t          not-byte)
                  (,not-word-t          not-word)
                  (,not-fixnum-t        not-fixnum)

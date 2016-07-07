@@ -1,167 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Special forms
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.45 $
-;;; $Log: p1spform.lisp,v $
-;;; Revision 1.45  1994/02/18  13:42:55  hk
-;;; let*-form wird nur generiert, wenn var-list nicht leer ist.
-;;; let/cc-form wird nur generiert, wenn es mindestens ein angewandtes
-;;; Vorkommen gibt.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.44  1994/02/18  10:47:45  hk
-;;; p1-progn: Kein progn-form generieren, wenn nur ein Ausdruck.
-;;; p1-tagbody: Kein Abschlie"sendes NIL, wenn davor ein (GO ..) steht.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Special forms
 ;;;
-;;; Revision 1.43  1994/01/07  13:46:41  hk
-;;; Unbenannte Funktionen bekommen nun den Namen LAMBDA statt Gxxx.
-;;;
-;;; Revision 1.42  1994/01/05  12:31:17  sma
-;;; Namensänderung im Laufzeitsystem: _INTERNAL bei rt::CATCH-INTERNAL,
-;;; rt::UNWIND-PROTECT-INTERNAL, rt::THROW-INTERNAL und rt::PROGV-INTERNAL
-;;; gestrichen.
-;;;
-;;; Revision 1.41  1993/10/15  10:21:09  hk
-;;; p1-progn optimiert
-;;;
-;;; Revision 1.40  1993/10/06  17:33:23  hk
-;;; In p1-labels/flet :par-spec früher vorläufig setzen, damit eine
-;;; Überprüfung auch bei wechselseitigen Aufrufen erfogen kann.
-;;;
-;;; Revision 1.39  1993/09/14  13:36:15  ft
-;;; rt::type-error in rt::the-type-error umbenannt, da der Name in CLtL2
-;;; schon vergeben ist.
-;;;
-;;; Revision 1.38  1993/09/13  15:10:58  ft
-;;; Der von P1-THE erzeugte Code ruft jetzt im Fehlerfall die
-;;; Laufzeitunktion TYPE-ERROR auf.
-;;;
-;;; Revision 1.37  1993/09/12  16:42:19  kl
-;;; Fehler in p1-setq behoben. Null-form -> empty-list und anderes.
-;;;
-;;; Revision 1.36  1993/09/10  14:44:51  hk
-;;; (setq) -> null-form, (setq x v) -> setq-form, (setq x v y w) ->
-;;; progn-form
-;;;
-;;; Revision 1.35  1993/09/10  13:20:17  hk
-;;; p1-progn generiert keine progn-forms mit leerer form-list mehr.
-;;;
-;;; Revision 1.34  1993/07/23  05:27:48  ft
-;;; p1-multiple-value-prog1 mit nur einer form als Rumpf expandiert jetzt
-;;; zu dieser form.
-;;;
-;;; Revision 1.33  1993/07/02  11:42:57  ft
-;;; Und noch ein Tippfehler...
-;;;
-;;; Revision 1.32  1993/07/02  11:31:14  ft
-;;; Anpassung an die geaenderte Definition von p1-named-lambda.
-;;;
-;;; Revision 1.31  1993/07/02  11:26:04  hk
-;;; Auch (setf f) in Makroexpansionsfunktionen im Wirts-Lispsystem
-;;; ausfuehren
-;;;
-;;; Revision 1.30  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.29  1993/05/10  11:57:00  hk
-;;; Fehlerhaftes when durch if ersetzt.
-;;;
-;;; Revision 1.28  1993/04/16  08:18:32  hk
-;;; Aufrufe von Lisp Funktionen in Makroexpansionsfunktionen werden
-;;; immer durch Lisp-Funktionen dargestellt, sonst Warning.
-;;;
-;;; Revision 1.27  1993/04/08  08:13:12  hk
-;;; Vorkommen von Lisp Systemfunktionen in Makroexpansionsfunktionen
-;;; werden gesondert behandelt.
-;;;
-;;; Revision 1.26  1993/04/03  10:03:17  hk
-;;; p1-function an Compiler-Macros angepasst.
-;;;
-;;; Revision 1.25  1993/02/16  16:40:29  hk
-;;; Revision Keyword eingefuegt, Symbole des zu uebersetzenden Programms
-;;; durch clicc-lisp:: gekennzeichnet.
-;;;
-;;; Revision 1.24  1993/01/22  15:07:05  ft
-;;; Aenderungen fuer die Verarbeitung von erweiterten Funktionsnamen.
-;;;
-;;; Revision 1.23  1993/01/08  17:11:20  kl
-;;; (the <Typ> <Ausdruck>) erzeugt nun einen entsprechenden Typtest
-;;; um <Ausdruck>.
-;;;
-;;; Revision 1.22  1992/12/03  16:59:25  ft
-;;; Fehler in p1-function beseitigt.
-;;;
-;;; Revision 1.21  1992/12/03  16:39:13  ft
-;;; Erweiterung von p1-function um die Bahandlung gen. Funktionen.
-;;;
-;;; Revision 1.20  1992/11/26  12:22:29  hk
-;;; ?write von dynamischen Variablen wird erhoeht, wenn diese beschrieben oder
-;;; gebunden werden, damit bestimmt werden kann, ob spaeter ein illegales
-;;; defconstant erfolgt.
-;;;
-;;; Revision 1.19  1992/10/09  13:39:48  hk
-;;; Fehler in p1-let/let* behoben.
-;;;
-;;; Revision 1.18  1992/10/08  16:56:00  hk
-;;; Prueft auf Mehrfachdefinition in p1-labels/flet.
-;;;
-;;; Revision 1.17  1992/10/02  09:36:33  kl
-;;; In p1-let/let* werden jetzt auch globale special-Variablen gesondert
-;;; behandelt.
-;;;
-;;; Revision 1.16  1992/09/08  15:24:38  kl
-;;; In p1-let/let* werden Deklarationen jetzt anders behandelt.
-;;;
-;;; Revision 1.15  1992/08/07  09:59:55  hk
-;;; Keine Closures von lokalen Makros, Definition von p1-macrolet nach p1macro.
-;;;
-;;; Revision 1.14  1992/08/06  13:04:45  hk
-;;; clicc-error fuer nicht implementierte Konstrukte.
-;;;
-;;; Revision 1.13  1992/08/05  13:21:43  hk
-;;; Syntaktische Aenderungen.
-;;;
-;;; Revision 1.12  1992/07/29  16:16:59  hk
-;;; Vereinfachung in p1-multiple-value-call.
-;;;
-;;; Revision 1.11  1992/07/29  12:08:50  hk
-;;; Kleine Fehler.
-;;;
-;;; Revision 1.10  1992/07/23  10:06:28  hk
-;;; :SYSTEM-MACRO --> :SYS-MACRO.
-;;;
-;;; Revision 1.9  1992/07/06  09:05:58  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.8  1992/07/06  08:47:23  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.7  1992/06/05  14:49:41  hk
-;;; progv-internal etc. mit rt:: versehen.
-;;;
-;;; Revision 1.6  1992/06/05  13:51:06  hk
-;;; Fehler in p1-multiple-value-call.
-;;;
-;;; Revision 1.5  1992/06/05  13:08:14  hk
-;;; Slot fuer den Rumpf einer Labels-form heisst :body und nicht :form.
-;;;
-;;; Revision 1.4  1992/06/04  11:57:53  hk
-;;; p1-let/let* korrigiert (mapcan -> mapcar).
-;;;
-;;; Revision 1.3  1992/06/04  10:19:01  hk
-;;; Fuer Form von setq hatte ich den Aufruf von p1-form vergessen.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
-;;;
-;;; Revision 1.0  1991/05/11  16:54:56  ob
+;;; $Revision: 1.47 $
+;;; $Id: p1spform.lisp,v 1.47 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -868,11 +730,14 @@
 (defun p1-the (value-type_form)
   (multiple-value-bind (value-type form)
       (parse-the value-type_form)
-    (p1-form `(L::LET ((result ,form))
-               (L::IF
-                (L::TYPEP result (L::QUOTE ,value-type))
-                result
-                (rt::the-type-error result (L::QUOTE ,value-type))))))) 
+    (p1-form
+     (if (or *IGNORE-THE* (eq value-type L::t))
+         form
+         `(L::LET ((result ,form))
+           (L::IF
+            (L::TYPEP result (L::QUOTE ,value-type))
+            result
+            (rt::the-type-error result (L::QUOTE ,value-type))))))))
 
 ;;------------------------------------------------------------------------------
 ;; eval-when ({situation}*) {form}* 

@@ -1,14 +1,14 @@
 #------------------------------------------------------------------------------
-#  Projekt : CLICC - a Common Lisp to C Compiler
-#            -----------------------------------
+# CLiCC: The Common Lisp to C Compiler
+# Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+# Christian-Albrechts-Universitaet zu Kiel, Germany
+#------------------------------------------------------------------------------
 # Function : Generates Lisp runtime-modules for CLICC.
 #            Uses optional parameter OPTIMIZE = <-{O | g}>.
 #            Uses environment variable CLICCROOT.
 #
-#  $Source: /home3/apply/public/clicc-0.6.4/src/runtime/lisp2c/RCS/Makefile,v $
-#  $Author: hk $
-#  $Revision: 1.2 $
-#  $Date: 1993/04/22 10:18:45 $
+#  $Revision: 1.3 $
+#  $Id: Makefile,v 1.3 1994/11/22 14:57:56 hk Exp $
 #------------------------------------------------------------------------------
 
 CC	= acc

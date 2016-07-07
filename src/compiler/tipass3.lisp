@@ -1,8 +1,25 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Nach der eigentlichen Typinferenz wird das analysierte 
 ;;;            Zwischensprachkonstrukt noch einmal traversiert und dabei
 ;;;            nach Typfehlern untersucht. Die folgenden Fehler werden gemeldet:
@@ -10,68 +27,8 @@
 ;;;               kein Funktionstyp ist,
 ;;;             o eine Funktion wurde auf Argumente mit Bottom-Typ appliziert.
 ;;;
-;;; $Revision: 1.19 $
-;;; $Log: tipass3.lisp,v $
-;;; Revision 1.19  1994/02/21  15:22:29  hk
-;;; look-for-type-errors v"ollig umgestellt. Untersucht Ausdr"ucke auf
-;;; potentielle Typfehler. Wenn ein Ausdruck mit Typfehlern gefunden
-;;; wurde, so werden seine Teilausdr"ucke nicht weiter analysiert, um
-;;; redundanten Meldungen vorzubeugen.
-;;;
-;;; Revision 1.18  1994/02/18  14:06:03  hk
-;;; write-type-warnings f"ur var-ref und setq-form geben nun den Namen der
-;;; Variablen an.
-;;;
-;;; Revision 1.17  1993/12/09  10:35:48  hk
-;;; provide wieder an das Dateiende
-;;;
-;;; Revision 1.16  1993/11/21  22:09:39  kl
-;;; provide umpositioniert.
-;;;
-;;; Revision 1.15  1993/11/21  19:58:49  kl
-;;; Referenz auf *ti-level* entfernt.
-;;;
-;;; Revision 1.14  1993/10/12  19:52:15  kl
-;;; Weitere Methoden fuer Typwarnungen erstellt.
-;;;
-;;; Revision 1.13  1993/09/12  12:10:30  kl
-;;; Spezialisierung ueber T ersetzt.
-;;;
-;;; Revision 1.12  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.11  1993/05/13  09:13:46  kl
-;;; Typfehler werden jetzt gemeldet, wenn einer der Argumenttypen bottom-t ist.
-;;;
-;;; Revision 1.10  1993/05/06  06:48:23  kl
-;;; Ausgabe umgestellt.
-;;;
-;;; Revision 1.9  1993/04/30  09:21:24  kl
-;;; Aufruf von traverse-module vereinfacht.
-;;;
-;;; Revision 1.8  1993/03/26  07:05:26  kl
-;;; Ausgabe bei Typwarnungen geaendert.
-;;;
-;;; Revision 1.7  1993/03/05  14:28:22  kl
-;;; Auf die used-Annotation wird nicht mehr zugegriffen.
-;;;
-;;; Revision 1.6  1993/03/04  10:45:46  kl
-;;; Anpassung an die eingefuehrten Typinferenzlevel.
-;;;
-;;; Revision 1.5  1993/02/26  11:10:26  jh
-;;; traverse-keyword function-selector in fun-selector geaendert.
-;;;
-;;; Revision 1.4  1993/02/16  16:10:00  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.3  1993/02/15  14:47:03  kl
-;;; Die Fehlermeldungen werden nur noch fuer benutzte Funktionen ausgegeben.
-;;;
-;;; Revision 1.2  1993/02/02  10:12:50  kl
-;;; Ausgaben verschoenert.
-;;;
-;;; Revision 1.1  1993/01/31  13:44:49  kl
-;;; Initial revision
+;;; $Revision: 1.20 $
+;;; $Id: tipass3.lisp,v 1.20 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

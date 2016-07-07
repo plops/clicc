@@ -1,151 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
  * Funktion : Deklarationen fuer das Laufzeitsystem
  * 
- * $Revision: 1.40 $
- * $Log: c_decl.h,v $
- * Revision 1.40  1994/05/18  15:10:42  sma
- * Datenstrukturen global_funarg und down_funarg nach obrepX verschoben.
- *
- * Revision 1.39  1994/04/28  09:42:12  sma
- * COPY und LISP_FUN Makros von obrep1 nach c_decl.h verschoben,
- * RET_BOOL_OPT eingeführt.
- *
- * Revision 1.38  1994/04/18  11:38:42  pm
- * Foreign Function Interface voellig ueberarbeitet.
- * - Weggefallene Macros entfernt
- *
- * Revision 1.37  1994/02/18  12:03:50  uho
- * Die Abfragen im Garbage-Collector auf konstante Datenobjekte und die
- * Heap-Konsistenz als Makros definiert. Bei Uebersetzung mit definitiertem
- * Preprozessorsymbol SHARED_LIBRARY werden alle Daten ausserhalb des
- * Heaps als konstant angesehen.
- *
- * Revision 1.36  1994/02/01  14:16:20  uho
- * 'extern'-Referenz auf 'Ssys' entfernt.
- *
- * Revision 1.35  1994/01/21  13:14:54  sma
- * Neues Makro LOAD_BOOL(expr, loc) welches das Lisp-äquivalent eines C
- * Wahrheitswerts nach "loc" schreibt. RET_BOOL basiert jetzt auf dieser
- * allgemeineren Form. Wird in cginline benutzt.
- *
- * Revision 1.34  1993/12/16  16:25:43  pm
- * Macros fuer den umgang mit dem FFI eingefuegt.
- *
- * Revision 1.33  1993/12/09  13:30:02  sma
- * Neues Makro ARG(xxxx) als Ersatz für STACK(base, xxxx)
- *
- * Revision 1.32  1993/11/22  09:24:02  hk
- * Neuer C-Code ONLY_ONCE in Initialisierungsfunktionen, der bewirkt,
- * da_ diese Funktionen hvchstens 1x ausgef|hrt werden.
- *
- * Revision 1.31  1993/10/14  16:05:11  sma
- * __OBREP wird nur == 1 definiert, wenn es nicht schon über die
- * Kommandozeile des Compilers gesetzt wurde.
- * CL_FORM wird erst innerhalb von obrepX.h definiert.
- * Die Definition von CONTENV, etc wird bis hinter die Einbindung von
- * obrepX.h verzögert.
- *
- * Revision 1.30  1993/09/09  09:55:29  uho
- * Zwei neue Macros definiert, deren Expansion bisher im Codegenerator
- * vorgenommen wurde: MEM_UP_MOVE und MV_TO_STACK.
- *
- * Revision 1.29  1993/09/07  16:10:24  sma
- * obrep?.h enthält objektrepäsentationsspezigische Definitionen
- *
- * Revision 1.28  1993/08/10  11:44:51  ft
- * Makro zum Pruefen auf den Typ CL_INSTANCE eingefuegt.
- *
- * Revision 1.27  1993/08/10  11:13:21  pm
- * Erweiterungen des FFI um Pointer
- *
- * Revision 1.26  1993/07/22  08:54:43  pm
- * LOAD- und GET-Funktionen für C-Strukturen
- *
- * Revision 1.25  1993/07/05  16:03:21  sma
- * Nur eine Zeile und trotzdem ein Fehler...
- *
- * Revision 1.24  1993/07/05  14:34:20  sma
- * OFFSET-Makro eingefuegt, welches anstelle des STACK-Makros benutzt werden
- * soll, wenn dieses nicht mit dem LISP-Stack zusammen eingesetzt wird.
- *
- * Revision 1.23  1993/07/05  12:30:31  hk
- * stack deklariert.
- *
- * Revision 1.22  1993/07/05  12:23:45  hk
- * ILLEGAL_ARGS deklariert.
- *
- * Revision 1.21  1993/06/30  17:10:51  hk
- * Deklaration fuer Ssys eingefuegt.
- *
- * Revision 1.20  1993/06/17  08:59:19  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.19  1993/06/14  16:58:42  hk
- * Deklaration fuer Variable Symbols herausgenommen, Kommentare neu formatiert.
- *
- * Revision 1.18  1993/06/04  18:03:56  wg
- * Tippfehler bei LOAD_C_... eliminiert.
- *
- * Revision 1.17  1993/06/04  13:41:43  pm
- * Globale Variable save_stack deklariert
- *
- * Revision 1.16  1993/05/31  16:57:03  pm
- * Fehler beseitigt
- *
- * Revision 1.15  1993/05/23  17:42:34  pm
- * alle primitiven C-Typen eingebaut
- * LOAD- und GET-Macros dafuer geschrieben
- *
- * Revision 1.14  1993/05/13  13:31:44  pm
- * GET_FOREIGN_INT eingebaut
- *
- * Revision 1.13  1993/05/03  12:26:42  pm
- * Erweiterung um die Tags fuer das FFI
- *
- * Revision 1.12  1993/04/22  10:31:09  hk
- * NIL_VALUE hat Wert 0,
- * SYMBOL und SYMVAL bekommen zusaetzliches Argument base,
- * einen Zeiger auf das Symbol-Array eines Moduls.
- *
- * Revision 1.11  1993/03/25  10:21:53  ft
- * CLASS_SIZE auf 6 erhoeht.
- *
- * Revision 1.10  1993/03/12  10:42:16  ft
- * Deklarationen zur Codegenerierung fuer Klassen.
- *
- * Revision 1.9  1993/02/17  16:21:49  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.8  1992/12/07  16:53:53  ft
- * Erweiterung um CL_INSTANCE.
- *
- * Revision 1.7  1992/11/26  11:43:48  pm
- * GET_STRING und GET_STREAM rausgeworfen (Relikte)
- *
- * Revision 1.6  1992/09/09  10:03:02  hk
- * Vorkommen von CL_PACKAGE entfernt, da nicht definiert.
- *
- * Revision 1.5  1992/09/08  15:12:26  hk
- * In LOAD_GLOBFUN wird nun GET_GFARG statt faelschlich GET_FORM benutzt.
- *
- * Revision 1.4  1992/09/08  13:46:17  hk
- * Extern Decl. fuer mv_args entfernt, da nicht benutzt.
- *
- * Revision 1.3  1992/04/15  08:59:26  hk
- * Schreibfehler korrigiert.
- *
- * Revision 1.2  1992/04/14  14:29:26  hk
- * CATCHENV in CONTENV und last_catch in last_cont umbenannt.
- *
- * Revision 1.1  1992/03/24  17:20:39  hk
- * Initial revision
- *
- *               1991/01/16            hk
- * BOOL wird durch char ersetzt, damit cproto es richtig erkennt
+ * $Revision: 1.46 $
+ * $Id: c_decl.h,v 1.46 1994/11/22 15:10:31 hk Exp $
 ------------------------------------------------------------------------------*/
 
 #include <stdio.h>
@@ -154,10 +32,9 @@
 /*------------------------------------------------------------------------------
  * Konfiguration
  *----------------------------------------------------------------------------*/
-#ifndef __OBREP
-#define __OBREP  1              /* Art der Datenrepräsentation */
-#endif
-#define __INT_GE_PTR            /* sizeof(int) >= sizeof(void *) */
+#include <obrep.h>
+
+/* #define INT_GE_PTR */      /* sizeof(int) >= sizeof(void *) */
 
 #ifdef __STDC__                 /* PTR ist allgemeiner Zeiger */
 typedef void *PTR;
@@ -196,13 +73,14 @@ typedef void CLOSURE_FUN (/*CL_FORM *base, ...*/);
 /*------------------------------------------------------------------------------
  * Alle Datenrepräsentationsabhängigen Definitionen einbinden...
  *----------------------------------------------------------------------------*/
-#if __OBREP == 1
+#if OBREP == 1
 #include "obrep1.h"
-#elif __OBREP == 2
+#elif OBREP == 2
 #include "obrep2.h"
 #else
-/* Dies sollte einen Laufzeitfehler erzeugen :-) */
-#include <error: __OBREP isn't defined or hold's an unsupported value>
+/* Der Whitespace vor dem #error ist notwendig, damit Pre-ANSI-C-Compiler
+ * das unbekannte Praeprozessorkommando ggf. ignorieren. */
+	#error "OBREP is not defined or has an unsupported value"
 #endif
 
 
@@ -315,7 +193,7 @@ struct contenv
  * sizeof(char*) > sizeof(int) gilt, Zeiger als Parameter von longjmp 
  * angegeben werden können.
  *----------------------------------------------------------------------------*/
-#ifdef __INT_GE_PTR
+#ifdef INT_GE_PTR
 #define SETJMP(buf)  setjmp(buf)
 #define LONGJMP(buf, value)  longjmp(buf, (int)(value))
 #else
@@ -332,6 +210,12 @@ struct contenv
 #define RET_BOOL(expr)  LOAD_BOOL(expr, ARG(0))
 
 #define RET_BOOL_OPT(expr)  if (!(expr)) LOAD_NIL(ARG(0))
+
+/*------------------------------------------------------------------------------
+ * Die Funktion get_c_string ist einfach genug, ein Makro sein zu koennen,
+ * dies beschleunigt sx_hashstring und allgemein Hashtabellen.
+ *----------------------------------------------------------------------------*/
+#define get_c_string(lisp_string) AR_STRING(GET_FORM(lisp_string))
 
 /*------------------------------------------------------------------------------
  * Speicherverwaltung: Konsistenzpruefung und Test auf Konstanten
@@ -389,6 +273,8 @@ extern char ILLEGAL_ARGS[];     /* in main.c */
 extern long tag_counter;        /* in main.c */
 extern BOOL bool_result;        /* in main.c */
 extern CL_FORM *stack;          /* in system.c */
+extern CL_FORM *fo_heap;        /* in system.c */
+extern unsigned form_heapsize;  /* in system.c */
 extern int mv_count;            /* in values.c */
 extern CL_FORM mv_buf[];        /* in values.c */
 extern CL_FORM bind_stack[];    /* in catch.c */

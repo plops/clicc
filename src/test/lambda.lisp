@@ -1,24 +1,32 @@
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Inhalt   : Tests zu Lambda-Listen in unbenannten und benannten Funktionen
 ;;;            Makrodefinitionen.
 ;;;            In Zukunft sollen hier auch die Lambda-Listen generischer von
 ;;;            Funktionen und Methodendefinitionen getestet werden.
 ;;;
-;;; $Revision: 1.4 $
-;;; $Log: lambda.lisp,v $
-;;; Revision 1.4  1993/02/16  17:15:49  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.3  1992/09/25  08:05:53  hk
-;;; Neuer Test mit special und closure Variabalen.
-;;;
-;;; Revision 1.2  1992/09/09  13:12:04  kl
-;;; Macrotests eingefuegt.
-;;;
-;;; Revision 1.1  1992/09/04  16:30:40  kl
-;;; Initial revision
+;;; $Revision: 1.5 $
+;;; $Id: lambda.lisp,v 1.5 1994/11/22 14:45:44 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "USER")

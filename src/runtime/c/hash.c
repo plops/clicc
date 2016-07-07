@@ -1,55 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- * Funktion : Laufzeitsystem
- *            - Low Level Hash-Funktionen
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * $Revision: 1.13 $
- * $Log: hash.c,v $
- * Revision 1.13  1994/04/28  09:47:43  sma
- * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
  *
- * Revision 1.12  1994/04/23  16:47:33  sma
- * hash() umgeschrieben, so daß keine Länge mehr übergeben werden muß.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ * Function : Low Level Hash-Functions
  *
- * Revision 1.11  1994/01/24  16:29:02  sma
- * combine-hash jetzt in LISP implementiert.
- *
- * Revision 1.10  1994/01/05  12:48:26  sma
- * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
- * versehen.
- *
- * Revision 1.9  1993/12/09  15:08:05  sma
- * string-hash und sxhash-simple-string gelöscht und in Lisp
- * programmiert. sxhash-string funktioniert jetzt nur noch mit
- * simple-strings statt mit beliebigen strings. STACK(base, xxx) ->
- * ARG(xxx)
- *
- * Revision 1.8  1993/06/30  16:41:45  hk
- * Neue Funktionen: sxhash_simple_string, sxhash_string, combine_hash.
- *
- * Revision 1.7  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.6  1993/04/22  10:29:34  hk
- * fun_decl.h -> sys.h.
- *
- * Revision 1.5  1993/02/17  15:42:20  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.4  1993/01/08  09:44:13  hk
- * Namen C_ nach c_.
- *
- * Revision 1.3  1992/10/05  17:00:26  hk
- * Kommentar zu string-hash korrigiert.
- *
- * Revision 1.2  1992/09/28  17:20:28  hk
- * Lerror -> Labort, neues Lerror mit Lisp-Parameter
- *
- * Revision 1.1  1992/03/24  17:03:37  hk
- * Initial revision
+ * $Revision: 1.14 $
+ * $Id: hash.c,v 1.14 1994/11/22 14:54:01 hk Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>

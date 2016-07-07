@@ -1,77 +1,36 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- * Funktion : System-Funktionen: Characters
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * $Revision: 1.17 $
- * $Log: character.c,v $
- * Revision 1.17  1994/05/22  15:50:05  sma
- * LOAD_FIXNUM -> LOAD_SMALLFIXNUM um Compiler-Warnung abzuschaffen.
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
  *
- * Revision 1.16  1994/04/28  09:43:25  sma
- * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ * Funktion : Characters
  *
- * Revision 1.15  1994/04/23  16:30:42  sma
- * RET_BOOL_OPT eingeführt. Dieses Makro lädt nicht explizit einen "true
- * value", wenn das Prädikat erfüllt ist.
- *
- * Revision 1.14  1994/02/01  14:13:36  uho
- * In rt_digit_char das fehlende 'X' in digitchars ergänzt.
- *
- * Revision 1.13  1994/01/14  09:20:41  sma
- * Character-Funktionen neu geschrieben. Mehr Lisp, weniger C. Alle
- * zeichensatzunabhängigen Funktionen befinden sich jetzt im LISP-Teil.
- *
- * Revision 1.12  1994/01/05  12:47:15  sma
- * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
- * versehen und den Postfix _internal entfernt. STACK(base,x) -> ARG(x)
- *
- * Revision 1.11  1993/08/27  11:48:44  sma
- * cproto-Warnungen wegen mehrzeiligem String beseitigt
- *
- * Revision 1.10  1993/08/26  15:31:07  sma
- * include <string.h> eingefuegt und char_table wieder entfernt.
- *
- * Revision 1.9  1993/08/24  16:20:43  sma
- * Variable char_table eingefügt und etwas aufgeräumt.
- *
- * Revision 1.8  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.7  1993/04/22  10:29:34  hk
- * fun_decl.h -> sys.h.
- *
- * Revision 1.6  1993/02/17  15:29:25  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.5  1993/01/08  09:44:13  hk
- * Namen C_ nach c_.
- *
- * Revision 1.4  1992/11/22  13:58:16  kl
- * strncasecmp in our_strncasecmp umbenannt.
- *
- * Revision 1.3  1992/09/28  17:20:28  hk
- * Lerror -> Labort, neues Lerror mit Lisp-Parameter
- *
- * Revision 1.2  1992/07/21  13:49:59  hk
- * Fchareq --> FcharE, etc..
- *
- * Revision 1.1  1992/03/24  17:03:37  hk
- * Initial revision
- *
- * 13.01.92 : strncasecmp selbst kodiert
- *
- * 25.06.91 : strnicmp durch strncasecmp ersetzt
- *
- * 12.11.90 : Erste Version
+ * $Revision: 1.20 $
+ * $Id: character.c,v 1.20 1995/04/26 13:22:02 uho Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>
 #include "sys.h"
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 
 /*------------------------------------------------------------------------------
  * Zeichenklassen-Tests
@@ -116,16 +75,13 @@ LISP_FUN(rt_both_case_p)
  *----------------------------------------------------------------------------*/
 LISP_FUN(rt_digit_char)
 {
-   static char digitchars[] =
-      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-   int ch = GET_CHAR(ARG(0));
+   char buf[2];
 
-   if (isalnum(ch))
-   {
-      ch = (int)(strchr(digitchars, ch) - digitchars);
-      if (ch >= 36) ch -= 26;
-      LOAD_SMALLFIXNUM(ch, ARG(0));
-   }
+   buf[0] = GET_CHAR(ARG(0));
+   buf[1] = '\0';
+
+   if (isalnum(buf[0]))
+      LOAD_SMALLFIXNUM(strtol(buf, NULL, 36), ARG(0));
    else
       LOAD_NIL(ARG(0));
 }

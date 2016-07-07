@@ -1,93 +1,30 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- * Funktion : Print Funktion fuer CL_FORMs
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * $Revision: 1.24 $
- * $Log: debug.c,v $
- * Revision 1.24  1994/05/31  15:17:06  sma
- * UNBOUND wieder als eigenen Tzp eingefuehrt.
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
  *
- * Revision 1.23  1994/05/18  15:18:12  sma
- * Anpassung für obrep2. Abstraktionen verbessert. (Außerdem Quelltext
- * teilweise neu formatiert)
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ * Function : primitive print functions which may be called by a debugger
+ *            to inspect stack locations and other memeory locations
  *
- * Revision 1.22  1994/05/06  08:26:24  hk
- * Structure-Printer angepa"st: size enth"alt die Anzahl der Slots, also
- * size+1
- *
- * Revision 1.21  1994/01/21  13:34:49  sma
- * Erneute Änderung der Symbolrepräsentation. Änderug für neue
- * Repräsentation von #<unbound>.
- *
- * Revision 1.20  1994/01/14  09:18:18  sma
- * Änderung der Symbol-Repräsentation auch für dc_pure_symbol.
- *
- * Revision 1.19  1994/01/13  16:36:51  sma
- * Änderung der Symbol-Repräsentation.
- *
- * Revision 1.18  1993/12/10  15:14:48  sma
- * in main.c wird stack_cont(stack, 0, 0) aufgerufen, was bis eben als
- * ungültiges Argument angesehen wurde. Ist korrigiert.
- *
- * Revision 1.17  1993/12/10  11:35:39  sma
- * extern-Declaration in stack_cont vergessen.
- *
- * Revision 1.16  1993/12/09  15:00:29  sma
- * Änderungen für neue array-Repräsentation. Code für jetzt unbenutzte Typen wie
- * CL_SMAR_FIXNUM entfernt. Source neu eingerückt. Check für stack_cont
- * eingebaut, der die "beliebten" BUS-Errors beim Debugen unterdrückt,
- * die entstehen, weil man stack_cont falsch aufruft.
- *
- * Revision 1.15  1993/10/27  12:23:59  sma
- * Auf die Länge von Strukturen und Instanzen wird jetzt (korrekterweise)
- * mit dem AR_SIZE-Makro zugegriffen.
- *
- * Revision 1.14  1993/09/19  18:02:32  sma
- * inspect um RT_*-Typen erweitert.
- * show_alist() zeigt formatiert eine a-liste an.
- *
- * Revision 1.13  1993/08/26  16:15:16  hk
- * Noch einen Cast für printf eingefügt.
- *
- * Revision 1.12  1993/08/26  15:51:26  hk
- * Einige Casts für Argumente vob printf eingefügt.
- *
- * Revision 1.11  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.10  1993/06/09  12:46:16  hk
- * dc_area geloescht, symbol_module_i neu.
- *
- * Revision 1.9  1993/04/22  10:22:16  hk
- * fun_decl.h -> sys.h, Funktion sym_table gestrichen.
- *
- * Revision 1.8  1993/04/19  07:56:43  ft
- * Pruefung auf NIL bei Typ 50 geaendert.
- *
- * Revision 1.7  1993/03/24  14:43:08  sma
- * schoener formatiert (fuer ft)
- *
- * Revision 1.6  1993/02/17  15:33:52  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.5  1992/12/11  09:24:22  ft
- * Erweiterung von inspect um case's fuer Instanzen bzw. Klassen.
- *
- * Revision 1.4  1992/10/02  15:00:36  uho
- * Extern-Deklaration von fo_heap entfernt, da schon in fun_decl.h
- * enthalten.
- *
- * Revision 1.3  1992/08/04  16:48:38  hk
- * Schreibfehler.
- *
- * Revision 1.2  1992/08/04  16:41:45  hk
- * Weitere Print-Methoden fuer Lisp-Objekte eingefuegt.
- *
- * Revision 1.1  1992/03/24  17:03:37  hk
- * Initial revision
+ * $Revision: 1.26 $
+ * $Id: debug.c,v 1.26 1994/11/22 14:54:01 hk Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>
@@ -208,12 +145,12 @@ BOOL in_list_p;
       break;
 
       /*----------------------------------------------------------------------*/
-	case CL_SMVEC_T:             /* 20 */
+	case CL_SMVEC_T:             /* 16 */
       size = AR_SIZE(fptr);
       printf("#1A%ld(", size);
       for (i = 0; i < size; i++)
       {
-         inspect(OFFSET(FORM_AR(fptr), i), level + 1, 0, FALSE);
+         inspect(OFFSET(AR_BASE(fptr), i), level + 1, 0, FALSE);
          if (i < size - 1)
             printf(" ");
          if (i > print_length)
@@ -226,7 +163,7 @@ BOOL in_list_p;
       break;
 
       /*----------------------------------------------------------------------*/
-	case CL_SMVEC_FIXNUM:        /* 21 */
+	case CL_SMVEC_FIXNUM:        /* 17 */
    {
       long *fixnum_ar = FIXNUM_AR(fptr);
 
@@ -248,7 +185,7 @@ BOOL in_list_p;
    }
 
       /*----------------------------------------------------------------------*/
-	case CL_SMVEC_FLOAT:         /* 22 */
+	case CL_SMVEC_FLOAT:         /* 18 */
    {
 		double *fl_ptr = FLOAT_AR(fptr);
 
@@ -269,9 +206,13 @@ BOOL in_list_p;
 		break;
    }
       /*----------------------------------------------------------------------*/
-	case CL_SMSTR:               /* 23 */
+	case CL_SMVEC_CHARACTER:     /* 19 */
       printf("\"%.*s\"", (int)AR_SIZE(fptr), AR_STRING(fptr));
       break;
+
+   case CL_SMVEC_BIT:           /* 20 */
+      printf("<Bitvector>");
+      break; 
       
       /*----------------------------------------------------------------------*/
 	case CL_STRUCT:              /* 39 */

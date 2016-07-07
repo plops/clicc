@@ -1,91 +1,31 @@
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Funktionen zur Steuerung der Optimierungsdurchlaeufe.
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Steuerung der Optimierungsdurchlaeufe.
 ;;;            Optimierungen eines einzelnen Ausdrucks oder rekursiv eines
 ;;;            Ausdrucks und aller seiner Komponenten.
 ;;;
-;;; $Revision: 1.23 $
-;;; $Log: optimain.lisp,v $
-;;; Revision 1.23  1994/05/02  11:34:37  pm
-;;; Fehler behoben
-;;; *optimize -> *optimize*
-;;;
-;;; Revision 1.22  1994/05/01  22:46:18  hk
-;;; Kein Gewicht berechnen, wenn *OPTIMIZE* = nil
-;;;
-;;; Revision 1.21  1994/04/06  11:45:31  jh
-;;; Statistik erweitert.
-;;;
-;;; Revision 1.20  1994/02/18  13:57:49  hk
-;;; Typ-Optimierung der If-Ausdr"ucke erfolgt nun von au"sen nach innen,
-;;; die zu eliminierenden Zweigen sollen nicht optimiert werden, um die
-;;; Statistik nicht zu verf"alschen und keine "uberfl"ussigen Warnungen zu
-;;; erhalten.
-;;;
-;;; Revision 1.19  1994/02/02  09:33:36  hk
-;;; Statistik an die Änderungen in simplifier angepaßt.
-;;; Weigt wird nur bestimmt, wenn Inlining angeschaltet ist.
-;;;
-;;; Revision 1.18  1994/01/26  14:22:55  sma
-;;; Änderung (von jh) damit auf ohne Optimierungen die Funcalls von
-;;; inline-compilierten setf-funs aufgelöst werden.
-;;;
-;;; Revision 1.17  1994/01/15  22:01:46  kl
-;;; Liste der Statistikmeldungen erweitert.
-;;;
-;;; Revision 1.16  1994/01/14  14:32:43  sma
-;;; Neuer Text für Optimierung von mehr- in 2-stellige Funktionen ergänzt.
-;;;
-;;; Revision 1.15  1993/11/26  12:24:38  jh
-;;; Statistik erweitert (equal-to-eql).
-;;;
-;;; Revision 1.14  1993/11/15  12:19:13  jh
-;;; Statistik erweitert.
-;;;
-;;; Revision 1.13  1993/10/20  15:43:30  jh
-;;; Statistik erweitert.
-;;;
-;;; Revision 1.12  1993/10/15  10:40:42  hk
-;;; optimize-parts (progn-form) geht nun davon aus, daß form-list nicht
-;;; leer ist.
-;;;
-;;; Revision 1.11  1993/10/08  18:16:42  kl
-;;; Tagged-forms behalten nun ihren Typ (bottom).
-;;;
-;;; Revision 1.10  1993/09/20  14:15:54  jh
-;;; Statistik erweitert.
-;;;
-;;; Revision 1.9  1993/09/01  15:24:51  jh
-;;; Fehler in optimize-parts fuer let/cc-form behoben.
-;;;
-;;; Revision 1.8  1993/08/30  14:06:31  jh
-;;; Nach dem Optimieren werden die Typen neu gesetzt. Dadurch werden teilweise
-;;; weitere Optimierungen bereits im selben Durchlauf moeglich.
-;;;
-;;; Revision 1.7  1993/08/26  14:48:58  jh
-;;; Statistik erweitert.
-;;;
-;;; Revision 1.6  1993/08/26  13:01:27  jh
-;;; Fehler in optimize-parts fuer progn-form behoben.
-;;;
-;;; Revision 1.5  1993/08/25  14:48:14  jh
-;;; Statistik fuer die Optimierungen, die auf der Seiteneffektanalyse beruhen,
-;;; eingebaut.
-;;;
-;;; Revision 1.4  1993/07/23  09:39:07  hk
-;;; *optimize-verbosity* auf 1 (wg. tomain)
-;;;
-;;; Revision 1.3  1993/07/08  10:48:30  jh
-;;; Einfache Optimierungen, die auf der Seiteneffektanalyse beruhen (seomain)
-;;; eingebaut.
-;;;
-;;; Revision 1.2  1993/06/30  16:41:15  hk
-;;; Schreibfehler in (optimize-parts mv-lambda) behoben.
-;;;
-;;; Revision 1.1  1993/06/30  15:22:53  jh
-;;; Initial revision
-;;;
+;;; $Revision: 1.26 $
+;;; $Id: optimain.lisp,v 1.26 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -205,7 +145,8 @@ to nth argument.")
 ;; toplevel-forms.
 ;;------------------------------------------------------------------------------
 (defun optimize-module (a-module)
-  (optimize-fun-def-list (?all-global-funs a-module)))
+  (let ((*level* 0))
+    (optimize-fun-def-list (?all-global-funs a-module))))
 
 (defun do-optimization ()
   (let (*optimize-statistics*)
@@ -216,8 +157,7 @@ to nth argument.")
 ;;------------------------------------------------------------------------------
 
 (defmethod optimize-fun-def ((a-simple-fun simple-fun))
-  (let ((*current-function* a-simple-fun)
-        (*current-fun* (?symbol a-simple-fun))
+  (let ((*current-fun* a-simple-fun)
         (*result-used* t))
     (optimize-params (?params a-simple-fun))
     (optimize-field (?body a-simple-fun))))
@@ -374,7 +314,8 @@ to nth argument.")
   ;; In und nach einer labels-form duerfen keine Ersetzungen vorgenommen werden.
   ;; (Bei Beachtung der Seiteneffekte kann hier genauer gearbeitet werden.)
   (clear-substitution)
-  (optimize-fun-def-list (?fun-list a-labels-form))
+  (let ((*level* (1+ *level*)))
+    (optimize-fun-def-list (?fun-list a-labels-form)))
   (optimize-field (?body a-labels-form))
   (setf (?type a-labels-form) (?type (?body a-labels-form)))
   a-labels-form)

@@ -1,9 +1,26 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem, Predicates
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Predicates
 ;;;            - TYPEP, SUBTYPEP in sehr eingeschraenkter Form.
 ;;;            - Praedikate zum Testen, ob ein Objekt eines bestimmten Typs
 ;;;              vorliegt. Die Definition dieser Funktionen scheinen zirkulaer
@@ -12,44 +29,8 @@
 ;;;            - Funktionen zum Testen gewisser Eigenschaften von Fixnums und
 ;;;              Arrays.
 ;;;
-;;; $Revision: 1.10 $
-;;; $Log: pred.lisp,v $
-;;; Revision 1.10  1994/01/24  16:21:13  sma
-;;; Not und null in LISP implementiert. Beide Funktionen muessen T
-;;; und nicht nur einen Wahrheitswert `true' zurueckliefern. Da das Symbol
-;;; T nicht mehr im Codegenerator bekannt ist, muessen diese Funktionen
-;;; zunaechst hier implementiert werden bis eine neue Optimierungsfunktion
-;;; geschrieben wurde.
-;;;
-;;; Revision 1.9  1993/12/09  17:13:20  sma
-;;; rt::simple-array-p -> simple-array-p.
-;;;
-;;; Revision 1.8  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.7  1993/04/22  10:44:14  hk
-;;;  (in-package "RUNTIME") -> (in-package "LISP"),
-;;; exports eingefuegt, commonp gestrichen, viele Praedikate nach inline.lisp
-;;;
-;;; Revision 1.6  1993/04/07  09:13:52  hk
-;;; Viele Praedikate nach inline.lisp
-;;;
-;;; Revision 1.5  1993/04/06  10:59:49  hk
-;;; check-integer-low, check-integer-high, check-string-size,
-;;; check-vector-size gestrichen, check-integer vereinfacht.
-;;;
-;;; Revision 1.4  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.10 $ eingefuegt
-;;;
-;;; Revision 1.3  1993/01/19  12:53:54  ft
-;;; Vorkommen von STRIN-CHAR in TYPEP gestrichen.
-;;;
-;;; Revision 1.2  1992/07/28  11:35:30  hk
-;;; Neue Funktionen check-integer-{low,high}.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.11 $
+;;; $Id: pred.lisp,v 1.11 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")

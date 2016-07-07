@@ -1,35 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Ersetzung von Konstanten und Variablen durch ihre Werte.
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.7 $
-;;; $Log: subst.lisp,v $
-;;; Revision 1.7  1994/03/03  13:53:44  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.6  1994/02/08  14:48:14  hk
-;;; used Slot nur in defined-fun/sym/class erhöhen.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Ersetzung von Konstanten und Variablen durch ihre Werte.
 ;;;
-;;; Revision 1.5  1993/09/21  12:52:14  jh
-;;; Voreilig eingecheckten Fehler beseitigt.
-;;;
-;;; Revision 1.4  1993/09/21  12:21:20  jh
-;;; Statt inc-used-slot zu verwenden, werden die used- und read-slots jetzt
-;;; direkt veraendert, da inc-used-slot mit Analysemarken arbeitet, die nicht
-;;; mehr aktuell sein muessen.
-;;;
-;;; Revision 1.3  1993/09/20  14:30:23  jh
-;;; Die used-Slots werden jetzt richtig verwaltet.
-;;;
-;;; Revision 1.2  1993/09/17  13:57:26  jh
-;;; Test #'eq bei assoc angegeben.
-;;;
-;;; Revision 1.1  1993/06/30  15:23:03  jh
-;;; Initial revision
-;;;
+;;; $Revision: 1.9 $
+;;; $Id: subst.lisp,v 1.9 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -56,8 +50,11 @@
   `(setq *SUBSTITUTION* ()))
 
 ;;------------------------------------------------------------------------------
+;; Diese Formen koennen mittels EQ verglichen werden
+;;------------------------------------------------------------------------------
 (defun copy-is-eq-p (x)
-  (or (and (simple-literal-p x) (not (float-form-p x)))
+  (or (null-form-p x)
+      (character-form-p x)
       (sym-p x)
       (fun-p x)
       (cont-p x)

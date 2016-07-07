@@ -1,10 +1,7 @@
                  Uebersicht zur Implementation der Zwischensprache
 	         -------------------------------------------------
 $Revision: 1.2 $
-$Log: Klassenbaum.txt,v $
-# Revision 1.2  1993/07/27  16:29:03  hk
-# Revision Keyword hinzugefuegt
-#
+$Id: Klassenbaum.txt,v 1.2 1993/07/27 16:29:03 hk Exp $
 
 zws-object -+- module
 	    |

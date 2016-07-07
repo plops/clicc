@@ -1,158 +1,36 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Syntaktischer Export und Import
 ;;;
-;;; $Revision: 1.35 $
-;;; $Log: sexport.lisp,v $
-;;; Revision 1.35  1994/01/24  16:15:29  sma
-;;; Fehler in write-syntax-export korrigiert.
-;;;
-;;; Revision 1.34  1993/12/18  11:08:58  hk
-;;; Noch einmal korrigiert.
-;;;
-;;; Revision 1.33  1993/12/18  09:48:17  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.32  1993/12/18  09:29:38  hk
-;;; package-name nur auf Package, nicht auf Namen anwenden (wg. AKCL).
-;;;
-;;; Revision 1.31  1993/12/09  17:05:52  uho
-;;; Meldung wird nicht mehr hier sondern zentral ausgegeben.
-;;;
-;;; Packages werden beim Einlesen der .def-Files angelegt. In
-;;; 'syntax-import' wird dann die Package-Use-List und die Nicknames
-;;; gestetzt.
-;;;
-;;; Revision 1.30  1993/12/09  10:04:58  uho
-;;; Beim Importieren syntaktisch und als Programmobjekt exportierter
-;;; Funktionen wird die zugehoerige Zwischensprach-Funktion in den neuen
-;;; slot 'syntax' der 'imported-fun'-Zwischensprachobjekte eingetragen.
-;;;
-;;; Revision 1.29  1993/12/07  11:13:34  uho
-;;; Achja. Ausserdem wird nun der Slot 'source' an den Funktionen des Moduls
-;;; zurueckgesetzt, nachdem der syntaktische Export vorgenommen wurde.
-;;; (Funktion: 'write-syntax-export')
-;;;
-;;; Revision 1.28  1993/12/07  11:06:56  uho
-;;; Syntaktisch exportierte Funktionsdefinitionen werden nun nicht mehr
-;;; durch 'p1-defun' importiert. Sie werden nun zur Interpretation nach
-;;; LZS ueberfuehrt und in das globale Environment eingetragen
-;;; (Funktion 'syntax-import-defun').
-;;;
-;;; Fuer ein IMPORT, das keine Package-Angabe enthaelt, wird eine
-;;; IMPORT-Spezifikation in das .syntax-File geschrieben, die das aktuelle
-;;; Package enthaelt. (Funktion 'write-syntax-export').
-;;;
-;;; Statt DEFUN wird das Schluesselwort SYNTAX-DEFUN verwendet, um die
-;;; Qualitaet des 'syntaktischen' Exports zu verdeutlichen.
-;;;
-;;; Ein Syntax-Import findet nun auch dann statt, wenn (?package *module*)
-;;; noch ungebunden ist (Im Quellcode stand dann noch keine entsprechende
-;;; Package Operation). (Funktion 'source-code-looks-like-a-new-module')
-;;;
-;;; Revision 1.27  1993/09/07  09:51:43  ft
-;;; Der Aufruf von p1-def-built-in in syntax-import liefert jetzt einen
-;;; Wert fuer die Annotation order einer built-in-class.
-;;;
-;;; Revision 1.26  1993/07/27  16:53:06  uho
-;;; IMPORT-Direktiven in Syntax-Headerfiles werden nun mit ausgewerteten
-;;; Argumenten generiert.
-;;; Beim Einlesen der Syntax-Headerfiles muessen IMPORT und EXPORT-
-;;; Direktiven konstante Parameter besitzen.
-;;;
-;;;
-;;; Revision 1.25  1993/07/19  14:48:05  uho
-;;; Generierung des Aufrufs der Initialisierungsfunktion und des
-;;; Zuruecksetzens von *PACKAGE* nach p1-load verschoben.
-;;;
-;;; Revision 1.24  1993/07/13  11:30:10  uho
-;;; Beim Importieren von Modulen ('syntax-import') wird jetzt Code fuer
-;;; den Aufruf der Initialisierungsfunktion des importierten Modul und das
-;;; richtige Ruecksetzen auf das aktuelle Package generiert.
-;;;
-;;; Revision 1.23  1993/07/05  17:48:53  kl
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.22  1993/07/05  13:18:54  uho
-;;; Neues Verfahren zum Schreiben und Lesen der Syntax-Headerfiles
-;;; eingebaut.
-;;;
-;;; Revision 1.21  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.20  1993/05/19  16:17:28  uho
-;;; Debugging-Funktionen auskommentiert.
-;;;
-;;; Revision 1.19  1993/05/14  13:18:55  hk
-;;; L:: eingefuegt, Lisp Package wird nicht ge-un-used.
-;;;
-;;; Revision 1.18  1993/05/14  09:10:13  hk
-;;; find-package nicht auf Package anwenden.
-;;;
-;;; Revision 1.17  1993/05/07  08:35:22  hk
-;;; In syntax-import: Aufruf von p1-def-built-in.
-;;;
-;;; Revision 1.16  1993/05/06  14:51:52  uho
-;;; Keine Ausgaben mehr waehrend des Syntax-Imports
-;;;
-;;; Revision 1.15  1993/05/03  15:24:23  uho
-;;; Einlesen von DEFTYPEs eingefuegt.
-;;;
-;;; Revision 1.14  1993/04/21  10:11:35  hk
-;;; write-syntax-export nach *OUT-FILENAME*.
-;;;
-;;; Revision 1.13  1993/04/21  08:53:11  ft
-;;; Anpassung an 'def-built-in'.
-;;;
-;;; Revision 1.12  1993/04/20  09:17:08  uho
-;;; Print-Parameter fuer write-syntax-export gesetzt.
-;;;
-;;; Revision 1.11  1993/04/20  09:07:57  uho
-;;; Behandlung von DEFVAR beim Importieren eingefuegt.
-;;;
-;;; Revision 1.10  1993/04/20  08:40:53  uho
-;;; DEFPARAMETER in write-syntax-export behandelt
-;;;
-;;; Revision 1.9  1993/04/16  11:02:49  kl
-;;; require an den Anfang der Datei verlegt.
-;;;
-;;; Revision 1.8  1993/04/16  08:36:26  uho
-;;; Syntax von PROCLAIM SPECIAL in DEFVAR umgeaendert
-;;;
-;;; Revision 1.7  1993/04/15  11:53:59  uho
-;;; Verfahren zum Funktionsmarkieren umgestellt;
-;;; Vergleich in  is-module-import  korrigiert.
-;;;
-;;; Revision 1.6  1993/04/15  08:31:53  hk
-;;; mark-all-exported-syntax-functions kennt nun :COMPILER-MACRO.
-;;;
-;;; Revision 1.5  1993/04/15  07:52:34  hk
-;;; Wert von *tr-fun-selector* korrigiert.
-;;;
-;;; Revision 1.4  1993/04/14  11:59:40  hk
-;;; Syntax von Special Deklarationen korrigiert.
-;;;
-;;; Revision 1.3  1993/04/14  10:25:19  hk
-;;; is-module-import: Neues Modul, wenn angegebenes Package in
-;;; (IN-PACKAGE <Package-name> ...) nicht mit dem Package des gerade
-;;; uebersetzten Modul uebereinstimmt.
-;;;
-;;; Revision 1.2  1993/04/14  07:57:02  kl
-;;; Ignore-Deklarationen eingefuegt.
-;;;
-;;; Revision 1.1  1993/04/08  14:55:56  uho
-;;; Initial revision
-;;;
+;;; $Revision: 1.38 $
+;;; $Id: sexport.lisp,v 1.38 1994/12/13 16:08:34 hk Exp $
 ;;;-----------------------------------------------------------------------------
 (in-package "CLICC")
 
 (require "traverse")
 
 
-(defvar *SYNTAX-EXTENSION* ".syntax")
+(defvar *SYNTAX-EXTENSION* "syntax")
 
 ;;------------------------------------------------------------------------------
 ;; Grundlegende Funktionen zur Manipulation der Liste der syntaktischen Exporte
@@ -452,7 +330,7 @@
   ;; --------------------
   (with-open-file
       (syntax-header-file
-       (concatenate 'string *OUT-FILENAME* *SYNTAX-EXTENSION*)
+       (calc-syntax-pathname *OUT-FILENAME*)
        :direction :output
        :if-exists :supersede)
     
@@ -609,10 +487,11 @@
 ;; Moduls ueberein.
 ;; Liefere ein Flag: T = ein neues Modul, NIL = Bestandteil des aktuellen Moduls
 ;;------------------------------------------------------------------------------
-(defun is-module-import (filename &optional ext)
-  (let ((*CLICC-FILENAME* (clc-probe-file filename ext))
-        (syntax-filename  (clc-probe-file filename *SYNTAX-EXTENSION*))
-        (*PACKAGE* (find-package "LISP")))
+(defun is-module-import (pathname)
+  (let* ((*CLICC-FILENAME* (clc-probe-file pathname))
+         (syntax-file (calc-syntax-pathname pathname))
+         (syntax-file-exists-p (probe-file syntax-file))
+         (*PACKAGE* (find-package "LISP")))
     
     (labels ((source-code-looks-like-a-new-module ()
                (block fun
@@ -635,27 +514,31 @@
                                   (eq (find-package (p1-eval (second form)))
                                       (?package *module*)))))))
                             (T (return-from fun NIL))))))
-                     ;; kein Quellcode gefunden: nimm an er gehoere zu einem
-                     ;; Modul
-                     (return-from fun T)))))
+                     
+                     ;; kein Quellcode gefunden: Die Frage kann nicht
+                     ;; beantwortet werden.
+                     ;;--------------------
+                     (clicc-error "File ~A cannot be loaded, it does not exist"
+                                pathname)))))
       
       (and (source-code-looks-like-a-new-module)
-           (if (null syntax-filename)
+           (if (not syntax-file-exists-p)
                (if *module-compiler*
                    (clicc-error "Cannot INCLUDE another module from file ~A"
-                                filename)
+                                pathname)
                    NIL)
                T)))))
 
 ;;------------------------------------------------------------------------------
 ;; Importiere die im angegebenen File vorhandenenen Syntax Exporte
 ;;------------------------------------------------------------------------------
-(defun syntax-import (filename)
+(defun syntax-import (pathname)
   (let* ((*PACKAGE* (find-package "LISP"))
-         (*CLICC-FILENAME* (clc-probe-file filename *SYNTAX-EXTENSION*)))
+         (syntax-file (calc-syntax-pathname pathname))
+         (*CLICC-FILENAME* (probe-file syntax-file)))
     (cond
       ((null *CLICC-FILENAME*)
-       (clc-error "File ~A~A does not exist.~%" filename *SYNTAX-EXTENSION*))
+       (clc-error "File ~A does not exist.~%" syntax-file))
       (T
        (block read-syntax-forms
          (with-open-file (headerfile *CLICC-FILENAME* :direction :input)
@@ -691,6 +574,10 @@
                     (otherwise (internal-error
                                 "syntax-import"
                                 "Undefined keyword: ~A" name)))))))))))))
+
+;;------------------------------------------------------------------------------
+(defun calc-syntax-pathname (pathname)
+  (make-pathname :type *SYNTAX-EXTENSION* :defaults pathname))
 
 ;;------------------------------------------------------------------------------
 (provide "sexport")

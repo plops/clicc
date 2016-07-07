@@ -1,35 +1,38 @@
---------------------------------------------------------------------------------
- Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
---------------------------------------------------------------------------------
- Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-            ------------------------------------------------------
- Funktion : COPYRIGHT Notice
-
- $Revision: 1.1 $
- $Id: COPYRIGHT,v 1.1 1993/06/18 13:05:19 hk Exp $
+---------------------------------------------------------------------
+ CLiCC: The Common Lisp to C Compiler
+ Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ Christian-Albrechts-Universitaet zu Kiel, Germany
+---------------------------------------------------------------------
+ $Revision: 1.2 $
+ $Id: COPYRIGHT,v 1.2 1994/11/22 15:13:29 hk Exp $
 -----------------------------------------------------------------------------
 
-Institut fuer Informatik und Praktische Mathematik
-Preusserstr. 1 - 9
-24105 Kiel, Germany
-(in the following named CAU Kiel)
-
 Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice and warranty
-disclaimer appear in supporting documentation, and that the name of
-CAU Kiel not be used in advertising or publicity pertaining to
+documentation for any purpose under the terms of the GNU General
+Public License version 2 is hereby granted, provided that the name of
+CAU Kiel is not used in advertising or publicity pertaining to
 distribution of the software without specific, written prior
 permission.
 
-CAU Kiel disclaims all warranties with regard to this software, including
-all implied warranties of merchantability and fitness. In no event
-shall CAU Kiel be liable for any special, indirect or consequential
-damages or any damages whatsoever resulting from loss of use, data or
-profits, whether in an action of contract, negligence or other
-tortious action, arising out of or in connection with the use or
-performance of this software.
+CLiCC has been developed as part of the APPLY research project,
+funded by the German Ministry of Research and Technology.
+
+CLiCC is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+CLiCC is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License in file COPYING for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-
+Christian-Albrechts-Universitaet zu Kiel
+Institut fuer Informatik und Praktische Mathematik
+Preusserstr. 1 - 9
+D-24105 Kiel, Germany

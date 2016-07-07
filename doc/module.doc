@@ -3,10 +3,7 @@ Projekt  : APPLY - A Practicable And Portable Lisp Implementation
            Anmerkungen zur Modulkompilation
 
 $Revision: 1.1 $
-$Log: module.doc,v $
-# Revision 1.1  1993/06/15  09:11:02  hk
-# Initial revision
-#
+$Id: module.doc,v 1.1 1993/06/15 09:11:02 hk Exp $
 
 Keywords
 --------

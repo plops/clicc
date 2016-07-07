@@ -1,250 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Ein Interpretierer fuer Teile der Zwischensprache.
-;;;
-;;; $Revision: 1.70 $
-;;; $Log: p1eval.lisp,v $
-;;; Revision 1.70  1994/04/28  13:40:44  hk
-;;; Fehler in zw-eval (mv-lambda t) behoben.
-;;;
-;;; Revision 1.69  1994/03/11  14:44:40  hk
-;;; break kann interpretiert werden, damit man Fehler in
-;;; Makro-Expansionsfunktionen eingrenzen kann.
-;;;
-;;; Revision 1.68  1994/03/08  16:26:32  hk
-;;; zw-eval f"ur let* bricht ab, wenn dynamische Variablen gebunden werden
-;;; sollen.
-;;;
-;;; Revision 1.67  1994/03/03  13:48:27  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.66  1994/02/09  15:30:38  hk
-;;; p1-eval kennt nun rt::set-prop und rt::remf-internal, die aus der
-;;; Makroexpansion von (setf getf) und remf entstehen.
-;;;
-;;; Revision 1.65  1994/02/08  14:49:09  hk
-;;; eval fÜR mv-lambda eingebaut.
-;;;
-;;; Revision 1.64  1993/12/09  10:12:53  hk
-;;; (method zw-apply imported-fun): (declare (ignore env)) gestrichen.
-;;;
-;;; Revision 1.63  1993/12/09  10:07:07  hk
-;;; zw-apply auf imported-fun verwendet nun ggf. die Funktion im Slot
-;;; syntax.
-;;;
-;;; Revision 1.62  1993/12/01  11:49:36  ft
-;;; Beim Aufruf von make-hash-table in init-zw-sym-fun-hash-table die
-;;; Groesse angegeben, da *zw-sym-fun-hash-table* konstant.
-;;;
-;;; Revision 1.61  1993/08/20  10:53:02  hk
-;;; In p1-eval (array character) -> (array standard-char), da in vielen
-;;; Implementierungen gilt: (array character) = (array T)
-;;;
-;;; Revision 1.60  1993/07/26  14:42:43  hk
-;;; Klammerfehler behoben
-;;;
-;;; Revision 1.59  1993/07/26  13:48:06  hk
-;;; Fehler in eval-structured-literal-value behoben: die Konstanten
-;;; duerfen nicht destruktiv veraendert werden, da der urspruengliche Wert
-;;; evt. der Wert einer Konstanten ist, der weiterhin verwendet werden
-;;; kann.
-;;;
-;;; Revision 1.58  1993/07/19  15:21:32  hk
-;;; Neu: eval-structured-literal-value
-;;;
-;;; Revision 1.57  1993/07/16  09:47:39  uho
-;;; dito fuer #-(or CLISP CMU) auf #-PCL
-;;;
-;;; Revision 1.56  1993/07/16  09:43:54  uho
-;;; Fuer Function als Specializer von #+(or CLISP CMU) auf #+PCL
-;;; umgestellt.
-;;;
-;;; Revision 1.55  1993/07/13  14:22:40  hk
-;;; Hash table fuer zw-symbol-fun hat nun test #'equal wg. (setf car)
-;;;
-;;; Revision 1.54  1993/07/02  11:27:59  hk
-;;; (setf ..) Funktionen in init-zw-sym-fun-hash-table eingetragen
-;;;
-;;; Revision 1.53  1993/06/23  13:20:29  uho
-;;; In p1-eval noch einen Fall fuer Symbol eingeschoben, da in CLtL1
-;;; (functionp 'sym) immer T ist.
-;;;
-;;; Revision 1.52  1993/06/23  10:25:16  uho
-;;; Inkompatibilitaet von LUCID und CLISP umgangen:
-;;;     (typep hallo '(array character)) => ???
-;;;
-;;; Revision 1.51  1993/06/23  08:23:29  hk
-;;; p1-eval: map-array nicht auf strings anwenden.
-;;;
-;;; Revision 1.50  1993/06/22  13:59:51  hk
-;;; Fixed a typo
-;;;
-;;; Revision 1.49  1993/06/22  13:29:02  hk
-;;; Resultat von p1-eval darf keine funktionalen Objekte enthalten.
-;;;
-;;; Revision 1.48  1993/06/22  08:28:45  uho
-;;; Fehler in CLISP (sym-fun) umgangen.
-;;;
-;;; Revision 1.47  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.46  1993/05/19  15:14:23  hk
-;;; *zw-sym-fun-hash-table* wird in init-zw-sym-fun-hash-table
-;;; mit einer Hashtable initialisiert.
-;;;
-;;; Revision 1.45  1993/05/19  13:47:28  ft
-;;; Auf Wunsch von Karsten einen Fehlerabbruch durch einen Abbruch des
-;;; Evaluationsversuchs ersetzt.
-;;;
-;;; Revision 1.44  1993/05/13  13:41:51  hk
-;;; Anpassung an CMU und CLISP.
-;;;
-;;; Revision 1.43  1993/04/30  13:48:28  hk
-;;; init-zw-sym-fun-hash-table vervollstaendigt.
-;;;
-;;; Revision 1.42  1993/04/20  14:31:26  ft
-;;; Auf besonderen Wunsch von Karsten wird bei Special-Variablen die
-;;; Evaluation ohne Fehler abgebrochen.
-;;;
-;;; Revision 1.41  1993/04/15  07:29:33  hk
-;;; init-zw-sym-fun-hash-table: Number Funktionen hinzugefuegt.
-;;;
-;;; Revision 1.40  1993/04/15  06:43:59  hk
-;;; In init-zw-sym-fun-hash-table Sequence Funktionen eingefuegt.
-;;;
-;;; Revision 1.39  1993/04/07  14:03:58  hk
-;;; Methode (zw-eval function) hinzugefuegt; fuer die Ausfuehrung von
-;;; Lisp Systemfunktionen bei der Makroexpansion.
-;;;
-;;; Revision 1.38  1993/04/06  09:48:59  hk
-;;; Predicates on Numbers hinzugefuegt.
-;;;
-;;; Revision 1.37  1993/04/06  09:40:34  hk
-;;; init-zw-sym-fun-hash-table um some, every, notany und notevery erw.
-;;;
-;;; Revision 1.36  1993/04/05  14:32:53  hk
-;;; Integerp in init-zw-sym-fun-hash-table.
-;;;
-;;; Revision 1.35  1993/03/22  17:36:12  hk
-;;; Keywords in LZS Slots.
-;;;
-;;; Revision 1.34  1993/03/18  14:51:33  ft
-;;; zw-eval um eine Methode ueber Klassen erweitert.
-;;;
-;;; Revision 1.33  1993/02/18  15:07:30  kl
-;;; Liste der waehrend der Makroexpansion genutzten Funktionen erweitert.
-;;;
-;;; Revision 1.32  1993/02/17  11:04:28  hk
-;;; Fehler in init-zw-sym-fun-hash-table behoben, anderes Makro.
-;;;
-;;; Revision 1.31  1993/02/16  17:31:11  hk
-;;; Fehler in init-zw-sym-fun-hash-table behoben: CLICC-LISP -> LISP.
-;;;
-;;; Revision 1.30  1993/02/16  16:59:57  hk
-;;; Revision Keyword eingefuegt, in init-zw-sym-fun-hash-table wird eine
-;;; Zuordnung von Symbolen im clicc-lisp Package zu Funktionen im lisp Package
-;;; hergestellt.
-;;;
-;;; Revision 1.29  1993/01/27  13:00:43  kl
-;;; last und butlast koennen jetzt waehrend der Uebersetzungszeit ausgewertet
-;;; werden.
-;;;
-;;; Revision 1.28  1993/01/19  12:57:15  hk
-;;; Symbole werden nur noch evaluiert, wenn sie Konstanten sind, deren
-;;; Wert bekannt ist.
-;;;
-;;; Revision 1.27  1993/01/14  14:40:07  hk
-;;; Neue Funktionen in init-zw-sym-fun-hash-table.
-;;;
-;;; Revision 1.26  1993/01/06  13:19:01  hk
-;;; init-zw-sym-fun-hash-table von p0init nach hier kopiert.
-;;;
-;;; Revision 1.25  1992/11/26  08:23:44  ft
-;;; Abbruch der Auswertung, statt Fehler, bei Forwaerts-referenzierter
-;;; Konstante.
-;;;
-;;; Revision 1.24  1992/11/24  13:14:01  ft
-;;; Fehlermeldung aus zw-symbol-fun entfernt.
-;;;
-;;; Revision 1.23  1992/11/20  13:49:57  ft
-;;; Abbruchmoeglichkeit fuer zw-eval geschaffen und Funktionsauswertung
-;;; begrenzt.
-;;;
-;;; Revision 1.22  1992/09/29  12:15:56  hk
-;;; Fehlermeldungstext.
-;;;
-;;; Revision 1.21  1992/09/25  17:14:16  kl
-;;; Umstellung auf die neue Repraesentation der einfachen Literale.
-;;;
-;;; Revision 1.20  1992/09/14  13:56:12  kl
-;;; constant-value-p nach zsdef.lisp verlegt.
-;;;
-;;; Revision 1.19  1992/09/04  12:02:35  kl
-;;; Log message korrigiert.
-;;;
-;;; Revision 1.18  1992/09/04  12:01:45  kl
-;;; In zw-eval werden benannte Konstanten, die nicht forward als Wert
-;;; enthalten zu der Auswertung der values-Komponente evaluiert.
-;;;
-;;; Revision 1.17  1992/08/11  16:25:49  hk
-;;; Declare Ignore.
-;;;
-;;; Revision 1.16  1992/08/10  11:01:10  hk
-;;; Labels-Form herausgezogen fuer CMU-Lisp.
-;;;
-;;; Revision 1.15  1992/08/06  13:05:32  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.14  1992/08/06  13:00:17  hk
-;;; Eval fuer tagbody und go geschrieben, fuer let/cc und cont korrigiert.
-;;;
-;;; Revision 1.13  1992/07/31  14:10:00  hk
-;;; Interpretation von Funktionen umgestellt, jetzt auch lokal-funs.
-;;;
-;;; Revision 1.12  1992/07/28  11:38:30  hk
-;;; p1-eval benutzt nun in-compile-time-env, Konstante listen werden beim
-;;; evaluieren nicht mehr destruktiv veraendert, Schreibfehler beseitigt.
-;;;
-;;; Revision 1.11  1992/07/23  08:42:13  hk
-;;; var-ref --> location.
-;;;
-;;; Revision 1.10  1992/07/09  15:06:35  hk
-;;; Keine Warnung, wenn in p1-eval mit symbol-function aufruft.
-;;;
-;;; Revision 1.9  1992/07/02  13:20:51  hk
-;;; Fehlermeldung bei (error) in zw-eval (structure-literal) eingefuegt.
-;;;
-;;; Revision 1.8  1992/06/11  08:46:03  hk
-;;; Warning, wenn in zw-eval eine Fkt. des Wirts-Lisps aufgerufen wird.
-;;;
-;;; Revision 1.7  1992/06/10  16:25:31  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.6  1992/06/10  16:22:32  hk
-;;; Wert eines Symbols ist ggf. konstanter Wert des Symbols.
-;;;
-;;; Revision 1.5  1992/06/10  16:11:16  hk
-;;; Fehler in zw-eval (progn-form), Resultat des letzten Ausdrucks verwenden.
-;;;
-;;; Revision 1.4  1992/06/05  12:41:23  hk
-;;; Continuations eingebaut; in app werden fun nicht evaluiert.
-;;;
-;;; Revision 1.3  1992/06/05  11:56:08  hk
-;;; Abbruchbedingung in zw-eval (let*-form) eingefuegt.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial RCS-revision
-;;;
-;;; Revision 1.0 24.07.91 
-;;; In CLICC-GET-BQ-FUNCTIONS wird MACROEXPAND benutzt, denn evtl. enthalten 
-;;; die aus Backquote-Ausdruecken erzeugten internen Ausdruecke Makros.
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Ein Interpretierer fuer Teile der Zwischensprache.
+;;;
+;;; $Revision: 1.71 $
+;;; $Id: p1eval.lisp,v 1.71 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

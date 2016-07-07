@@ -1,123 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Hilsfunktionen, Hilfsmakros, Fehlermeldungen, Par-spec
 ;;;
-;;; $Revision: 1.35 $
-;;; $Log: clcmisc.lisp,v $
-;;; Revision 1.35  1994/06/10  23:31:11  hk
-;;; Neue Funktion intern-postnum, die an ein Symbol eine Zahl anh"angt
-;;;
-;;; Revision 1.34  1994/06/03  15:25:41  uho
-;;; Underscores werden in C Namen zu Us.
-;;;
-;;; Revision 1.33  1994/02/22  14:46:25  hk
-;;; check-nparams gestrichen, Fehler in clc-check-nparams behoben.
-;;;
-;;; Revision 1.32  1994/02/21  10:26:14  kl
-;;; clc-check-nparams erweitert und neue Unterfunktionen dazu geschrieben.
-;;;
-;;; Revision 1.31  1994/02/08  11:06:00  sma
-;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
-;;;
-;;; Revision 1.30  1993/11/17  23:00:31  hk
-;;; In clc-probe-file wurde (open .. :probe) durch (probe-file ..)
-;;; ersetzt, weil akcl sonst das limit für 'open files' überschritten
-;;; hatte.
-;;;
-;;; Revision 1.29  1993/08/20  10:41:17  hk
-;;; :element-type eingefuegt bei make-array mit :displaced-to.
-;;;
-;;; Revision 1.28  1993/07/28  11:14:51  hk
-;;; merge-pathnames in clc-probe-file verwendet
-;;;
-;;; Revision 1.27  1993/07/26  13:45:24  hk
-;;; Neue Funktion copy-array
-;;;
-;;; Revision 1.26  1993/07/19  11:37:09  hk
-;;; Kommentar korrigiert
-;;;
-;;; Revision 1.25  1993/07/13  11:16:28  uho
-;;; Funktionen 'C-ify' und 'unique-prefix' aus cgfuns hierher geschoben.
-;;; Funktion 'calc-C-name' definiert, der aus einem String einen gueltigen
-;;; C-Identifikator macht.
-;;;
-;;; Revision 1.24  1993/06/22  12:51:15  uho
-;;; Extrabehandlung von *default-pathnames-defaults* fuer CLISP eingebaut
-;;;
-;;; Revision 1.23  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.22  1993/05/28  14:52:06  kl
-;;; duplicates-in-list umgestellt.
-;;;
-;;; Revision 1.21  1993/05/06  15:13:21  hk
-;;; break in clc-error.
-;;;
-;;; Revision 1.20  1993/04/07  16:07:07  hk
-;;; Fehlermeldungen und Warnings nach *error-output*.
-;;;
-;;; Revision 1.19  1993/04/03  09:37:37  hk
-;;; Neues Macro match-args, das die Argumente eines Aufrufs destrukturiert.
-;;;
-;;; Revision 1.18  1993/03/30  13:00:34  hk
-;;; Neues Macro match zum destrukturieren von Listen in lokale Variablen.
-;;;
-;;; Revision 1.17  1993/02/17  11:15:59  kl
-;;; Intern-prefixed und intern-postfixed akzeptieren statt Symbolen nun
-;;; auch Strings.
-;;;
-;;; Revision 1.16  1993/02/16  15:27:21  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.15  1993/01/22  14:53:35  ft
-;;; duplicates-in-list an erweiterte Funktionsnamen angepasst.
-;;;
-;;; Revision 1.14  1993/01/20  15:16:12  kl
-;;; intern-prefixed und intern-postfixed eingefuehrt.
-;;;
-;;; Revision 1.13  1993/01/07  15:04:03  hk
-;;; ~a durch ~s ersetzt.
-;;;
-;;; Revision 1.12  1992/12/02  10:58:51  hk
-;;; Error und Warning Messages nicht bzw. als anderer Kommentar.
-;;;
-;;; Revision 1.11  1992/12/02  10:46:54  hk
-;;; In clc-check-nparams wurde clicc-error durch clc-error ersetzt,
-;;; damit clc-check-nparams auch in Pass3 benutzt werden kann.
-;;;
-;;; Revision 1.10  1992/11/05  09:16:35  kl
-;;; subclasses und subclasses* nach printzs.lisp verlegt.
-;;;
-;;; Revision 1.9  1992/11/04  13:45:10  kl
-;;; Funktion internal-error fuer CLICC-interne Fehler eingefuehrt.
-;;;
-;;; Revision 1.8  1992/11/03  12:36:49  ft
-;;; Erweiterung um Hilfsfunktionen aus printzs.lisp.
-;;;
-;;; Revision 1.7  1992/10/08  16:51:33  hk
-;;; Neue Funktion duplicates-in-list.
-;;;
-;;; Revision 1.6  1992/09/29  20:37:53  hk
-;;; Kein (throw 'ABORT nil) mehr, clc-error neu, kein (tab) mehr.
-;;;
-;;; Revision 1.5  1992/08/07  11:47:36  hk
-;;; Syntaktische Aenderungen.
-;;;
-;;; Revision 1.4  1992/07/09  16:34:16  hk
-;;; Neue Funktionen map-array und update-array.
-;;;
-;;; Revision 1.3  1992/06/05  12:42:06  hk
-;;; Aufruf von (break) in clicc-error.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.37 $
+;;; $Id: clcmisc.lisp,v 1.37 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")     
@@ -487,50 +393,20 @@
         (unique-prefix c-name :prefix-letter prefix)
         (concatenate 'string prefix c-name))))
 
-
-;;------------------------------------------------------------------------------
-;; ******** Betriebsystemabhaengig *********
-;;------------------------------------------------------------------------------
 ;;------------------------------------------------------------------------------
 ;; Testet, ob eine Datei mit Namen 'filename' geoeffnet werden kann.
-;; Resultat: Dateiname, falls Datei existiert, NIL sonst.
+;; Pr"uft verschiedene Extensions.
+;; Resultat: Truename, falls Datei existiert, NIL sonst.
 ;;------------------------------------------------------------------------------
-(defun clc-probe-file (filename ext)
-  (do ((extensions (if (and ext (string/= "" ext))
-                     (list ext)
-                     '(".lisp" ".lsp" ".cl" "")))
-       filename-ext)
-      ((null extensions) nil)
-    (setq filename-ext
-          (merge-pathnames (concatenate 'string filename (pop extensions))))
-    (when (probe-file filename-ext)
-      (return filename-ext))))
-
-;;------------------------------------------------------------------------------
-(defun strip-path (name)
-  (let ((n (position #\/ name :from-end t)))
-    (if n
-      (subseq name (1+ n))
-      name)))
-
-;;------------------------------------------------------------------------------
-(defun get-path (name)
-  (let ((n (position #\/ name :from-end t)))
-    (if n
-      (subseq name 0 (1+ n))
-      "")))
-
-;;------------------------------------------------------------------------------
-;; Teilt einen Pfadnamen-String auf in den Name und Extension
-;;------------------------------------------------------------------------------
-(defun split-name-ext (name)
-  (let* ((slash-pos (position #\/ name :test #'char= :from-end t))
-         (dot-pos   (position #\. name :test #'char= :start (if slash-pos 
-                                                                (1+ slash-pos) 
-                                                                0))))
-    (if dot-pos
-      (values (subseq name 0 dot-pos) (subseq name dot-pos))
-      (values name ""))))
+(defun clc-probe-file (pathname)
+  (let ((type (pathname-type pathname)))
+    (if type
+      (probe-file pathname)
+      (dolist (type *POSSIBLE-LISP-EXTENSIONS* nil)
+        (let ((file-exists
+               (probe-file (make-pathname :type type :defaults pathname))))
+          (when file-exists
+            (return file-exists)))))))
 
 ;;------------------------------------------------------------------------------
 (provide "clcmisc")

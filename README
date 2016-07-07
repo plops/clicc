@@ -1,12 +1,10 @@
 ---------------------------------------------------------------------
- Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+ CLiCC: The Common Lisp to C Compiler
+ Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ Christian-Albrechts-Universitaet zu Kiel, Germany
 ---------------------------------------------------------------------
- Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-            ------------------------------------------------------
- Funktion : README for CLiCC
-
- $Revision: 1.8 $
- $Id: README,v 1.8 1994/06/23 14:59:01 hk Exp $
+ $Revision: 1.10 $
+ $Id: README,v 1.10 1994/11/28 16:06:24 hk Exp $
 ------------------------------------------------------------------
 
  CLiCC is a Common Lisp to C Compiler.  It generates C-executables 
@@ -32,7 +30,7 @@
            CLiCC is available via anonymous ftp from
  
            ftp.informatik.uni-kiel.de  (134.245.15.114) 
-           file: kiel/apply/clicc-0.6.4.tar.gz
+           file: /pub/kiel/apply/clicc-0.6.5.tar.gz
  
  -----------------------------------------------------------------
  

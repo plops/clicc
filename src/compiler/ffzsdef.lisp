@@ -1,49 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Zwischensprachkonstrukte fuer das Foreign Function Interface
 ;;;
-;;; $Revision: 1.12 $
-;;; $Log: ffzsdef.lisp,v $
-;;; Revision 1.12  1994/06/07  15:34:57  jh
-;;; provide eingefuegt.
-;;;
-;;; Revision 1.11  1994/04/18  12:11:14  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Weitere Annotation fuer das Zwischensprachkonstrukt fuer
-;;;   Call-Out-Functions.
-;;;
-;;; Revision 1.10  1993/12/16  16:36:29  pm
-;;; Bezeichner bei foreign-fun umbenannt. Zur Vereinheitlichung.
-;;;
-;;; Revision 1.9  1993/11/03  11:46:27  pm
-;;; Inkonsistenzen in den Symbolnamen behoben.
-;;;
-;;; Revision 1.8  1993/07/26  16:52:10  pm
-;;; Erweiterungen um Strukturen
-;;;
-;;; Revision 1.7  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.6  1993/05/31  17:03:53  pm
-;;; Struktur fuer call-in-Funktionen eingefuegt
-;;;
-;;; Revision 1.5  1993/03/10  12:48:47  pm
-;;; Kleinigkeiten geaendert
-;;;
-;;; Revision 1.4  1993/02/16  15:23:12  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.3  1992/11/05  10:47:02  pm
-;;; Ueberarbeitet
-;;;
-;;; Revision 1.2  1992/10/16  16:05:10  pm
-;;; Zwischensprach-Konstrukt fuer Foreign-Functions
-;;;
-;;; Revision 1.1  1992/10/16  16:02:58  pm
-;;; Initial revision
+;;; $Revision: 1.13 $
+;;; $Id: ffzsdef.lisp,v 1.13 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 

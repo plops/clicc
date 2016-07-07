@@ -3,10 +3,7 @@ Projekt  : APPLY - A Practicable And Portable Lisp Implementation
            Resultat von Pr"adikaten des Laufzeitsystems
 
 $Revision: 1.1 $
-$Log: predicates.doc,v $
-# Revision 1.1  1993/06/15  09:28:20  hk
-# Initial revision
-#
+$Id: predicates.doc,v 1.1 1993/06/15 09:28:20 hk Exp $
 
 Diese Datei beschreibt das Resultat von Pr"adikaten, falls sie nicht
 das Symbol T im Erfolgsfall liefern.

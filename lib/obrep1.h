@@ -1,113 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
  * Funktion : obrep1.h - datenrepräsentationsspezifisch
  *
- * $Revision: 1.26 $
- * $Log: obrep1.h,v $
- * Revision 1.26  1994/05/31  15:15:25  sma
- * UNBOUND wieder als eigenen Tzp eingefuehrt.
- *
- * Revision 1.25  1994/05/22  15:00:38  sma
- * LOAD_SMALLFIXNUM-Makro eingefügt.
- *
- * Revision 1.24  1994/05/18  15:13:40  sma
- * Neues EQL-Makro; Makros MALLOC und HEAP_ALIGN gelöscht; global_funarg
- * und down_funarg von c_decl.h nach hier verschoben; Makros für Zugriff
- * auf global/down_funarg von funcall.c nach hier verschoben; neues Makro
- * INIT_FUN welches obrep-spezifische Initialisierungen enthalten kann.
- *
- * Revision 1.23  1994/04/28  09:40:51  sma
- * Viele Änderungen um eine höhere Abstraktion des von CLiCC erzeugten
- * C-Codes zu erlangen.
- *
- * Revision 1.22  1994/04/18  11:40:37  pm
- * Foreign Function Interface voellig ueberarbeitet.
- * - Weggefallene Macros entfernt
- * - Macros fuer den Umgang mit C-Typen umgeschrieben bzw. angepasst
- * - Neue Macros eingefuegt
- *
- * Revision 1.21  1994/04/11  12:45:32  sma
- * Neues Makro REST_NOT_EMPTY, im Rahmen einer Korrektur für
- * rest-variablen, die auf Prädikatsposition stehen.
- *
- * Revision 1.20  1994/02/03  17:28:35  sma
- * Änderungen für Optimierung von &rest-Paramtern.
- *
- * Revision 1.19  1994/01/26  11:04:28  sma
- * Letzten Verweis auf in symbols.c definiertes T entfernt.
- *
- * Revision 1.18  1994/01/24  16:40:27  sma
- * LOAD_T liefert jetzt nicht mehr das Symbol T (geht nicht, dies wird
- * `erst' im LISP-Modul definiert) sondern einen Wahrheitswert `true'
- * (momentan repräsentiert durch #\T). Korrektur der AR_SIZE von
- * Strukturen. Probehalber mal TAG mit dem Typ int definiert.
- *
- * Revision 1.17  1994/01/21  13:15:26  sma
- * Fehler in INIT_SYMBOL verbessert
- *
- * Revision 1.16  1994/01/21  08:25:25  sma
- * Erneute Änderung der Symbolrepräsentation (letzte Änderung war keine
- * so gute Idee). Änderung der Repräsentation von UNBOUND.
- *
- * Revision 1.15  1994/01/13  16:31:50  sma
- * Änderungen durch Umstellung der Symbolrepräsentation. Statt direkt
- * eine "Immitation" eines simple-string am Symbolanfang zu speichern
- * wird ein echtes simple-string-Objekt eingetragen.
- *
- * Revision 1.14  1994/01/05  12:57:44  sma
- * SYM_MAKE_SYM-Makro gelöscht. INIT_* und LOAD_VEC_*-Makros eingefügt.
- * Damit ist das Erzeugen von Vektoren, Strukturen, Instanzen und
- * Symbolen weiter von der objektrepräsentation abstrahiert.
- *
- * Revision 1.13  1993/12/16  16:26:22  pm
- * Fehler behoben.
- *
- * Revision 1.12  1993/12/14  12:19:16  sma
- * Neues Testmakro CL_SMVEC_T_P für simple-vector-p.
- *
- * Revision 1.11  1993/12/09  13:47:05  sma
- * MAKE_LIST in MAKE_CONSREF geändert. Alle Makros und Konstanten für die
- * neue Array-Repräsentation verändert/ergänzt/gelöscht. STACK(base, xx)
- * in ARG(xx) geändert.
- *
- * Revision 1.10  1993/11/12  13:09:05  sma
- * Neue Konstante BITS_PER_FIXNUM.
- *
- * Revision 1.9  1993/10/29  15:02:31  sma
- * Änderungen für korrektes Funktionieren von obrep1 & obrep2.
- *
- * Revision 1.8  1993/10/14  15:54:04  sma
- * Weitere Makros eingeführt, um obrep1 und obrep2 ohne Änderung von
- * weiterem Code austauschen zu können.
- *
- * Revision 1.7  1993/09/28  16:03:29  pm
- * Fehler korrigiert.
- *
- * Revision 1.6  1993/09/28  14:44:39  pm
- * Pointer-Tags eingetragen
- *
- * Revision 1.5  1993/09/13  11:51:37  sma
- * Fehler in Längenangaben von Arrays, Vectoren und Instanzen beseitigt
- * durch Einführen des SET_AR_SIZE-Makros.
- *
- * Revision 1.4  1993/09/09  15:30:13  uho
- * Einige Makrodefinitionen eingerückt, um die Lesbarkeit zu erhöhen.
- *
- * Revision 1.3  1993/09/06  16:43:57  sma
- * Umgeordnet, besser kommentiert, neue Makros für Konstantendefinitionen.
- * cgconst.lisp erzeugt jetzt nicht mir direkt CL_INIT-Strukturen, sondern
- * MAKE_* Makros, die die eigentliche Repräsentation der Lispdaten
- * abstrahieren.
- *
- * Revision 1.2  1993/08/23  09:59:44  pm
- * Aenderungen fuer C-Pointer
- *
- * Revision 1.1  1993/08/22  14:26:37  sma
- * Initial revision
- *
+ * $Revision: 1.33 $
+ * $Id: obrep1.h,v 1.33 1995/03/08 14:50:45 wg Exp $
  *----------------------------------------------------------------------------*/
 
 
@@ -261,30 +177,9 @@ typedef struct
 
 #define CL_INSTANCE         50  /* CLOS Instanz */
 
-/* Die nächsten Konstanten müssen in dieser Reihenfolge stehen!! */
-#define CL_C_CHAR           60  /* char, signed-char */
-#define CL_C_SHORT          61  /* short, short-int, signed-short,
-                                   signed-short-int */
-#define CL_C_INT            62  /* int, signed, signed-int */
-#define CL_C_LONG           63  /* long, long-int, signed-long,
-                                   signed-long-int */
-#define CL_C_UNSIGNED_CHAR  64 
-#define CL_C_UNSIGNED_SHORT 65
-#define CL_C_UNSIGNED_INT   66  /* unsigned-int, unsigned */
-#define CL_C_UNSIGNED_LONG  67
-
-#define CL_C_FLOAT          68
-#define CL_C_DOUBLE         69
-#define CL_C_LONG_DOUBLE    70
-/* Bis hier ist die Reihenfolge wichtig */
-
-#define CL_C_STRUCT         71
-#define CL_C_UNION          72
-#define CL_C_ARRAY          73
-#define CL_C_HANDLE         74
-
-#define CL_C_STRING         75
-
+#define CL_FOREIGN          51
+/* hier stehen die weiteren Foreign-Tags: */
+#include "foreign1.h"
 
 /*------------------------------------------------------------------------------
  * Makros für den Zugriff auf die Komponenten eines LISP-Objektes
@@ -322,38 +217,6 @@ typedef struct
 #define INDIRECT(loc)           ((loc)->val.form)
 #define GET_CFILE(loc)          ((loc)->val.cfile)
 
-/* Foreign Fuctions */
-#define GET_C_CHAR(loc)               (char)((loc)->val.ch)
-#define GET_C_SHORT(loc)              (short)((loc)->val.i)
-#define GET_C_INT(loc)                (int)((loc)->val.i)
-#define GET_C_LONG(loc)               (long)((loc)->val.i)
-#define GET_C_UNSIGNED_CHAR(loc)      (unsigned char)((loc)->val.ch)
-#define GET_C_UNSIGNED_SHORT(loc)     (unsigned short)((loc)->val.i)
-#define GET_C_UNSIGNED_INT(loc)       (unsigned int)((loc)->val.i)
-#define GET_C_UNSIGNED_LONG(loc)      (unsigned long)((loc)->val.i)
-#define GET_C_FLOAT(loc)              (float)((loc)->val.i)
-#define GET_C_DOUBLE(loc)             (double)((loc)->val.i)
-#define GET_C_LONG_DOUBLE(loc)        (long double)((loc)->val.i)
-
-#define GET_C_STRING(loc)             (char *)((loc)->val.ch_ptr)
-
-#define GET_C_STRUCT(loc) \
-     *GET_CHAR_PTR(OFFSET(GET_FORM(loc), 2))
-#define GET_C_UNION(loc)  \
-     *GET_CHAR_PTR(OFFSET(GET_FORM(loc), 2))
-#define GET_C_ARRAY(loc)  \
-     *GET_CHAR_PTR(OFFSET(GET_FORM(loc), 2))
-
-#define GET_C_HANDLE(loc) \
-     GET_CHAR_PTR(OFFSET(GET_FORM(loc), 2))
-#define GET_C_STRUCT_PTR(loc) \
-     GET_CHAR_PTR(OFFSET(GET_FORM(loc), 2))
-#define GET_C_UNION_PTR(loc)  \
-     GET_CHAR_PTR(OFFSET(GET_FORM(loc), 2))
-#define GET_C_ARRAY_PTR(loc)  \
-     GET_CHAR_PTR(OFFSET(GET_FORM(loc), 2))
-
-
 /*------------------------------------------------------------------------------
  * Prädikate zum Testen des Datentyps
  *----------------------------------------------------------------------------*/
@@ -377,32 +240,6 @@ typedef struct
 #define CL_DOWNFUNP(loc)   (TYPE_OF (loc) == CL_DOWNFUN)
 #define CL_INSTANCEP(loc)  (TYPE_OF (loc) == CL_INSTANCE)
 #define CL_STRUCTP(loc)    (TYPE_OF (loc) == CL_STRUCT)
-
-#define CL_C_STRUCT_P(loc)         (TYPE_OF (loc) == CL_C_STRUCT)
-#define CL_C_UNION_P(loc)          (TYPE_OF (loc) == CL_C_UNION)
-#define CL_C_ARRAY_P(loc)          (TYPE_OF (loc) == CL_C_ARRAY)
-#define CL_C_HANDLE_P(loc)         (TYPE_OF (loc) == CL_C_HANDLE)
-
-#define CL_C_CHAR_P(loc)           (TYPE_OF (loc) == CL_C_CHAR)
-#define CL_C_SHORT_P(loc)          (TYPE_OF (loc) == CL_C_SHORT ||\
-                                    TYPE_OF (loc) == CL_C_CHAR)
-#define CL_C_INT_P(loc)            (TYPE_OF (loc) == CL_C_INT ||\
-                                    TYPE_OF (loc) == CL_C_SHORT ||\
-                                    TYPE_OF (loc) == CL_C_CHAR)
-#define CL_C_LONG_P(loc)           (TYPE_OF (loc) == CL_C_LONG ||\
-                                    TYPE_OF (loc) == CL_C_INT ||\
-                                    TYPE_OF (loc) == CL_C_SHORT ||\
-                                    TYPE_OF (loc) == CL_C_CHAR)
-#define CL_C_UNSIGNED_CHAR_P(loc)  (TYPE_OF (loc) == CL_C_UNSIGNED_CHAR)
-#define CL_C_UNSIGNED_SHORT_P(loc) (TYPE_OF (loc) == CL_C_UNSIGNED_SHORT ||\
-                                    TYPE_OF (loc) == CL_C_UNSIGNED_CHAR)
-#define CL_C_UNSIGNED_INT_P(loc)   (TYPE_OF (loc) == CL_C_UNSIGNED_INT ||\
-                                    TYPE_OF (loc) == CL_C_UNSIGNED_SHORT ||\
-                                    TYPE_OF (loc) == CL_C_UNSIGNED_CHAR)
-#define CL_C_UNSIGNED_LONG_P(loc)  (TYPE_OF (loc) == CL_C_UNSIGNED_LONG ||\
-                                    TYPE_OF (loc) == CL_C_UNSIGNED_INT ||\
-                                    TYPE_OF (loc) == CL_C_UNSIGNED_SHORT ||\
-                                    TYPE_OF (loc) == CL_C_UNSIGNED_CHAR)
 
 #define CL_NUMBERP(obj) (CL_FIXNUMP(obj) || CL_FLOATP(obj))
 #define CL_LISTP(loc) (CL_CONSP(loc) || CL_NILP(loc))
@@ -453,43 +290,6 @@ typedef struct
 #define LOAD_UNIQUE_TAG(loc)     (SET_TAG(loc, CL_UNIQUE_TAG),\
                                   GET_FIXNUM(loc) = tag_counter++)
 
-#define LOAD_C_CHAR(chr, loc) \
-   (((loc)->val.ch) = (long)(chr), SET_TAG(loc, CL_C_CHAR))
-#define LOAD_C_SHORT(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_SHORT))
-#define LOAD_C_INT(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_INT))
-#define LOAD_C_LONG(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_LONG))
-#define LOAD_C_UNSIGNED_CHAR(chr, loc) \
-   (((loc)->val.ch) = (long)(chr), SET_TAG(loc, CL_C_UNSIGNED_CHAR))
-#define LOAD_C_UNSIGNED_SHORT(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_UNSIGNED_SHORT))
-#define LOAD_C_UNSIGNED_INT(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_UNSIGNED_INT))
-#define LOAD_C_UNSIGNED_LONG(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_UNSIGNED_LONG))
-#define LOAD_C_FLOAT(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_LONG))
-#define LOAD_C_DOUBLE(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_LONG))
-#define LOAD_C_LONG_DOUBLE(num, loc) \
-   (((loc)->val.i) = (long)(num), SET_TAG(loc, CL_C_LONG))
-
-#define LOAD_C_STRUCT(ptr, loc) \
-   (((loc)->val.form) = (ptr), SET_TAG(loc, CL_C_STRUCT))
-#define LOAD_C_UNION(ptr, loc) \
-   (((loc)->val.form) = (ptr), SET_TAG(loc, CL_C_UNION))
-#define LOAD_C_HANDLE(ptr, loc) \
-   (((loc)->val.form) = (ptr), SET_TAG(loc, CL_C_HANDLE))
-#define LOAD_C_ARRAY(ptr, loc) \
-   (((loc)->val.form) = (ptr), SET_TAG(loc, CL_C_ARRAY))
-
-#define LOAD_C_STRING(ptr, loc) \
-   (((loc)->val.ch_ptr) = (ptr), SET_TAG(loc, CL_C_STRING))
-
-
-
 /*------------------------------------------------------------------------------
  * Aufbau von Symbolen
  *----------------------------------------------------------------------------*/
@@ -505,6 +305,17 @@ typedef struct
 #define SYM_VALUE(sym)          (GET_FORM(sym) + OFF_SYM_VALUE)
 #define SYM_PACKAGE(sym)        (GET_FORM(sym) + OFF_SYM_PACKAGE)
 #define SYM_NAME(sym)           (GET_FORM(sym) + OFF_SYM_NAME)
+
+#define GET_SYM_NAME(top,sym,loc) \
+if(FO_CONSTANTq(GET_FORM(sym))) \
+LOAD_SMSTR(SYM_NAME(sym), loc); \
+else \
+{ \
+   CL_FORM *str = form_alloc(top, 2); \
+   COPY(OFFSET(SYM_NAME(sym),0), str); \
+   COPY(OFFSET(SYM_NAME(sym),1), str+1); \
+   LOAD_SMSTR(str, loc); \
+}
 
 #define SYM_SET_NAME(name,sym)  COPY(OFFSET(name,0), OFFSET(SYM_NAME(sym),0));\
                                 COPY(OFFSET(name,1), OFFSET(SYM_NAME(sym),1))
@@ -532,7 +343,6 @@ typedef struct
 #define AR_BASE(ar)          OFFSET(ar, 1)
 #define AR_STRING(ar)        GET_CHAR_PTR(AR_BASE(ar))
 
-#define FORM_AR(ar)          GET_FORM(AR_BASE(ar))
 #define FIXNUM_AR(ar)        GET_FIXNUM_PTR(AR_BASE(ar))
 #define FLOAT_AR(ar)         GET_FLOAT_PTR(AR_BASE(ar))
 #define CHAR_AR(ar)          GET_CHAR_PTR(AR_BASE(ar))
@@ -548,7 +358,13 @@ typedef struct
  *----------------------------------------------------------------------------*/
 #define EQ(x, y) (TYPE_OF(x) == TYPE_OF(y) && GET_FORM(x) == GET_FORM(y))
 
-#define EQL(x, y) (EQ(x, y) || (CL_FLOATP(x) && GET_FLOAT(x) == GET_FLOAT(y)))
+#define EQL(x, y) (EQ(x, y) || \
+                   (CL_FLOATP(x) && CL_FLOATP(y) && \
+                    GET_FLOAT(x) == GET_FLOAT(y)) || \
+                   (CL_C_STRUCTURED_P(x) && CL_C_STRUCTURED_P(y) && \
+                    GET_C_TYPESYMBOL(x) == GET_C_TYPESYMBOL(y) && \
+                    GET_CHAR_PTR(OFFSET(GET_FORM(x), 1)) == \
+                    GET_CHAR_PTR(OFFSET(GET_FORM(y), 1))))
 
 /*------------------------------------------------------------------------------
  * Kopieren von statischen Variablen in den Heap.

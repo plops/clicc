@@ -1,6 +1,6 @@
 -*-indented-text-*-
 --------------------------------------------------------------------------------
-$Header: /home3/apply/public/clicc-0.6.4/doc/RCS/migration,v 1.7 1993/08/04 13:37:55 hk Exp $
+$Header: /home2/karlo/uho/clicc-pre-0.6.5/doc/RCS/migration,v 1.7 1993/08/04 13:37:55 hk Exp $
 
                    Anleitung fuer die Migration 
  
@@ -14,29 +14,7 @@ $Header: /home3/apply/public/clicc-0.6.4/doc/RCS/migration,v 1.7 1993/08/04 13:3
 
 
 $Revision: 1.7 $
-$Log: migration,v $
-# Revision 1.7  1993/08/04  13:37:55  hk
-# Formulierung zu eval und symbol-value geaendert, specific-eval
-# berichtigt.
-#
-# Revision 1.6  1993/08/04  13:07:31  hk
-# Kommentar zur Migration von (eval 'x) korrigiert.
-#
-# Revision 1.5  1993/07/27  16:27:58  hk
-# Revision Keyword hinzugefuegt
-#
-# Revision 1.4  1993/06/10  08:24:39  hk
-# Einfuegen undefinierter Funktionen, eval auf Quote, A-Listen Trick.
-#
-# Revision 1.3  1993/04/30  13:56:16  hk
-# Makroaufrufe vor Definitionen
-#
-# Revision 1.2  1992/10/05  13:53:55  hk
-# Erfahrungen aus der Migration von ALCSAT aus Paderborn sind eingeflossen.
-#
-# Revision 1.1  1992/09/29  10:25:13  uho
-# Initial revision
-#
+$Id: migration,v 1.7 1993/08/04 13:37:55 hk Exp $
 
 Hier sollen Idee und Anmerkungen gesammelt werden, wie man am besten
 das Tor zu CommonLisp durchschreiten kann.

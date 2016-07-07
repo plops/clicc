@@ -1,20 +1,19 @@
 #------------------------------------------------------------------------------
-#  Projekt : CLICC - a Common Lisp to C Compiler
-#            -----------------------------------
+# CLiCC: The Common Lisp to C Compiler
+# Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+# Christian-Albrechts-Universitaet zu Kiel, Germany
 # Function : Generates Lisp runtime-modules for CLICC.
 #            Uses optional parameter OPTIMIZE = <-{O | g}>.
 #            Uses environment variable CLICCROOT and CROSS386.
 #
-#  $Source: /home3/apply/public/clicc-0.6.4/src/runtime/lisp2c/RCS/GNUmakefile386,v $
-#  $Author: uho $
-#  $Revision: 1.4 $
-#  $Date: 1993/06/04 18:28:29 $
+#  $Revision: 1.6 $
+#  $Id: GNUmakefile386,v 1.6 1995/03/02 03:50:08 uho Exp $
 #------------------------------------------------------------------------------
 
 CC	= $(CROSS386)/gcc
 LIB	= $(CLICCROOT)/lib
 OPTIMIZE = -g # alternative to -O is -g
-CFLAGS	= -I$(LIB) $(OPTIMIZE)
+CFLAGS	= -I$(LIB) $(OPTIMIZE) -DCROSSCOMPILE=1
 ARFLAGS	= r
 
 SOURCES 	= $(wildcard *.c)

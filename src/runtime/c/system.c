@@ -1,105 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- * Funktion : Laufzeitsystem-Routinen: Speicherverwaltung, Abort-Funktion
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * $Revision: 1.26 $
- * $Log: system.c,v $
- * Revision 1.26  1994/05/18  15:22:45  sma
- * Anpassung für obrep2. INIT_FUN-Makro in memallot eingefügt, MALLOC und
- * HEAP_ALIGN entfernt. gc() geändert für Anpassung an neuen obrep2-gc.
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
  *
- * Revision 1.25  1994/01/26  10:13:27  sma
- * Verweis auf die Symbole NIL + T in Ssys gelöscht.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ * Funktion : Speicherverwaltung, Abort-Funktion
  *
- * Revision 1.24  1994/01/06  13:48:41  hk
- * gc erhält nun eine Zeichen als zusätzliches Argument. Dieses Zeichen
- * wird in der Garbage Colllection Meldung ausgegeben und zeigt an,
- * welche Speicheranforderung nicht erfüllt werden konnte:
- * o = form, x = fixnum, c = char, b = bit, l = float
- *
- * Revision 1.23  1993/12/16  16:40:44  pm
- * FLAbort fuer Fehlermeldungen des FFI. Wird an Parameterposition
- * benotigt, und muss deswegen einen Wert zurueckgeben.
- *
- * Revision 1.22  1993/12/09  15:17:53  sma
- * swap_bits eingefügt zur garbage collection von bit-vectors.
- * STACK(base, xxx) -> ARG(xxx)
- *
- * Revision 1.21  1993/11/12  13:05:20  sma
- * Funktion bits_alloc reserviert ein Array von Bits.
- *
- * Revision 1.20  1993/11/04  10:43:33  sma
- * toh ist immer korrekt aligned durch Makro HEAP_ALIGN
- *
- * Revision 1.19  1993/11/02  09:30:04  hk
- * Unbenutzte Funktion list_alloc gestrichen.
- *
- * Revision 1.18  1993/10/14  15:46:01  sma
- * Alles Objektrepäsentative nach obrepX.c ausgelagert.
- *
- * Revision 1.17  1993/09/07  17:14:33  sma
- * gc_symbols verändert.
- *
- * Revision 1.16  1993/07/28  15:05:28  hk
- * Bug in char_alloc behoben: das abschliessende 0 Character wurde nicht
- * direkt hinter dem String sondern um 1 zu weit dahinter geschrieben.
- *
- * Revision 1.15  1993/07/13  15:26:31  sma
- * Kopieren durch Systemaufruf memcpy
- *
- * Revision 1.14  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.13  1993/05/31  17:08:31  pm
- * Fehler in den c-floats entfernt
- *
- * Revision 1.12  1993/05/23  17:55:04  pm
- * die Funktion safe_form um den Test fuer die C-Typen erweitert
- *
- * Revision 1.11  1993/05/03  12:35:39  pm
- * garbage-collector versteht jetzt auch die Tags des FFI
- *
- * Revision 1.10  1993/04/22  10:27:26  hk
- * Neue Funktion gc_symbols, die die Symbole eines Moduls traversiert.
- * Bei der Garbage Collection wird gc_main aufgerufen, um das Traversieren
- * der Symbole der Module zu veranlassen. gc_main wird im Hauptprogramm
- * definiert.
- *
- * Revision 1.9  1993/03/25  09:06:38  hk
- * Fehlermeldungen und GC Meldungen nach stderr.
- *
- * Revision 1.8  1993/02/26  14:54:39  ft
- * Den GC um die Behandlung von Instanzen erweitert.
- *
- * Revision 1.7  1993/02/17  15:49:41  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.6  1993/01/06  15:45:26  hk
- * *** empty log message ***
- *
- * Revision 1.5  1993/01/06  15:41:48  hk
- * Character Arrays sind mit einem 0 Character abgeschlossen.
- *
- * Revision 1.4  1992/10/05  16:09:34  uho
- * Statt calloc jetzt malloc benutzt, da calloc mit 0 initialisiert, was
- * gar nicht notwendig ist.
- * Die MIN* und MAX* Preprocessor Symbole in externe Variablen umgewandelt.
- * Sie werden nun im erzeugten Programm definiert.
- *
- * Revision 1.3  1992/10/02  14:58:22  uho
- * Definition der Heapbereiche auf dynamisches Anfordern umgestellt.
- * memallot zum dynamischen Anfordern des Heaps angelegt.
- * Groessen der einzelnen Heapbereiche statt als Konstanten nun als globale
- * Variablen definiert.
- *
- * Revision 1.2  1992/09/28  17:20:28  hk
- * Lerror -> Labort, neues Lerror mit Lisp-Parameter
- *
- * Revision 1.1  1992/03/24  17:03:37  hk
- * Initial revision
+ * $Revision: 1.29 $
+ * $Id: system.c,v 1.29 1994/11/29 15:09:43 hk Exp $
  *----------------------------------------------------------------------------*/
 #ifdef __STDC__
 #include <stdlib.h>
@@ -180,6 +104,9 @@ unsigned fl_heapsize;
  * Returns a pointer to the newly allocated block, or NULL if not succesful
  * ACTELEM is assigne to the number of elements actually allocated.
  *----------------------------------------------------------------------------*/
+#if __STDC__
+static PTR allocate(unsigned, unsigned, unsigned, unsigned *);
+#endif
 static PTR allocate(nelem, minelem, elsize, actnelem)
 unsigned nelem, minelem, elsize, *actnelem;
 {
@@ -207,6 +134,9 @@ unsigned nelem, minelem, elsize, *actnelem;
 /*------------------------------------------------------------------------------
  * Fehlermeldung
  *----------------------------------------------------------------------------*/
+#if __STDC__
+  static void no_mem(char *msg, unsigned amount);
+#endif
 static void no_mem(msg, amount)
 char *msg;
 unsigned amount;
@@ -375,8 +305,10 @@ char type;
    double  *fl_tmp = fl_heap;
    double fo_room, fx_room, fl_room;
 
+#ifdef DEBUG
    fprintf (stderr, ";;; GC -%c- ", type);
    fflush(stderr);
+#endif
 
    /* Vertauschen der Heap-Bereiche */
    /* ----------------------------- */
@@ -397,12 +329,14 @@ char type;
 
    do_gc(base);
 
+#ifdef DEBUG
    fo_room = (double)(form_toh - form_heap) / form_heapsize;
    fx_room = (double)(fx_toh - fx_heap) / fx_heapsize;
    fl_room = (double)(fl_toh - fl_heap) / fl_heapsize;
    fprintf(stderr, "Allocated: %5.2f%% Forms, %5.2f%% \
 Characters/Fixnums, %5.2f%% Floats \n",
            100 * fo_room, 100 * fx_room, 100 * fl_room);
+#endif
 }
 
 /*------------------------------------------------------------------------------

@@ -1,0 +1,941 @@
+% Projekt  : APPLY - A Practicable And Portable Lisp Implementation
+%            ------------------------------------------------------
+%            CL_0 Sprachbeschreibung
+% 
+% $Revision: 1.1 $
+% $Id: cl0-engl.tex,v 1.1 1993/09/03 15:01:38 wg Exp $
+
+\documentstyle[11pt,twoside,apply,eapply,listing]{article}
+
+%% RCS Time is GMT = (MET - 1) !
+%% $Id: cl0-engl.tex,v 1.1 1993/09/03 15:01:38 wg Exp $
+
+
+\def\RCSdate $#1 19#2/#3/#4 #5 ${#4.#3.#2}
+\def\RCSrevision $#1 #2 ${#2}
+
+\def\clos0{{\sc CLOS$_0$}}
+\def\CLOS{{\sc CLOS}}
+\newcommand{\option}[1]{\code{#1}}
+\newcommand{\cliccnote}[1]{%
+  \bigskip
+  \begin{quote}
+  {\bf Note:}\\
+  {\it #1}
+  \end{quote}
+  \bigskip
+}
+
+\author{\wg, \uh, \hk}
+\title{\cl0\ and \clos0: The Language Definition}
+\issuer{Christian-Albrechts-Universit\"at zu Kiel}
+\institution{CAU}
+\task{Definition effizienter Teilsprachen}
+\documentid{APPLY/CAU/II.2/2}
+\status{Draft}
+\created{09.08.93}
+\revised{\RCSdate $Date: 1993/09/03 15:01:38 $}
+\synopsis{This document includes the definition of the languages \cl0\
+and \clos0\ as strict subsets of \CL\ and \CLOS.}
+
+% man mu"s es trennen k"onnen.
+\def\CL{{\sc Common\-Lisp}}
+\def\cl0{{\sc Common\-Lisp}$_0$}
+
+\def\clm{{\sc CL}$_{macro}$}
+\def\.{\discretionary{}{}{}}
+
+\begin{document}
+
+\coverpages
+
+%%------------------------------------------------------------------------------
+\section{Introduction}
+
+The program development process for \Lisp\ applications usually takes
+place within an interactive development and runtime system. It
+benefits from the possibilities to incrementally add and redefine
+arbitrary parts of the program and to interactively test and debug
+even incomplete program parts. Since many of the tools used to
+facilitate this process have been expressed in \Lisp\ itself, it is
+easy to build an application specific development environment.
+Unfortunately, many of these tools actually have
+become part of the language \CL\ itself and, as a
+consequence, the application specific program development environment
+often becomes part of the application program. Hence, many 
+applications inherently include the ability to dynamically change their own 
+program text, i.e.\ are {\em reflective}.
+
+One of the major goals of the \APPLY\ project is to develop the techniques
+needed for generating efficient stand alone applications which easily can 
+be integrated with and into standard software environments. One of the 
+techniques we use in order to achieve this goal is called {\em complete 
+compilation} of programs or modules. It uses the complete set of 
+information about the whole program or module in order to perform global 
+and interprocedural program analysis and optimization. 
+
+In order to prove those optimizations correct we have to ensure that
+the program is not reflective, i.e.\ that it does not include the
+ability to change its own program text. In general, this is impossible
+for the full \CL\ language. Hence, this document defines a suitable
+subset, essentially excluding the reflective parts of \CL. We call
+this subset \cl0. It is a very large and strict subset of the \CL\ as
+it is defined in \cite{Steele84} and \cite{Steele90}.
+
+% Code, der vom Compiler zur "Ubersetzungszeit evaluiert werden mu"s,
+% z.~B.\ w"ahrend der Ausf"uhrung von Makroexpansionsfunktionen oder zur
+% Initialisierung von Konstanten, darf nicht auf die
+% "Ubersetzungszeitumgebung zugreifen. Das hei"st, da"s z.~B.\ die
+% Variable {\tt *package*} nicht explizit gesetzt werden darf, sondern
+% da"s dazu nur das Makro {\tt in-package} verwendet werden darf. Durch
+% diese Einschr"ankung werden Inkompatibilit"aten, die aus
+% unterschiedlichen Ladereihenfolgen entstehen, ausgeschlossen.
+
+% Die Verwendung von CLOS wird in entsprechender Weise eingeschr"ankt:
+% Alle Klassen, generischen Funktionen und Methoden m"ussen schon zur
+% "Ubersetzungszeit bekannt sein und d"urfen nicht ver"andert werden. Das
+% wird zum einen dadurch erreicht, da"s {\tt eval} nicht verwendet
+% werden darf und zum anderen werden Funktionen, die generische
+% Funktionen zur Laufzeit erzeugen oder ver"andern (z.~B.\ {\tt
+% add-method} oder {\tt ensure-generic-function}) aus dem Sprachumfang
+% von \cl0\ entfernt.
+
+%-------------------------------------------------------------------------------
+
+%%------------------------------------------------------------------------------
+\subsection{How to read this document}
+
+This document has to be read carefully in conjunction with the
+original \CL\ language definition, i.e.\ a copy of \cite{Steele84} or
+\cite{Steele90}. We will define \cl0\ by stating the differences and 
+changes with respect to the \CL\ definition instead of listing the whole 
+language. The second edition of Guy Steele's book
+(\cite{Steele90}) contains a complete copy of the first one, and
+additionally contains
+
+\begin{itemize}
+\item corrections to the first edition which concern errors and inconsistencies,
+\item clarifications formulated by the ANSI standardization committee X3J13,
+\item extensions proposed by X3J13, and
+\item changes proposed by X3J13.
+\end{itemize}
+
+The ANSI standardization committee X3J13 has been established in order
+to define an ANSI standard for the language \CL. Up to now, this
+standardization process is not yet finished. Therefore, the proposals
+of X3J13 stated in \cite{Steele90} have to be taken as part of an
+ongoing discussion about the language, which at the end might result
+in a language definition for ANSI \CL\ even is incompatible with
+\cite{Steele90}. Therefore, at present the \cl0\ definition is based
+on \cite{Steele84}, together with the corrections stated in
+\cite{Steele90}, i.e.\ on what is commonly referred to as CLtL1.
+
+We will mention extensions and changes proposed by X3J13 in so far as
+we are able to state whether or not they are {\em acceptable} for
+future versions of \cl0. Proposals for changes or extensions to parts
+of \CL\ which are not intended to belong to \cl0 will be called {\em
+unuseful} throughout this document. In no sense this is meant to value
+the proposals' quality. However, many constructs of the development
+environment are unuseful as parts of a subset of the language which is
+defined for the sake of generating stand alone applications.
+
+Although this document is intended to be a language definition, it
+will include some remarks stating differences between \cl0\ or \clos0\
+and the language which is supported by the current release of our
+Common Lisp to C Compiler CLiCC. We added these remarks in order to
+make this document usable as part of the CLiCC documentation.
+
+%%------------------------------------------------------------------------------
+\subsection{A strict subset of \CL}
+
+\cl0\ is intended to be a strict and very large subset of \CL. By {\em
+  strict} we mean, that every well defined \cl0\ program is also a
+well defined and semantically equivalent \CL\ program.
+
+The restrictions we defined are different in nature. Some functions
+like {\tt eval} or {\tt symbol-function} are simply not part of the
+language \cl0, others are less defined. Some \CL\ functions like {\tt
+  load} are defined to be compile time operations, and hence are
+restricted to be used at top level of the program with constant
+arguments only. There are both syntactical and semantical
+restrictions, and some of the latter aren't even decidable. It might
+depend on some additional invariants to hold, whether or not a program
+actually is a well defined \cl0\ program. As an example, the
+programmer has to ensure that the functional argument {\it form} in
+{\tt (apply {\it form} ...)} neither evaluates to a symbol denoting a
+function nor to a list starting with {\tt lambda}. Otherwise, the
+\cl0\ program would cause an error, whereas the \CL\ program
+eventually runs successfully.  Note, however, that this situation does
+not destroy the property of \cl0\ beeing a strict subset of \CL.
+
+\cl0\ is intended to be a very large subset of \CL. It is not our
+major goal to define a well-structured new lisp-like language.
+Instead we define \cl0\ as large as the approach of complete
+compilation reasonably allows, in order to simplify the migration
+process for real world \CL\ applications.
+
+There are some practical advantages which result from \cl0\ beeing a
+strict subset of \CL, and which we shall mention here: The programmer
+may use a conventional Common Lisp system in order to develop, debug,
+and test \cl0\ applications. Moreover, the strict subset property
+allows to incrementally migrate \CL\ programs into \cl0, using the
+development system as a runtime and test environment for the stepwise
+resulting programs. We refer to \cite{APPLY/CAU/IV/2} for details on
+migration.
+
+%%------------------------------------------------------------------------------
+\subsection{Notation}
+
+As in \cite{Steele90} we will use the {\tt (setf f)} notation in order
+to refer to the function which {\em updates} the {\em place} {\tt f}
+results in. 
+
+In \CL, lists which start with the symbol {\tt lambda} are often 
+implicitely {\em coerced} to functions. We will call those lists {\em 
+lambda-lists} throughout this document. Lambda-lists will not be coerced 
+to functions in \cl0. Use {\tt \#'(lambda ...)} instead of {\tt '(lambda 
+...)}. A similar restriction holds for symbols which actually are names of 
+functions. We will often call them {\em function names}.
+
+%%------------------------------------------------------------------------------
+\section{\cl0}
+
+As mentioned earlier, we will not define \cl0\ by completely listing
+the whole language. Instead we will follow the original language
+definition of \CL\ \cite{Steele84} chapter by chapter, stating only
+restrictions and differences of \cl0\ with respect to \CL.
+Therefore, it will be necessary to read a copy of \cite{Steele84} or
+\cite{Steele90} at the same time in order to obtain the complete
+definition.
+
+The same strategy will be used in order to define \clos0. However, the
+\clos0\ definition is subject of a separate chapter (\ref{clos0def})
+of this document.
+
+Some of the restrictions defined below are of syntactical nature. Some
+of the \CL\ language constructs, for example, are restricted to be
+used as top level forms, only. Please note, that in the following we
+assume macro calls of the original program to be sufficiently expanded
+in order to make those constructs visible.
+
+The restrictions defined for \cl0\ roughly fall into four classes:
+
+The language constructs which are only useful during the program
+development process, like {\tt trace}, {\tt break} or {\tt compile-file},
+are completely dropped from the language. We recommend the use of a
+conventional \CL\ system for the development, debugging and test of
+\cl0\ applications. Hence, the dropped functionality is part of the
+development environment, but it needs not to be part of the
+application itself.
+
+We completely disallow {\em reflection}. Functions which dynamically
+change the program code, like {\tt eval} and {\tt (setf
+symbol-function)} are not part of \cl0. Unlike \CL, \cl0\ does not
+implicitely {\em coerce} symbols or lists starting with {\tt lambda}
+to functions. Hence, functions like {\tt apply} or {\tt funcall} are
+restricted to be undefined, if the functional argument actually is a
+symbol or a list. Multiple definitions of functions and/or macros are
+not allowed.
+
+In order to generate small application programs it is useful to be
+able to statically determine the set of potentially called functions
+within a program. Practically, this would be impossible if there were
+nontrivial calls to {\tt symbol-function}. A very simple and in some
+sense necessary method in order to avoid these complications is to
+avoid {\tt symbol-function} at all. We additionally benefit from this
+restriction, because for many functions, actually for all those which
+are not explicitely used as functional objects, it now becomes
+possible to statically determine all function calls.  This will enable
+us to use classical interprocedural program analysis and optimization
+techniques which rely on the knowledge of all calling contexts.
+
+In order to enable separate compilation of Lisp modules, we restricted
+the use of the \CL\ package operations to really express
+modularization. The complex functionality of the \CL\ package system
+seems to be useful only to avoid name conflicts while reloading or
+recompiling program parts. And this, again, facilitates the program
+development process, but needs not necessarily to be part of the
+application itself.
+
+\cliccnote{The current release of CLiCC does not support the complete
+set of functions as they are defined to be part of \cl0. Moreover,
+some functions, like {\tt format}, are not implemented completely.
+We will document this in future versions. At present, please have a
+look at the runtime system source code, i.e.\ the file {\tt
+format.lisp} for the function {\tt format}.
+
+CLiCC will support a foreign function interface to C in one
+of the future releases which will not be part of \cl0\ as a strict
+subset of \CL, and hence will be documented separately.
+}
+
+Note, that the titles of the following sections are equal to those
+used in \cite{Steele84}.
+
+%%------------------------------------------------------------------------------
+\subsection{Introduction}
+
+No changes.
+
+%%------------------------------------------------------------------------------
+\subsection{Data Types}
+
+The \CL\ data type {\tt function} is restricted to contain ''real''
+functions only, i.e.\ functions which are the result of evaluating the
+special form {\tt function}. Function names, i.e.\ symbols which name
+a function, and lambda-lists are not functions and will not be
+implicitely coerced to functions. The range of system functions
+which deal with functional arguments, like {\tt apply} or {\tt
+mapcar}, is restricted to the \cl0\ data type {\tt function}. They are
+listed in sections \ref{control}, \ref{sequences}, and
+\ref{lists}. This restriction has already been proposed by X3J13.
+
+\cliccnote{In the released version, CLiCC does not support bignums,
+rational and complex numbers, and bit vectors. Moreover, only some of
+the trigonometric functions are supported.}
+
+X3J13 proposed to add the data types {\tt base-character} und {\tt
+  extended-character} instead of the type {\tt extended-character},
+which is acceptable. The same holds for the proposed extensions to
+stream types.
+
+%%------------------------------------------------------------------------------
+\subsection{Scope and Extent}
+
+No changes.
+
+%%------------------------------------------------------------------------------
+\subsection{Type Specifiers}
+\label{type}
+
+Type specifiers are classified to be part of the program text in \cl0. 
+Therefore, we disallow type specifiers to be evaluated at runtime.
+This would be the interpretation of data as code at runtime, hence {\em 
+reflection}.
+
+Type specifiers may occur as part of declarations, where they are 
+completely known at compile time. \cl0 does not restrict type declarations.
+
+In \CL, type specifiers are also allowed to be the result of argument
+forms of functions like {\tt coerce}, {\tt typep}, {\tt subtypep},
+{\tt make-sequence}, {\tt concatenate}, {\tt map}, {\tt merge}, {\tt
+make-array}, {\tt adjust-array}, and {\tt open}. Consequently, we have
+to restrict their type specifier arguments:
+
+%Die Bedeutung der Typspezifikatoren, die den Typ der Parameter und
+%Resultate von Funktionen beschreiben, ist nicht brauchbar,
+%so wie sie in \cite{Steele84} beschrieben ist.
+
+\begin{itemize}
+\item {\tt coerce}, {\tt typep}, and {\tt subtypep} are defined to be 
+macros. The type specifier arguments are required to be constants.
+\item {\tt make-sequence}, {\tt concatenate}, {\tt map}, {\tt merge}, {\tt 
+make-array}, {\tt adjust-array}, and {\tt open} are restricted to be 
+defined only on special symbols and lists which denote known types. For 
+further details see the sections \ref{sequences}, \ref{arrays}, 
+\ref{strings} und \ref{io}.
+\item {\tt type-of} is not part of \cl0. It evaluates type specifiers at 
+runtime and hence has become obsolete in \cl0.
+\end{itemize}
+
+Note, that the first item above implies, that {\tt coerce}, {\tt typep}, 
+and {\tt subtypep} cannot be used directly as functional objects in \cl0. 
+But, of course, functions like {\tt \#'(lambda (x) (coerce x '(vector 
+float)))} are allowed. 
+
+Since {\tt type-of} is not part of \cl0, forms like {\tt (eq (type-of
+  x) 'integer)} have to be expressed like {\tt (integerp x)}
+
+The restrictions above imply that in \cl0\ type specifiers, which are 
+defined using {\tt deftype} forms, can be expanded at 
+compile time. Hence, {\tt deftype} has become syntactic sugar in \cl0.
+
+The functions {\tt upgraded-\.array-\.element-\.type} and {\tt
+upgraded-\.complex-\.part-\.type} proposed by X3J13 are acceptable
+with similar restrictions. {\tt coerce}'ing a symbol to a function
+explicitely, as proposed by X3J13, is just another notation
+for {\tt symbol-function}, and hence is unuseful.
+
+X3J13 proposed to handle type specifiers uniformly, no matter whether they 
+occur as part of a declaration or as part of a method discriminator, and to 
+add {\tt eql} type specifiers. Both proposals are acceptable. Moreover, the 
+proposed change of the semantics of the {\tt function} type specifier is 
+acceptable. It would allow type inference to actually use the information 
+contained in type declarations, which, in turn, would improve the results 
+of type inference for \CL\ and \cl0\ programs dramatically. We hope this to 
+be part of the ANSI \CL\ specification and will then adopt it for future 
+versions of \cl0.
+
+%%------------------------------------------------------------------------------
+\subsection{Program Structure}
+\label{progstructure}
+
+Calls of the \CL\ macros {\tt defun}, {\tt defvar}, {\tt
+  def\-para\-meter}, {\tt def\-constant}, {\tt def\-type}, {\tt
+  def\-setf}, {\tt define-\.setf-\.method}, {\tt
+  define-\.modify-\.macro}, {\tt defmacro}, and {\tt defstruct} as
+well as the \clos0\ macro calls to {\tt defclass}, {\tt defgeneric},
+and {\tt defmethod} are called to be {\em defining forms} in \cl0.
+They are restricted only to occur as {\em extended top level forms},
+which we define as follows:
+
+\cliccnote{At present, CLiCC will only accept {\tt (progn ...)} forms
+as extended top level forms. Adding the others is part of our TODO list.}
+
+Definition:
+\label{erwTLF}
+
+\begin{enumerate}
+
+\item Every top level form is an {\em extended top level form}.
+\item If a call of the special forms {\tt progn}, {\tt
+let}, {\tt let*}, {\tt labels}, {\tt flet}, {\tt macro-let}, {\tt
+eval-when}, or {\tt progv} is an {\em extended top level form}, then so are 
+the forms occuring within the body. 
+\end{enumerate}
+
+% Die von X3J13 vorgeschlagenen Special Forms {\tt generic-flet}, {\tt
+% generic-labels}, {\tt symbol-macrolet}, {\tt with-added-methods} und
+% {\tt locally} werden in die Liste der eben genannten Special Forms
+% aufgenommen werden.
+% --> CLOS
+
+X3J13 proposed to add the special forms {\tt symbol-macrolet} and
+{\tt locally}. This is acceptable. Moreover, they could be added to the list of 
+special forms mentioned in the above definition.
+
+Note, that the above restrictions on the occurance of defining forms allow 
+defining forms to occur within non empty lexical environments. The X3J13 
+proposal to allow defining forms to occur in arbitrary contexts is 
+unuseful. The reason is, that it has to remain decidable whether or not, and 
+when, a definition actually takes place. Moreover, \cl0\ does not allow any 
+redefinition:
+
+Global Macros and global functions share the same namespace, in which multiple 
+definitions are rejected. Note, that this restriction also concerns 
+implicitely defined global functions, like those defined by {\tt 
+defstruct}, and generic functions.
+
+Likewise, constants and global variables, i.e.\ those names defined by {\tt 
+defconstant} and {\tt defvar}, resp., also share a common namespace. 
+Multiple {\tt defvar}'s are allowed, but constants may not be redefined to 
+be global variables, and vice versa. Multiple definitions of the same 
+constant are rejected.
+
+The fact, that redefinitions are rejected in general, implies, of course, 
+that predefined functions of the {\tt "LISP"} package may not be redefined, 
+as proposed by X3J13.  The same holds for predefined constants of 
+the {\tt "LISP"} package.
+
+A restricted version of {\tt eval-when} is part of \cl0. The forms which 
+have to be evaluated at compile time are restricted to be part of the 
+language \clm\ which slightly differs from \cl0\ and is defined in section 
+\ref{clm}. 
+
+\cliccnote{CLiCC does not support {\tt eval-when} at present. This is
+part of our TODO list.}
+
+X3J13 proposed to add {\tt (setf f)} forms as legal function names. This is 
+acceptable. The proposed changes of {\tt eval-when} are acceptable, as well 
+as the proposal to allow arbitrary symbols to denote {\em keywords} in 
+formal parameter lists.
+
+%%------------------------------------------------------------------------------
+\subsection{Predicates}
+\label{predicates}
+
+The operators {\tt typep} and {\tt subtypep} are defined to be macros
+in \cl0. A macro call {\tt (typep {\it object type}\/)} is completely
+expanded at compile time into an appropriate runtime system function
+call.  E.g., {\tt (typep x 'symbol)} will be expanded into {\tt
+  (symbolp x)}.  Since type specifiers are restricted to be constant
+in \cl0\ (section \ref{type}), calls to {\tt subtypep} can be replaced
+by their results.  {\tt (subtypep } {\em type1 type2} {\tt)} will be
+expanded at compile time into a call of {\tt values}. In order to give
+an example, {\tt (subtypep 'cons 'list)} will expand into {\tt (values
+  t t)}. This very rigorous simplification will change in future
+versions of \cl0\ with respect to class arguments of {\tt subtypep}.
+
+\cliccnote{At present, {\tt subtypep} is not supported by CLiCC.}
+
+The changes to {\tt typep} and {\tt subtypep} proposed by X3J13 are 
+acceptable.
+
+The predicate {\tt functionp} is restricted to be undefined on symbols
+and lists. The reason is to preserve the strict subset property, i.e.\
+{\tt functionp} may not be defined to yield a different result than
+the \CL\ {\tt functionp} eventually would do if applied to a lambda
+list or function name.  Note, that this restriction to {\tt functionp}
+enlarges the set of non well defined \cl0\ programs. This is the price
+we have to pay for preserving the strict subset property. However, the
+function {\tt functionp} as proposed by X3J13, is acceptable and
+could be part of \cl0\ without any restrictions.
+
+\cliccnote{Hence, {\tt (functionp 'A)} should signal an error, which
+is not the case in our present CLiCC release. Fixing this bug is part
+of our TODO list.}
+
+%%------------------------------------------------------------------------------
+\subsection{Control Structure}
+\label{control}
+
+The functions {\tt symbol-function} and {\tt (setf symbol-function)} are 
+not part of \cl0, nor are {\tt fboundp} and {\tt fmakunbound}. The reason 
+for eliminating {\tt (setf symbol-function)} needs no further explanation. 
+We eliminated {\tt symbol-function} as well in order to enable dead code 
+elimination, and to keep the set of eventually called functions small. In 
+\cl0, we know every function which eventually is called, since it has to be 
+mentioned explicitely within the program text, either in a function call or 
+in the form {\tt \#'f}.
+
+The function {\tt special-form-p} is not part of \cl0.
+
+The {\tt defsetf} and {\tt define-setf-method} macro bodies are completely 
+evaluated at compile time. The functions {\tt get-setf-method} and {\tt
+get-setf-method-multiple-value} are useless at runtime of a program and 
+therefore do not belong to \cl0. They will be part of \clm.
+
+Symbols and lambda-lists are not allowed as functional arguments to
+the functions {\tt funcall}, {\tt apply}, {\tt mapcar}, {\tt maplist},
+{\tt mapc}, {\tt mapl}, {\tt mapcan}, and {\tt map}. This is one of
+the major restrictions in \cl0, and the reason once more is the
+elimination of reflection: For any form {\it x}, the form {\tt
+(funcall (list 'lambda () {\it x}))} is equivalent to {\tt (eval {\it
+x})}.  Instead of lambda-lists or quoted symbols the programmer has to
+use the forms {\tt \#'(lambda (}\ldots{\tt) \ldots\ )} or {\tt \#'f},
+resp.  X3J13 already proposed to eliminate the automatic coercion of
+lambda-lists to functions, which is acceptable. In \cl0, the
+coercion of function names to functions is eliminated, too.
+
+X3J13 proposed to add the function {\tt fdefinition}, which
+essentially is the same as {\tt symbol-function}, and therefore is
+unuseful.
+
+As proposed already by X3J13, the special form {\tt compiler-let} is not 
+part of \cl0. Adding the special form {\tt symbol-macrolet} would be 
+acceptable.
+
+%%------------------------------------------------------------------------------
+\subsection{Macros}
+\label{macro}
+
+Like in \CL, macro expansion is completely performed at compile time. The 
+language \clm\, as defined in section \ref{clm}, can be used to 
+formulate expressions which have to be evaluated at compile time. It 
+slightly differs from \cl0, but neither \clm\ is a subset of \cl0 nor vice 
+versa. Note, that the result of the macro expansion has to fit into \cl0, 
+whereas the forms that compute this result, have to be part of \clm.
+
+The functions {\tt macro-function} and {\tt (setf macro-function)} do not 
+belong to \cl0. Hence, the only way to define a global macro is to use the 
+defining form {\tt defmacro}. A macro has to be defined before its first 
+use. The redefinition of macros is not allowed, and a macro must not 
+redefine a function already defined.
+
+The functions {\tt macroexpand} and {\tt macroexpand-1} do not belong to 
+\cl0, but they do belong to \clm.
+
+\cliccnote{At present, {\tt macroexpand} and {\tt macroexpand-1} are
+not part of \clm. This is part of our TODO list.}
+
+The variable {\tt *macroexpand-hook*} is not part of \cl0.
+
+Within this chapter, the X3J13 proposals mention the additional macros
+and functions {\tt destruc\-turing-\.bind}, {\tt
+  define-\.compiler-\.macro}, {\tt compiler-\.macro-\.function}, {\tt
+  compiler-\.macro\-expand} {\tt compiler-\.macro\-expand-1}, {\tt
+  variable-\.infor\-mation}, {\tt function-\.information}, {\tt
+  decla\-ration-\.infor\-mation}, {\tt augment-\.environment}, {\tt
+  define-\.declaration}, {\tt parse-\.macro}, and {\tt enclose}. They
+are unuseful as parts of \cl0\ because it only makes sense to use them
+during macro expansion. However, as parts of \clm\ they are
+acceptable.
+
+%%------------------------------------------------------------------------------
+\subsection{Declarations}
+
+The operator {\tt proclaim} is defined to be a macro in \cl0\, which only 
+may occur as an extended top level form (see page \pageref{erwTLF}). Its 
+arguments are evaluated at compile time. The macro {\tt declaim}, as it is 
+proposed by X3J13, is acceptable. But it has to be restricted to only occur as 
+extended top level form.
+
+X3J13 proposed changes with respect to the semantics of type declarations, 
+which are acceptable. They probably will improve the results of type 
+inference for Lisp programs.
+ 
+%%------------------------------------------------------------------------------
+\subsection{Symbols}
+
+No changes. 
+
+X3J13 proposed changes with respect to {\tt gensym} and {\tt
+*gensym-counter*}, which both are acceptable.
+
+
+%%------------------------------------------------------------------------------
+\subsection{Packages}
+\label{packages}
+
+In \cl0, packages may be used to express {\em modules}. A \cl0\ program then
+consists of one or more modules. In \CL, on the other hand, packages are 
+used to define separate name spaces for symbols, and the package operations 
+altogether are a powerful tool to maintain these name spaces. At a first 
+glance, these two views of packages have nothing in common. The reason why 
+packages can be used to express modules is in some sense historical: The 
+syntactical representation of a \CL\ program actually is a list, consisting 
+of a lot of symbols. Since the reader has to be used to read a program
+text like 
+any other piece of data, symbols denoting program identifiers are 
+modularized into different packages. 
+
+Unfortunately, the \CL\ package operations are too powerful to express
+a real modularization. The programmer is able to break every module
+border. The possibility of using "::" package qualifiers or of
+exporting symbols from different packages, are examples.
+
+The good news is, however, that not every package operation at runtime
+necessarily has to have an effect to the process of reading the
+program text
+itself, i.e.\ to the compile time environment. Therefore, package
+operations within a program fall into two classes. Those which do not
+occur at top level of the program, and hence are not evaluated at
+compile time, may be used without any restriction. The restrictions
+which have to hold for the top level or extended top level package
+operations of a \cl0\ program, and which are defined below, are
+intended to let packages express real modules in the sense of \EL\ or
+Modula-2.
+
+%
+% Packages sollen in \cl0\ verwendet werden, um die Module eines Programms
+% zu beschreiben. Ein Modul ist {\em ein} zusammenh"angendes
+% Programmst"uck; es kann in der konkreten Realisierung auf eine oder
+% mehrere Dateien verteilt sein. Dem APPLY-Modul-Compiler mu"s es
+% erm"oglicht werden, alle Teile des Programms, die zu einem Modul
+% geh"oren, in einem St"uck zu lesen und zu "ubersetzen.
+%
+
+A module starts with a call of {\tt in-package}. The only legal
+package top level forms within the subsequent module text are calls of
+{\tt export}, {\tt import}, {\tt shadow}, {\tt shadowing-import}, and
+{\tt use-package} with arguments which are evaluated at compile time.
+A top level package operation must not operate on a package other than
+the current one. Therefore the optional package argument of the above
+forms, if supplied, has to denote the current package. Function calls
+of {\tt make-package}, {\tt unexport}, and {\tt unuse-package} as well
+as write accesses to the global variable {\tt *package*} must
+not be used as top level forms. Moreover, none of these forms
+are allowed within any form of the
+program which has to be evaluated at compile time. This restriction
+will remain even if the use of global variables will be allowed in
+\clm\ in future versions of \cl0. 
+
+\cliccnote{At present, neither {\tt shadow} nor {\tt shadowing-import}
+are supported as legal package top level forms. This is part of our
+TODO list. It will be fixed as soon as the module compilation feature
+gets released, which, however, is an inofficial part of the current
+release already {\tt :-)}}
+
+{\tt (in-package ...)} top level forms may occur repeatedly within one
+module, unless the package argument denotes a different package.  This
+is useful since \cl0\ modules may be separated into different files.
+
+A {\tt (load {\it filename})} top level form loading a file which
+starts with an {\tt (in-package ...)} form, changing into a new and
+different package, serves as a module import. The {\em package}{\tt
+:}{\em name} notation may be used to get access to the exported
+identifiers of the imported module. Of course, {\tt import} or {\tt
+use-package} may be used to enable this access without any package
+qualification.  However, the {\em package}{\tt ::}{\em name} notation
+is not allowed in \cl0.
+
+A module $A$ {\em depends on} a module $B$ if one or more identifiers
+of $B$ are referenced within the program text of $A$. This {\em module
+dependency} relation has to form a DAG (directed acyclic graph) in
+\cl0. This restriction ensures that all of the necessary information
+about the exported functionality of $B$ is known while analysing $A$.
+Hence, the separate compilation of modules is possible, starting with
+the leaf modules of the module dependency graph of the program.
+
+\cliccnote{The DAG property of the module dependency graph will not be
+checked by CLiCC in it's current release. This is part of our TODO list.}
+
+Within one module, global definitions are restricted to only use names
+which have the current package as home package. One module must not change
+the global definitions of another one:
+
+Example:
+%
+{\listing \parskip0.8ex
+
+(in-package "a")
+  (export 'f)
+  (defun f (x) (* x x))
+
+(in-package "b")
+  (export 'g)
+  (defun g (x) (+ x x))
+
+(in-package "c")
+  (use-package "a")
+  (f 3)
+  (defvar f 4)     ; prohibited !
+  (b:g 3)
+  (defstruct b:g ) ; prohibited !
+}
+
+The changes to the package system proposed by X3J13 are acceptable.
+The {\tt defpackage} top level form improves the possibility of using
+packages as modules.
+
+Like {\tt load}, the functions {\tt require} and {\tt provide} are
+restricted to the extended top level of the program. {\tt require}
+behaves like {\tt load}, but like in \CL\ it uses the variable {\tt
+*modules*} in order to avoid reloading of modules.
+
+%%------------------------------------------------------------------------------
+\subsection{Numbers}
+
+No changes.
+
+%%------------------------------------------------------------------------------
+\subsection{Characters}
+
+No changes.
+
+%%------------------------------------------------------------------------------
+\subsection{Sequences}
+\label{sequences}
+
+Only the symbols {\tt list}, {\tt vector}, {\tt simple-vector}, {\tt 
+string}, {\tt simple-string}, {\tt bit-vector}, or {\tt simple-bit-vector} 
+are allowed to be result type specifications for the functions {\tt 
+make-sequence}, {\tt concatenate}, {\tt map}, and {\tt merge}
+
+The following functions do not accept function names or lambda-lists as 
+functional argument:
+
+{\tt map}, {\tt some}, {\tt every}, {\tt notany}, {\tt notevery}, {\tt
+reduce}, {\tt remove}, {\tt remove-\.if}, {\tt remove-\.if-\.not},
+{\tt delete}, {\tt delete-\.if}, {\tt delete-\.if-\.not}, {\tt
+remove-\.dup\-licates}, {\tt delete-\.dup\-licates}, {\tt
+sub\-stitute}, {\tt sub\-sti\-tute-\.if}, {\tt
+sub\-sti\-tute-\.if-not}, {\tt nsub\-stitute}, {\tt
+nsub\-sti\-tute-if}, {\tt nsub\-stitute-\.if-\.not}, {\tt find}, {\tt
+find-\.if}, {\tt find-\.if-\.not}, {\tt position}, {\tt position-if},
+{\tt position-\.if-\.not}, {\tt count}, {\tt count-\.if}, {\tt
+count-\.if-\.not}, {\tt mismatch}, {\tt search}, {\tt sort}, {\tt
+stable-sort}, {\tt merge}.
+
+%%------------------------------------------------------------------------------
+\subsection{Lists}
+\label{lists}
+
+The following functions do not accept function names or lambda-lists as 
+functional argument:
+
+{\tt tree-equal}, {\tt push-new}, {\tt subst}, {\tt subst-\.if}, {\tt
+subst-\.if-\.not}, {\tt nsubst}, {\tt nsubst-\.if}, {\tt
+nsubst-\.if-\.not}, {\tt sublis}, {\tt nsublis}, {\tt member}, {\tt
+member-\.if}, {\tt member-\.if-\.not}, {\tt adjoin}, {\tt union}, {\tt
+nunion}, {\tt inter\-section}, {\tt ninter\-section}, {\tt
+set-\.difference}, {\tt nset-\.difference}, {\tt set-exclusive-or},
+{\tt nset-exclusive-or}, {\tt subsetp}, {\tt assoc}, {\tt assoc-if},
+{\tt assoc-\.if-\.not}, {\tt rassoc}, {\tt rassoc-\.if}, {\tt
+rassoc-\.if-not}.
+
+%%------------------------------------------------------------------------------
+\subsection{Hash Tables}
+
+The {\tt :test} argument of {\tt make-hash-table} has to be a functional 
+object. Function names or lambda-lists are not allowed.
+
+%%------------------------------------------------------------------------------
+\subsection{Arrays}
+\label{arrays}
+
+The functions {\tt make-array} and {\tt adjust-array} are undefined on
+{\tt :element-type} arguments other than the symbols {\tt t}, {\tt
+float}, {\tt short-float}, {\tt single-float}, {\tt long-\.float}, {\tt
+double-\.float}, {\tt fixnum}, {\tt bit}, {\tt character}, {\tt
+standard-char}, {\tt string-char} or lists of the form {\tt
+(signed-byte} {\em s} {\tt)} or {\tt (unsigned-byte} {\em s} {\tt)}.
+
+As proposed by X3J13, the value of {\tt array-dimension-limit} has to be of 
+type {\tt fixnum} in \cl0. The same holds for {\tt array-total-size-limit}.
+
+%%------------------------------------------------------------------------------
+\subsection{Strings}
+\label{strings}
+
+No changes.
+
+%%------------------------------------------------------------------------------
+\subsection{Structures}
+
+Redefinitions of structures are not allowed. Name clashes between 
+implicitely generated structure functions and any other global function or 
+macro name will cause an error. Name clashes between the structure name and 
+the name of any other type are rejected as well.
+
+%%------------------------------------------------------------------------------
+\subsection{The Evaluator}
+
+\cl0 does not contain the functions {\tt eval}, {\tt evalhook}, {\tt 
+applyhook} and {\tt constantp}, nor does it contain the variables {\tt 
+*evalhook*} and {\tt *applyhook*}. 
+
+Since \cl0\ is intended to be a language rather than an interactive 
+programming system, the variables {\tt +}, {\tt ++}, {\tt +++}, {\tt -}, 
+{\tt *}, {\tt **}, {\tt ***}, {\tt /}, {\tt //}, and {\tt ///} are not 
+supported. They only make sense in order to control the {\tt 
+read-eval-print} loop of an interactive \CL\ system.
+
+%%------------------------------------------------------------------------------
+\subsection{Streams}
+
+The variables {\tt *debug-io*} and {\tt *trace-io*} are not part of \cl0.
+
+%%------------------------------------------------------------------------------
+\subsection{Input/Output}
+\label{io}
+
+One of the most dangerous language constructs in \CL\ is {\tt (eval 
+(read))}. Note, that the input of a form like {\tt (defun f ...)} might 
+even change the running program. The dispatching macros `{\tt \#.}' und 
+`{\tt \#,}' exactly have this effect, i.e.\ evaluating the enclosed form 
+while reading it. Therefore they do not belong to \cl0.
+
+%%------------------------------------------------------------------------------
+\subsection{File System Interface}
+\label{file}
+
+The {\tt :element-type} of the function {\tt open} has to be one of the 
+symbols {\tt string-char}, {\tt character}, {\tt unsigned-byte}, {\tt 
+signed-byte}, or {\tt bit}.
+
+The operator {\tt load} is defined to be a macro, restricted to the 
+extended top level of the program. The arguments are evaluated at compile 
+time. {\tt (load {\it file}\/)} is substitutet by the content of {\it
+  file}, or stands for a {\em module import},
+if the situation is as
+described in section \ref{packages}.
+
+%%------------------------------------------------------------------------------
+\subsection{Errors}
+
+\cl0\ does not know anything about break loops or interactive error 
+handling. The function {\tt cerror} will ask the user whether or not to 
+continue the program. {\tt break} behaves like {\tt cerror}. {\tt error} 
+aborts the program without any chance to continue.
+
+The variable {\tt *break-on-warnings*} is not part of \cl0.
+
+Since \cl0\ is a strict subset of \CL, any existing interactive \CL\ system 
+will serve as a more or less comfortable debugging and test environment for 
+\cl0\ programs. 
+
+%%------------------------------------------------------------------------------
+\subsection{Miscellaneous Features}
+
+The functions {\tt compile}, {\tt compile-file}, {\tt disassemble},
+and {\tt documentation} do not belong to \cl0.
+
+{\tt trace}, {\tt untrace}, {\tt step}, {\tt time},
+{\tt describe}, {\tt inspect}, {\tt room}, {\tt ed}, {\tt dribble},
+{\tt apropos}, and {\tt apropos-list} are definitely part of the 
+development environment of \CL\ systems, and therefore, are not part of 
+the language \cl0.
+
+%%------------------------------------------------------------------------------
+\section{\clm}
+\label{clm}
+
+Like \cl0, \clm\ is a subset of \CL. But neither \clm\ is a subset of \cl0\ 
+nor vice versa. Expressions of a \cl0\ program, which have to be evaluated 
+at compile time, like macro bodies, have to belong to \clm. Expressions, 
+which eventually are evaluated at compile time and at runtime, like
+bodies of functions which are used to compute macro expansion results, have 
+to satisfy the restrictions defined for both \cl0\ and \clm.
+
+The definition of \clm\ is not yet finished. One of the open questions at 
+present is whether or not we should allow global variables to be 
+interpreted at compile time. We are aware of applications which use global 
+variables for macro expanders to communicate with each others. But there 
+are problems with the distinction between compile time and runtime values 
+of those variables. They may vary if the compiler does not evaluate the 
+whole program at compile time already. The problems are wellknown, and many 
+programmers have had the same problems while writing portable \CL\ code.
+
+The functions {\tt get-setf-method}, {\tt macroexpand}, and {\tt 
+macroexpand-1} are part of \clm, but they do not belong to \cl0, since 
+accessing the compile time environment makes no sense at runtime.
+
+\cliccnote{At present, \clm\ is a subset of \cl0\ because the
+additional features are not yet implemented.}
+
+\clm\ does not include any package operations. Note, that e.g. macro 
+expansion might result in package operations, but must not perform any 
+package manipulation. Every package operation evaluated at compile
+time has to occur explicitely as a legal package top level operation,
+after sufficiently expanding top level macro calls, though.
+
+%%% Ein weiterer Grund, die Sprache \clm\ einzuschr"anken, ist darin
+%%% zu sehen, da"s ein \cl0-Compiler \clm-Ausdr"ucke zur "Ubersetzungszeit
+%%% {\em evaluieren} mu"s und es m"oglich sein soll, diesen Compiler in
+%%% \cl0\ zu schreiben.  Daraus ergibt sich die Notwendigkeit, in \cl0\
+%%% einen Interpretierer f"ur \clm\ zu schreiben. Um dessen Umfang
+%%% m"oglichst klein zu halten, kann es sinnvoll sein, den Sprachumfang
+%%% von \clm\ bzgl.\ \cl0\ einzuschr"anken.
+
+\CL\ does not specify anything about how a reasonable compile time
+environment for evaluating forms at compile time looks like. For good
+reasons, it is not defined whether or not {\em compiling} a definition
+also means {\em evaluating} that definition within the compile time
+environment, although many \CL\ systems will do so. Consequently,
+nothing is defined for the compile time environment for \cl0.
+
+% Loop: Ein Makro-Paket, da"s in \cl0\ beschreibbar ist. Allerdings mu"s
+% \clm\ dazu m'achtig genug sein.
+
+% Pretty-Printing: Nicht sehr relevant f"ur Applikationen. Falls es
+% implementiert wird, dann mu's folgende Einschr"ankung vorgenommen
+% werden: Der Teilstring ~/<Function name>/ zum Aufruf einer Funktion
+% aus Format-Strings heraus ist nicht Bestandteil von \cl0\. Dies ist
+% zumindest dann notwendig, wenn der Format-String dynamisch erzeugt
+% wird. Die Einschr"ankung ist notwendig, damit zur "Ubersetzungszeit
+% alle erreichbaren Funktionen bekannt sind.
+
+% Conditions: Zur "Ubersetzungszeit sollte bekannt sein, welche
+% Condition-Handler installiert sind, damit besser optimiert werden
+% kann. 
+% Beispiel: 
+% (defun fak (x)
+% ...
+% (* ... ...))
+
+% (fak (read))
+
+% darf man ein spezielles read einsetzten, da"s nur Numbers einliest ?
+% Oder kann * eine Condition ausl"osen, so da"s auch not-Numbers
+% verarbeitet werden k"onnen ?
+
+\section{\clos0}
+\label{clos0def}
+
+\input{clos-0}
+%% To be added.
+
+\section{Acknowledgements}
+
+We would like to thank Harry Bretthauer and J\"urgen Kopp for an intensive 
+discussion and many suggestions helping us to improve the definition of 
+\clos0.
+
+\nocite{APPLY/GMD/XIII/1}
+\nocite{Knutzen91}
+\nocite{Burkart91}
+\bibliographystyle{named} \bibliography{apply,own,other}
+
+\end{document}
+

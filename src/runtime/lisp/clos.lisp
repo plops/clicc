@@ -1,131 +1,35 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Laufzeitfunktionen des Objektsystems
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.34 $
-;;; $Log: clos.lisp,v $
-;;; Revision 1.34  1994/01/21  13:25:26  sma
-;;; rt::set-slot-unbound gelöscht und Lisp-Code ersetzt.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.33  1994/01/13  12:20:04  ft
-;;; rt:typep-class optimiert, indem statt T der erste Parameter
-;;; zurueckgeliefert wird.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Objectsystem
 ;;;
-;;; Revision 1.32  1994/01/05  12:37:36  sma
-;;; Namensänderung: rt::make-instance-internal -> rt::make-instance
-;;;
-;;; Revision 1.31  1993/09/27  12:14:54  hk
-;;; Argumentreihenfolge beim Aufruf von rt::set-slot-unbound korrigiert.
-;;;
-;;; Revision 1.30  1993/09/06  06:24:24  ft
-;;; Tippfehler entfernt: set-direct-class-of.
-;;;
-;;; Revision 1.29  1993/09/02  13:37:59  ft
-;;; Erweiterung um CLASS-OF.
-;;;
-;;; Revision 1.28  1993/08/30  07:46:12  ft
-;;; REINITIALIZE-INSTANCE hinzugefuegt und MAKE-INSTANCE an das
-;;; veraenderte rt::make-instance-internal angepasst.
-;;;
-;;; Revision 1.27  1993/07/14  08:51:54  ft
-;;; Anpassung an die geänderten Parameter von instance-ref/set.
-;;;
-;;; Revision 1.26  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.25  1993/06/11  09:01:02  ft
-;;; Mal wieder 'ne Klammer vergessen.
-;;;
-;;; Revision 1.24  1993/06/10  14:15:05  ft
-;;; Fehlermeldung verfeinert und Erläuterungen eingefügt.
-;;;
-;;; Revision 1.23  1993/06/09  16:26:21  hk
-;;; Fehler in make-instance provisorisch behoben.
-;;;
-;;; Revision 1.22  1993/05/22  10:33:11  ft
-;;; Erweiterung um die Auswertung von Slot-Init-Funktionen.
-;;;
-;;; Revision 1.21  1993/05/11  08:38:37  ft
-;;; Erweiterung um (setf slot-value).
-;;;
-;;; Revision 1.20  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.19  1993/04/21  14:12:56  ft
-;;; Spezifischere Fehlermeldung fuer make-instance mit einem Symbol als
-;;; Klassen-Parameter.
-;;;
-;;; Revision 1.18  1993/04/15  13:00:07  ft
-;;; Neue Funktionen fuer die Handhabung von Slots.
-;;;
-;;; Revision 1.17  1993/04/02  11:21:48  ft
-;;; simple-member optimiert.
-;;;
-;;; Revision 1.16  1993/04/02  06:31:40  ft
-;;; type-class verwendet jetzt ein einfaches member um schneller zu sein.
-;;;
-;;; Revision 1.15  1993/04/01  08:23:50  ft
-;;; Macros zur besseren Lesbarkeit eingefuehrt.
-;;;
-;;; Revision 1.14  1993/03/30  12:37:33  ft
-;;; slot-boundp an die geaenderte Darst. des Zustands 'unbound' angepasst.
-;;;
-;;; Revision 1.13  1993/03/25  10:17:58  ft
-;;; Test des ersten Parameters von make-instance, korrigierter Zugriff
-;;; auf Klassen.
-;;;
-;;; Revision 1.12  1993/03/23  14:38:18  ft
-;;; Make-instance prueft jetzt ob der erste Parameter eine Klasse ist.
-;;;
-;;; Revision 1.11  1993/03/23  07:40:39  ft
-;;; make-instance-using-class in make-instance umbenannt, damit die
-;;; Anwendungen als funktionales Object richtig gebunden werden.
-;;;
-;;; Revision 1.10  1993/03/15  15:15:41  ft
-;;; Fehler beim Zugriff auf Klassen beseitigt.
-;;;
-;;; Revision 1.9  1993/03/12  09:58:57  ft
-;;; Indirektion beim Zugriff auf Instanzen beseitigt; unbenoetigte Funktionen
-;;; geloescht; Instanziierung grundlegend geaendert.
-;;;
-;;; Revision 1.8  1993/02/26  14:57:44  ft
-;;; make-instance und typep-class optimiert.
-;;;
-;;; Revision 1.7  1993/02/26  10:09:32  ft
-;;; no-applicable-method mit Parametern versehen.
-;;;
-;;; Revision 1.6  1993/02/23  15:36:47  ft
-;;; Verarbeitung des initial-value nil bei make-instance korrigiert.
-;;;
-;;; Revision 1.5  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.34 $ eingefuegt
-;;;
-;;; Revision 1.4  1993/01/25  09:59:15  kl
-;;; Funktion no-applicable-method, die eine entsprechende Meldung ausgibt
-;;; eingefuehrt.
-;;;
-;;; Revision 1.3  1993/01/21  14:54:18  ft
-;;; Erweiterung um no-next-method.
-;;;
-;;; Revision 1.2  1992/12/18  09:23:36  ft
-;;; Erweiterung um SLOT-BOUNDP.
-;;;
-;;; Revision 1.1  1992/12/11  07:21:22  ft
-;;; Initial revision
+;;; $Revision: 1.37 $
+;;; $Id: clos.lisp,v 1.37 1995/03/04 22:07:38 wg Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "LISP")
 
 (export
- '(make-instance slot-value slot-boundp slot-makunbound no-next-method
+ '(make-instance slot-value slot-boundp slot-exists-p slot-makunbound no-next-method
    no-applicable-method slot-missing slot-unbound))
 (export '(rt::typep-class) "RT")
 
@@ -269,8 +173,8 @@
       ((slot-infos (slot-infos (class-of object)))
        (slot-pos   (position slot-name slot-infos :key #'third)))
     (if slot-pos
-        (rt::instance-set new-value object slot-pos))
-        (slot-missing (class-of object) object slot-name '(SETF SLOT-VALUE))))
+        (rt::instance-set new-value object slot-pos)
+        (slot-missing (class-of object) object slot-name '(SETF SLOT-VALUE)))))
 
 ;;------------------------------------------------------------------------------
 ;; SLOT-BOUNDP instance slot-name
@@ -284,6 +188,15 @@
         (slot-missing (class-of instance) instance slot-name 'SLOT-BOUNDP))))
 
 ;;------------------------------------------------------------------------------
+;; SLOT-EXISTS-P instance slot-name
+;;------------------------------------------------------------------------------
+(defun slot-exists-p (instance slot-name)
+  (let* 
+      ((slot-infos (slot-infos (class-of instance)))
+       (slot-pos   (position slot-name slot-infos :key #'third)))
+    (if slot-pos T NIL)))
+
+;;------------------------------------------------------------------------------
 ;; SLOT-MAKUNBOUND instance slot-name
 ;;------------------------------------------------------------------------------
 (defun slot-makunbound (instance slot-name)
@@ -292,8 +205,8 @@
        (slot-pos   (position slot-name slot-infos :key #'third)))
     (if slot-pos
         (rt::instance-set (rt::unbound-value) instance slot-pos)
-        (slot-missing (class-of instance) instance 
-                      slot-name 'SLOT-MAKUNBOUND)))
+      (slot-missing (class-of instance) instance 
+                    slot-name 'SLOT-MAKUNBOUND)))
   instance)
 
 ;;------------------------------------------------------------------------------

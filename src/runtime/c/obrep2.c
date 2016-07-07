@@ -1,39 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
  * Funktion : obrep2.c - datenrepräsentationsspezifisch
  *
- * $Revision: 1.8 $
- * $Log: obrep2.c,v $
- * Revision 1.8  1994/06/17  15:12:33  sma
- * make_fixnum entfernt, Funktion wurde als Makro in obrep2.h
- * implementiert.
- *
- * Revision 1.7  1994/05/31  14:52:50  sma
- * Neuer Typ CL_UNBOUND.
- *
- * Revision 1.6  1994/05/26  09:21:51  sma
- * Fehler in gc_relocate bezeitigt. Ausserdem Wrong-Heap test eingebaut.
- *
- * Revision 1.5  1994/05/18  15:20:57  sma
- * Komplett neu geschrieben. Funktionsfähig bis auf
- * foreign-function-Datentypen.
- *
- * Revision 1.4  1994/02/18  12:11:00  uho
- * Das Ermitteln konstanter Datenobjekte und der Heapkonsistenz wird
- * durch Makroaufrufe vorgenommen.
- *
- * Revision 1.3  1993/11/04  14:05:11  sma
- * Fehler in save_form2 gehoben
- *
- * Revision 1.2  1993/10/29  15:21:23  sma
- * Fehlerkorrekturen.
- *
- * Revision 1.1  1993/10/14  15:43:26  sma
- * Initial revision
- *
+ * $Revision: 1.15 $
+ * $Id: obrep2.c,v 1.15 1995/03/06 17:43:49 wg Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>
@@ -45,7 +35,7 @@
 #include <malloc.h>
 #endif
 
-#if __OBREP == 2
+#if OBREP == 2
 
 /*------------------------------------------------------------------------------
  * LISP-Laufzeitstack
@@ -131,10 +121,6 @@ CL_FORM *f;
    if (FO_CONSTANTq(p))
       return;
 
-   /* Etwas Paranoia kann nicht schaden */
-   if (FO_WRONG_HEAPq(p))
-      Labort ("Wrong heap");
-   
    /* Es es eine Referenz? */
    if (GCMARK(f))
    {
@@ -142,7 +128,7 @@ CL_FORM *f;
       return;
    }
    
-   /* Datum in neuen Heap kopieren */
+   /* Datum in neuen Heap kopieren bzw. downfuns ignorieren*/
    np = form_toh;
    switch (TYPE_OF(f))
    {
@@ -197,8 +183,36 @@ CL_FORM *f;
       np[1] = p[1];
       form_toh += 2;
       break;
+   case CL_DOWNFUN:
+      return; 
+
+   case CL_FOREIGN:
+      switch (F_TYPE_OF(f))
+      {
+      case CL_C_FLOATING:
+         FLOAT_AR(p) = fl_swap(FLOAT_AR(p), 1);
+      case CL_C_PRIMITIVE:
+      case CL_C_STRING:
+         np[0] = p[0];
+         np[1] = p[1];
+         form_toh += 2;
+         break;
+         
+      case CL_C_STRUCT:
+      case CL_C_UNION:
+      case CL_C_ARRAY:
+      case CL_C_HANDLE:
+         np[0] = p[0];
+         np[1] = p[1];
+         np[2] = p[2];
+         form_toh += 3;
+         break;
+      };
+
+      break;
+
    default:
-      fprintf(stderr, ";;; Unkonwn data type %d by GC\n", TYPE_OF(f));
+      fprintf(stderr, ";;; Unkonwn data type %d in GC\n", TYPE_OF(f));
       exit(1);
    }
    GCSETMARK(f);
@@ -262,6 +276,26 @@ void gc_scan_newheap()
       case CL_CFILE:
          p += 2;
          break;
+
+      case CL_FOREIGN:
+         switch (F_TAG_FIELD(p))
+         {
+         case CL_C_FLOATING:
+         case CL_C_PRIMITIVE:
+         case CL_C_STRING:
+            p += 2;
+            break;
+         case CL_C_STRUCT:
+         case CL_C_UNION:
+         case CL_C_ARRAY:
+         case CL_C_HANDLE:
+            gc_relocate(OFFSET(p, 1));
+            p += 3;
+            break;
+         };
+         
+         break;
+
       default:
          fprintf(stderr, ";;; Unkonwn data type %d by GC\n", TAG_FIELD(p));
          exit(1);

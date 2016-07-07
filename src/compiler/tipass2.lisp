@@ -1,179 +1,32 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Methoden zum Traversieren der Zwischensprache, die die 
 ;;;            Zwischensprachausdruecke analysieren, Typen inferieren 
 ;;;            und die entsprechenden Ausdruecke mit Typinformationen 
 ;;;            versehen.
 ;;;
-;;; $Revision: 1.48 $
-;;; $Log: tipass2.lisp,v $
-;;; Revision 1.48  1994/05/16  12:03:06  hk
-;;; Schreibfehler behoben
-;;;
-;;; Revision 1.47  1994/05/16  11:12:43  hk
-;;; SC-mapcar vereinfacht. SC-mapcan korrigiert, der Resultattyp ist keine
-;;; Liste von Funktionsresultaten wie bei mapcar sondern das
-;;; Funktionsresultat oder NULL.
-;;;
-;;; Revision 1.46  1994/02/21  10:24:57  kl
-;;; Bei Applikationen mit falscher Argumentanzahl kann es nun nicht mehr
-;;; zum Abbruch der Typinferenz kommen.
-;;;
-;;; Revision 1.45  1994/01/26  14:44:30  ft
-;;; Letzter Feinschliff an der eben gemachten Änderung.
-;;;
-;;; Revision 1.44  1994/01/26  13:37:43  ft
-;;; Änderung der Darstellung von ungebundenen Slots.
-;;;
-;;; Revision 1.43  1994/01/15  20:28:42  kl
-;;; Destruktives Bearbeiten der Variablen *ti-workset* korrigiert.
-;;;
-;;; Revision 1.42  1993/12/09  10:35:16  hk
-;;; provide wieder an das Dateiende
-;;;
-;;; Revision 1.41  1993/11/21  22:16:42  kl
-;;; In den Typumgebungen tauchen jetzt keine doppelten Elemente mehr auf..
-;;;
-;;; Revision 1.40  1993/10/28  07:49:17  kl
-;;; An Applikation werden jetzt zum Teil schaerfere Typen inferiert.
-;;;
-;;; Revision 1.39  1993/10/13  10:22:22  hk
-;;; Methode (analyse-types T) entfernt.
-;;;
-;;; Revision 1.38  1993/10/12  19:53:35  kl
-;;; Nun wird die Funktion not-destructive von Anouar benutzt.
-;;;
-;;; Revision 1.37  1993/10/09  17:55:30  atr
-;;; Die Funktion has-destruktiv-effects an die neue Analyse angepasst.
-;;; Jeztz werden auch Spr"unge als Seiteneffekt betrachtet, deswegen gibt
-;;; es jetzt einen Effekt bei DATA-EFFECTS zu betrachten :jump.
-;;;
-;;; Revision 1.36  1993/10/08  22:37:27  kl
-;;; Praezisere Behandlung von Seiteneffekten eingebaut.
-;;;
-;;; Revision 1.35  1993/10/08  15:57:57  kl
-;;; Variablenreferenzen in setq-Ausdruecken erhalten jetzt den Typ des
-;;; zugewiesenen Wertes.
-;;;
-;;; Revision 1.34  1993/10/04  14:13:13  hk
-;;; Fehler in (defmethod analyse-types (tagbody-form)) behoben.
-;;;
-;;; Revision 1.33  1993/09/12  16:09:41  kl
-;;; Bei den Stufen 0,1 und 2 werden globale Variablen mit TOP getypt.
-;;; Dadurch werden diese Stufen sehr viel schneller.
-;;;
-;;; Revision 1.32  1993/09/12  15:21:39  kl
-;;; Ruecksetzen dynamisch gebundener Variablen in let*-Ausdruecken korrigiert.
-;;;
-;;; Revision 1.31  1993/09/12  11:52:23  kl
-;;; Typinferenz-Level 2 gestrichen.
-;;;
-;;; Revision 1.30  1993/09/04  14:13:13  kl
-;;; Fixpunktiteration beschleunigt. In der Variablen *successor-workset*
-;;; wird nun ein Teil der zu analysierenden Objekte vorgehalten. Dadurch
-;;; muessen nicht mehr alle Mengenoperationen auf der evtl. sehr grossen
-;;; *ti-workset* vorgenommen werden.
-;;; Bei einem Level > 2 werden vor der eigentlichen Fixpunktiteration alle
-;;; Elemente einmal vorweg analysiert. Das fuehrt waehrend der Iteration zu
-;;; einer in der Regel schnelleren Abnahme der Anzahl noch zu analysierender
-;;; Funktionen.
-;;;
-;;; Revision 1.29  1993/06/24  14:35:06  kl
-;;; Verhalten bei destruktiven Seiteneffekten verbessert.
-;;;
-;;; Revision 1.28  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.27  1993/06/16  07:51:14  kl
-;;; Bei Applikationen wird nun die Komponente data-effects beachtet.
-;;;
-;;; Revision 1.26  1993/06/10  10:32:53  kl
-;;; Neuen ti-level eingefuehrt. Binden von Funktionsparameter vereinheitlicht.
-;;;
-;;; Revision 1.25  1993/06/07  10:09:52  kl
-;;; Binden der aktuellen Parameter vereinheitlicht.
-;;;
-;;; Revision 1.24  1993/06/05  21:46:27  hk
-;;; Bei mv-lambda suppliedp Parameter an bool-t gebunden.
-;;;
-;;; Revision 1.23  1993/05/27  13:41:01  kl
-;;; Weil cont keine LZS-form ist, wurde eine besondere around-Methode
-;;; der gen. Funktion analyse-type fuer Continuations noetig.
-;;;
-;;; Revision 1.22  1993/05/27  13:17:33  kl
-;;; Typisierung der Continuations auf tomain.lisp abgestimmt.
-;;;
-;;; Revision 1.21  1993/05/23  15:59:45  kl
-;;; Anpassungen an den neuen Typverband.
-;;;
-;;; Revision 1.20  1993/05/21  12:27:01  kl
-;;; Fehler im Umgang mit Typumgebungen behoben.
-;;;
-;;; Revision 1.19  1993/05/18  16:16:04  kl
-;;; Umstellung auf die neue Implementierung des Typverbands. Fehler in der
-;;; Behandlung von tagbody-Konstrukten behoben. Analyse-Methode fuer
-;;; foreign-funs eingefuehrt.
-;;;
-;;; Revision 1.18  1993/05/15  14:07:52  kl
-;;; Behandlung der Initialisierungsausdruecke umgestellt.
-;;;
-;;; Revision 1.17  1993/05/09  16:57:27  kl
-;;; Argumenttypen der importierten Funktionen koennen jetzt genutzt werden.
-;;;
-;;; Revision 1.16  1993/04/30  09:23:34  kl
-;;; Hauptfunktion nach timain.lisp verlagert.
-;;;
-;;; Revision 1.15  1993/04/20  15:06:57  kl
-;;; Es werden jetzt auch die Klassendefinitionen analysiert.
-;;;
-;;; Revision 1.14  1993/04/20  11:24:55  kl
-;;; Fehler in der Seiteneffektanalyse werden besser aufgefangen.
-;;; Typisierung der mapping-Funktionen und der Funktion coerce verbessert.
-;;;
-;;; Revision 1.13  1993/04/19  12:25:59  kl
-;;; Die durch appfuns gelieferten Informationen werden jetzt besser genutzt.
-;;;
-;;; Revision 1.12  1993/04/15  08:29:12  kl
-;;; nunion durch union ersetzt und appfuns benutzt.
-;;;
-;;; Revision 1.11  1993/03/22  17:32:32  hk
-;;; Keywords in LZS Slots.
-;;;
-;;; Revision 1.10  1993/03/18  13:46:49  kl
-;;; Umstellung auf die neue Bedeutung des analysed-Slots.
-;;;
-;;; Revision 1.9  1993/03/10  08:50:01  kl
-;;; Bei fehlender Hauptfunkion wird kein Fehler mehr erzeugt.
-;;;
-;;; Revision 1.8  1993/03/09  07:21:25  ft
-;;; Erweiterung von analyse-types um eine Methode fuer Klassen.
-;;;
-;;; Revision 1.7  1993/03/05  15:50:48  kl
-;;; Die used-Annotation wird nicht mehr verwendet.
-;;;
-;;; Revision 1.6  1993/03/04  10:44:59  kl
-;;; Anpassung an die eingefuehrten Typinferenzlevel.
-;;;
-;;; Revision 1.5  1993/02/16  16:10:20  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.4  1993/02/15  14:46:19  kl
-;;; Ist eine Variable nicht (Typ-)gebunden, dann hat sie Typ bottom-t.
-;;; Das Ruecksetzen der Typumgebungen auf bottom-t geschieht
-;;; durch Loeschen aller Eintraege.
-;;;
-;;; Revision 1.3  1993/02/02  09:58:54  kl
-;;; Initialisierungen der Vorgaengertypumgebungen nach tipass1 verlegt.
-;;;
-;;; Revision 1.2  1993/01/26  18:34:51  kl
-;;; Umbenennung der globalen Variablen vorgenommen. Einige Variablen
-;;; nach tidef.lisp verlegt.
-;;;
-;;; Revision 1.1  1993/01/26  17:10:49  kl
-;;; Initial revision
+;;; $Revision: 1.50 $
+;;; $Id: tipass2.lisp,v 1.50 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -452,13 +305,28 @@
   ;; auf Variablen ausgeloest worden sind, setze die Typbindungen geeignet
   ;; zurueck.
   ;;------------------------------------------------------------------------
-  (cond ((defined-fun-p (?form an-app))
-         (setf *type-environment* 
-               (update-type-env *type-environment* 
-                                (?result-type-env (?form an-app))))
-         (reset-type-bindings '() (not-destructive an-app)))
-        (T 
-         (reset-type-bindings (?write-list an-app) (not-destructive an-app)))))
+  (let ((form (?form an-app)))
+    (cond
+      ((defined-fun-p form)
+       (setf *type-environment* 
+             (update-type-env *type-environment* 
+                              (?result-type-env form)))
+       (reset-type-bindings '() (not-destructive form)))
+    
+      ((and (imported-fun-p form) (?has-funs-as-args form))
+       (let ((effect (empty-effect))
+             (local-effect (make-instance 'local-effect)))
+         (effect-of-form an-app effect local-effect)
+         (reset-type-bindings (unify-lists (?write-list effect)
+                                           (?write-list local-effect))
+                              (not-destructive effect))))
+      ((?other-funs an-app)
+       (reset-type-bindings -1 nil))
+    
+      (T (dolist (called (?called-funs an-app))
+           (when (fun-p called)
+             (reset-type-bindings (?write-list called)
+                                  (not-destructive called))))))))
 
 
 ;;------------------------------------------------------------------------------

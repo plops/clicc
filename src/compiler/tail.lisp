@@ -1,382 +1,229 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;--------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Tail-rekursion.
-;;;            Tail-rekursive Aufrufe werden in geeigneter Form in 
-;;;            Spruenge umgewandelt.
-;;; Autor    : Anouar trigui
-;;; $Revision: 1.15 $
-;;; $Log: tail.lisp,v $
-;;; Revision 1.15  1994/01/04  16:14:44  atr
-;;; Die Funktion tail-rec-fun geändert. Nun werden werden die Level-Slots
-;;; bei den lokalen Funktionen während der Tail-rekursion gesetzt, damit
-;;; die Level-Slots der neu erzeugten Tagbody's auch gesetzt werden
-;;; können.
-;;;
-;;; Revision 1.14  1994/01/03  11:58:13  atr
-;;; Tail-rekursive Aufrufe, die innerhalb eines Let-Konstruktes sind, das
-;;; dynamische Variablen bindet werden nicht mehr in Spr"unge umgewandelt,
-;;; denn dies kann zu Fehlern führen.
-;;;
-;;; Revision 1.13  1993/12/22  11:13:01  atr
-;;; Die Tail-Rekursion kann jetzt Funktionen mit Multiplen Werte richtig
-;;; umwandeln.
-;;;
-;;; Revision 1.12  1993/12/02  12:33:48  atr
-;;; Der Slot level soll natuerlich bei dem neu erzeugten Tagbody gesetzt
-;;; werden und nicht bei der nei erzeugten tagged-form !!!
-;;;
-;;; Revision 1.11  1993/12/02  12:00:33  atr
-;;; Der Slot Level bei der neu erzeugten Tagged-form *body-tag* gesetzt.
-;;;
-;;; Revision 1.10  1993/11/09  16:40:25  atr
-;;; Die globalen Variablen stehen jetzt in se-init.lisp.
-;;;
-;;; Revision 1.9  1993/10/15  12:37:10  hk
-;;; In den used-slot der generierten tagged-forms wird nun die Anzahl der
-;;; angwandten Vorkommen eingetragen (statt 1), damit beim Wegoptimieren
-;;; unbenutzter tagged-forms die Zählung durcheinander..
-;;; In transform-form (switch-form) wurde vergessen, den Slot otherwise zu
-;;; bearbeiten.
-;;;
-;;; Revision 1.8  1993/10/13  14:46:25  atr
-;;; Methode transform-form f"ur CONT eingef"ugt.
-;;;
-;;; Revision 1.7  1993/10/13  11:23:41  atr
-;;; Transform-form bei APP korrigiert.
-;;; (any-thing-else T) --> (any-thing form)
-;;;
-;;; Revision 1.6  1993/09/14  13:15:24  atr
-;;; Die Funktion make-a-twin-var erzeugt jetzt auch fuer eine dynamisch
-;;; gebundene Variable eine  lokale lexikalisch gebundene Variable.
-;;;
-;;; Revision 1.5  1993/09/06  11:41:47  atr
-;;; Jetzt werden lokale Funktionen analysiert, und eventuell die
-;;; Tail-rekursion eliminiert.
-;;;
-;;; Revision 1.4  1993/08/16  16:46:16  hk
-;;; (provide "tail") eingefügt, damit compile-clicc funktioniert
-;;;
-;;; Revision 1.3  1993/08/16  14:57:47  atr
-;;; Nun entsteht nicht, wie bisher, eine setq-form fuer jede
-;;; Resultatsform im Rumpf der Funktion, sondern nur eine Setq-form fuer den
-;;; optimierten Rumpf der Funktion.
-;;;
-;;; Revision 1.2  1993/08/04  15:42:59  hk
-;;; make-setq-form in assign-to-result umbenannt, da make-setq-form schon
-;;; in zsdef definiert wurde.
-;;;
-;;; Revision 1.1  1993/08/04  09:55:56  atr
-;;; Initial revision
-;;;
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Tail-rekursive Aufrufe werden in geeigneter Form in
+;;;            Spruenge umgewandelt.
+;;; 
+;;; $Revision: 1.21 $
+;;; $Id: tail.lisp,v 1.21 1994/11/22 14:49:16 hk Exp $
+;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
 
-;;;--------------------------------------------------------------------------
+;;------------------------------------------------------------------------------
+;; Z"ahler f"ur erfolgreiche Tail-Rekursions-Eliminierungen
+;;------------------------------------------------------------------------------
+(defvar *app-counter*)
+
+;;--------------------------------------------------------------------------
 (defun tail-rec-module ()
-  (let ((*app-counter*    0)
-        (*optimized-funs* 0))
+  (let ((*app-counter* 0)
+        (*level* 0))
     (clicc-message "Tail recursion elimination ...")
-    (clicc-message "------------------------------")
-    (mapc #'tail-rec-fun (?fun-list *module*))
-    (clicc-message "~s tail recursive calls are eliminated"
+    (dolist (fun (?fun-list *module*))
+      (tail-rec-fun fun))
+    (clicc-message "~s tail recursive calls eliminated"
                    *app-counter*)))
-;;;--------------------------------------------------------------------------
-;;; Die Tail-rekursion wird nur auf Funktionen angewendet, die 
-;;; Tail-rekursive Aufrufe enthalten, keine Closures bilden und 
-;;; keine Rest-Parameter haben.
-;;;--------------------------------------------------------------------------
-(defun tail-rec-fun (function)
-  (let ((*current-function* function)
-        (*static-level*     (if (global-fun-p function)
-                                0
-                                (?level function))))
-    
-    (when (and (not (generates-closures function))
-               (has-tail-rec-calls function)
-               (null (?rest (?params function))))
-      (incf *optimized-funs*)
-      (clicc-message "optimizing function ~s " (?symbol function))
-      (setf (?body function) (transform-tail-rec-calls function)))
-    (when (?local-funs *current-function*)
 
-      ;; Die Level-Slots der lokalen Funktionen werden zunächst gesetzt, 
-      ;; dann werden die Funktionen behandelt.
-      ;;----------------------------------------------------------------
-      (dolist (one-local-fun (?local-funs *current-function*))
-        (setf (?level one-local-fun) (1+ *static-level*)))
-      (mapc #'tail-rec-fun (?local-funs *current-function*)))))
-    
-  
+;;--------------------------------------------------------------------------
+(defun closure-uses-vars (local-fun-list)
+  (dolist (local-fun local-fun-list)
+    (when (or (and (eq :closure (?closure local-fun))
+                   (some #'(lambda (var)
+                             (eql (?level var) *level*))
+                         (?free-lex-vars local-fun)))
+              (closure-uses-vars (?local-funs local-fun)))
+      (return t)))
+  nil)
 
+;;------------------------------------------------------------------------------
+;; Die Marke, f"ur den sprung an den Anfang der Funktion
+;;------------------------------------------------------------------------------
+(defvar *body-tag*)
 
-;;;--------------------------------------------------------------------------
-;;; Wenn die Funktion sich selbst aufruft, und zwar steht der Aufruf 
-;;; auf Ergebisposition, dann kann der Aufruf zu einem Sprung 
-;;; umgewandelt weden.
-;;;--------------------------------------------------------------------------
-(defun has-tail-rec-calls (function)
-  (member function (get-applied-functions (?body function)) :test #'eq))
+;;--------------------------------------------------------------------------
+;; Die Tail-Rekursions-Eliminierung wird nur auf Funktionen angewendet, die
+;; keine Closures mit gef"ahrdeten freien Variablen bilden und keine
+;; Rest-Parameter haben.
+;; Der Rumpf der Funktion wird in ein Let/cc-Konstrukt umgewandelt.
+;; Dieses Let/cc-Konstrukt enth"alt einen Tagbody mit nur einem Tag.
+;; In diesem Tag wird die Continuation auf den neuen Rumpf der Funktion,
+;; indem Tail-rec-Aufrufe durch Sprünge ersetzt werden, aufgerufen.
+;; (block end
+;;   (tagbody
+;;     start
+;;     (return-from end <body>)))
+;;--------------------------------------------------------------------------
+(defun tail-rec-fun (fun)
+  (unless (or (?rest (?params fun))
+              (closure-uses-vars (?local-funs fun)))
 
+    (let* ((*body-tag* nil)
+           (*current-fun* fun)
+           (body (transform-tail-calls (?body fun))))
+      (when *body-tag*
 
-;;;--------------------------------------------------------------------------
-;;; Der Rumpf der Funktion wird in ein Let/cc-Konstrukt umgewandelt.
-;;; Dieses Let/cc-Konstrukt enth"alt einen Tagbody mit nur einem Tag. 
-;;; In diesem Tag wird die Continuation auf den neuen Rumpf der Funktion,
-;;; indem Tail-rec-Aufrufe durch Sprünge ersetzt werden, aufgerufen.
-;;;--------------------------------------------------------------------------
-(defun transform-tail-rec-calls (function)
-  (let* ((new-body     (make-instance 'let/cc-form
-                                      :cont (make-instance 'cont 
-                                                           :read 1)))
-         
-         (new-tagbody  (make-instance 'tagbody-form
-                                      :first-form empty-list
-                                      :level (if (global-fun-p function)
-                                                 0
-                                                 (?level function))
-                                      :tagged-form-list
-                                      nil))
-         (*body-tag*   (make-instance 'tagged-form 
-                                      :form nil
-                                      :tagbody  new-tagbody
-                                      :used 0)))
-    
-    (incf *app-counter*)
-    
-    (setf (?form *body-tag*) (make-instance 'app
-                                            :form (?cont new-body)
-                                            :arg-list (list (transform-form 
-                                                             (?body function)))))
-    (setf (?tagged-form-list new-tagbody)
-          (list *body-tag*))
-    (setf (?body new-body) new-tagbody) 
-    new-body))
+        (clicc-message "tail recursion in ~s" (?symbol fun))
+        (incf *app-counter*)
+        (let* ((new-tagbody (make-tagbody-form
+                             :first-form empty-list
+                             :tagged-form-list (list *body-tag*)
+                             :level *level*))
+               (cont (make-cont :level *level* :read 1 :mv-spec (?mv-spec fun)
+                                :only-local t :unknown-caller nil))
 
+               (new-body (make-let/cc-form :cont cont
+                                           :body new-tagbody)))
+          (setf (?tagbody *body-tag*) new-tagbody)
 
-;;;-------------------------------------------------------------------------
-;;; Diese Funktion erzeugt fuer die Variable "VAR"eine neue lokale Variable, 
-;;; die dafuer dient den Wert des Arguments, an dem die Variable "VAR" 
-;;; gebunden ist aufzunehmen.
-;;;-------------------------------------------------------------------------
-(defun make-a-twin-var (var)
-  (make-instance 'local-static 
-                 :symbol (if (dynamic-p var)
-                             (?symbol (?sym var))
-                             (?symbol var))
-                 :read 1
-                 :write 1
-                 :level (if (global-fun-p *current-function*)
-                            0
-                            (?level *current-function*))))
+          (setf (?form *body-tag*) (make-app :form cont
+                                             :arg-list (list body)
+                                             :mv-used t
+                                             :downfun-list ()
+                                             :called-funs (list cont)
+                                             :other-funs nil))
+          (setf (?body fun) new-body))))))
 
-;;;-------------------------------------------------------------------------
-;;; Fuer jeden formalen Parameter wird eine lokale Variable erzeugt.
-;;; Die Liste der Paare (var . new-var) wird zurueckgegeben.
-;;;-------------------------------------------------------------------------
-(defun make-new-bindings-var ()
-  (let ((var-list      (?all-vars (?params *current-function*)))
-        (old-new-list  nil))
-    (dolist (one-var var-list)
-      (push (cons one-var (make-a-twin-var one-var)) old-new-list))
-    (reverse old-new-list)))
+;;--------------------------------------------------------------------------
+;; Ein Tail-rekursiver Aufruf der Form (f arg1 ... argN) wird umgeformt
+;; in  (let ((local-arg1 arg1)
+;;                ...
+;;           (local-argN argN))
+;;         (setq P1 local-arg1)
+;;                ...
+;;         (setq PN local-argN)
+;;         (go start))
+;;--------------------------------------------------------------------------
+(defun optimize-tail-call (fun arg-list)
+  (unless *body-tag* (setq *body-tag* (make-tagged-form :used 0)))
+  (incf (?used *body-tag*))
+  (multiple-value-bind (var-list init-list subst-map)
+      (let ((*only-application* nil))
+        (bind-arguments (?params fun) arg-list))
+    (make-let*-form
+     :var-list var-list
+     :init-list init-list
+     :body (let ((form-list (list *body-tag*)))
+             (dolist (subst subst-map)
+               (push (update-old-with-new subst) form-list))
+             (make-progn-form :form-list form-list)))))
 
-;;;--------------------------------------------------------------------------
-;;; Ein Tail-rekursiver Aufruf der Form (f arg1 ... argN) wird umgeformt
-;;; in  (let ((local-arg1 arg1)
-;;;                ...
-;;;           (local-argN argN))
-;;;         (setq P1 local-arg1)
-;;;                ...
-;;;         (setq PN local-argN))
-;;;--------------------------------------------------------------------------
-(defun make-a-tail-rec-call (a-app)
-  (let ((init-list nil)
-        (old-new-list (make-new-bindings-var))
-        one-init-form
-        one-par)
-    
-    
-    ;; Abbilden der Argumentliste auf die Parameterliste.
-    ;;----------------------------------------------------
-    (dolist (one-pair old-new-list)
-      (setq one-par (car one-pair))
-      (setq one-init-form (get-arg-from-param one-par  a-app))
-      (if  (and (var-ref-p one-init-form)
-                (eql (?var one-init-form) one-par))
-           (setf old-new-list (remove one-pair  old-new-list))
-           (push one-init-form init-list)))
-    (setf init-list (reverse init-list))
-    (if (and (eql 1 (length old-new-list))
-             (eql 1 (length init-list)))
-        
-        ;; Hier wird keine Let-form erzeugt, sonder nur eine Setq-form
-        ;;------------------------------------------------------------
-        (let* ((location (make-instance 'var-ref 
-                                        :var (caar old-new-list)))
-               (progn-f 
-                (make-instance 'progn-form
-                               :form-list 
-                               (list
-                                (make-instance 'setq-form
-                                               :location location
-                                               :form (car init-list))
-                                *body-tag*))))
-          (incf (?used *body-tag*))
-          progn-f)
-        ;; Erzeugen der Let-form.
-        ;;-----------------------
-        (let ((let-form (make-instance 'let*-form)))
-          (setf (?var-list let-form)  (mapcar #'cdr old-new-list))
-          (setf (?init-list let-form) init-list)
-          
-          ;; Der Rumpf der Funktion ist dann eine Sequenz von 
-          ;; (SETQ varI local-varI) gefolgt von einem Sprung zum Anfang
-          ;; der Funktion.
-          ;;-----------------------------------------------------------
-          (setf (?body let-form) 
-                (make-instance 'progn-form 
-                               :form-list 
-                               (append 
-                                (mapcar #'update-old-with-new old-new-list)
-                                (list *body-tag*))))
-          (incf (?used *body-tag*))
-          let-form))))
-
-;;;------------------------------------------------------------------------
-;;; Bestimme ob das Argument geschlossen ist oder nicht.
-;;; Also ob im Argument nur der entsp  Parameter gelesen wird .
-;;;------------------------------------------------------------------------
-(defun is-closed (one-par form)
-  (let ((effect     (empty-effect))
-        (loc-effect (make-instance 'local-effect)))
-    (effect-of-form form effect loc-effect)
-    (and (null (?write-list effect))
-         (subsetp (?read-list loc-effect) (list one-par)))))
-;;;------------------------------------------------------------------------
-;;; Diese Funktion liefert fuer ein Paar (var . local-var) eine 
-;;; setq-form (setq old var-ref.local-var).
-;;;------------------------------------------------------------------------
+;;------------------------------------------------------------------------
+;; Diese Funktion liefert fuer ein Paar (var . local-var) eine
+;; setq-form (setq old var-ref.local-var).
+;;------------------------------------------------------------------------
 (defun update-old-with-new (pair-of-twin-vars)
-  (let* ((old     (make-instance 'var-ref 
-                                 :var (car pair-of-twin-vars)))
-         (new     (make-instance 'var-ref  
-                                 :var (cdr pair-of-twin-vars))))
-    
-    (make-instance 'setq-form 
-                   :location old
-                   :form new)))
+  (let* ((old (make-var-ref :var (car pair-of-twin-vars)))
+         (new (make-var-ref :var (cdr pair-of-twin-vars))))
+    (make-setq-form :location old :form new)))
 
-;;;------------------------------------------------------------------------
-;;; dynamic-var-bound überprüft ob eine Liste von Variablen eine dynamische 
-;;; Variable enthält.
-;;;------------------------------------------------------------------------
-(defun dynamic-var-bound (list-of-var)
+;;------------------------------------------------------------------------
+;; dynamic-var-bound-p überprüft ob eine Liste von Variablen eine dynamische
+;; Variable enthält.
+;;------------------------------------------------------------------------
+(defun dynamic-var-bound-p (list-of-var)
   (if (null list-of-var)
       nil
       (if (dynamic-p (car list-of-var))
           T
-          (dynamic-var-bound (cdr list-of-var)))))
-;;;------------------------------------------------------------------------
-;;; transform-Form traversiert den Rumpf der Funktion, und ersetzt 
-;;; alle Ergebnis-formen durch Sequenzen von 
-;;; 1 :einer Zuweisung an die  *result-var* (mit der result-form) 
-;;; 2 :einem Sprung zum *body-tag*
-;;; in dem Fall wo die Form kein rekursiver Aufruf ist.
-;;; wenn die Result-form ein rekursiver Aufruf ist, dann wird er
-;;; ersetzt durch eine Sequenz von Zuweisungen zum updaten der 
-;;; formalen Parameter.
-;;;-------------------------------------------------------------------------
-(defmethod transform-form ((a-progn-form progn-form))
-  (setf (car (last (?form-list a-progn-form)))
-        (transform-form (car (last (?form-list a-progn-form)))))
-  a-progn-form)
+          (dynamic-var-bound-p (cdr list-of-var)))))
 
-(defmethod transform-form ((a-let-form let*-form))
-  (if (dynamic-var-bound (?var-list a-let-form))
-      a-let-form
-      (progn 
-        (setf (?body a-let-form) (transform-form (?body a-let-form)))
-        a-let-form)))
+;;------------------------------------------------------------------------
+;; transform-tail-calls traversiert eine Ausdruck und wendet auf alle
+;; tail-rekursivenden Aufrufe von *current-fun* die Funktion
+;; optimize-tail-call an.
+;; Dies geschieht nicht f"ur R"umpfe von Let-Ausdr"ucken und
+;; MV-lambda-Ausdr"ucken, die dynamische Variablen binden, da die dynamische
+;; Bindung verloren geht, wenn man den rekursiven Aufruf durch einen Sprung
+;; ersetzt
+;;-------------------------------------------------------------------------
 
-;;;--------------------------------------------------------------------------
-;;; Bei der (?form a-setq) können keine rekursive Aufrufe durch Sprünge 
-;;; ersetzt werden, weil die letzte Berechnung die Zuweisung an die Variable, 
-;;; und nicht die Auswertung der (?form a-setq) ist.
-;;;--------------------------------------------------------------------------
-(defmethod transform-form ((a-setq-form setq-form))
-  a-setq-form)
+(defmethod transform-tail-calls ((an-app app))
+  (let ((fun (?form an-app)))
+    (if (eq fun *current-fun*)
+        (optimize-tail-call fun (?arg-list an-app))
+        an-app)))
 
-(defmethod transform-form ((a-switch-form switch-form))
-  (dolist (one-case (?case-list a-switch-form))
-    (setf (?form one-case)
-          (transform-form (?form one-case))))
-  (setf (?otherwise a-switch-form) (transform-form (?otherwise a-switch-form)))
-  a-switch-form)
+(defmethod transform-tail-calls ((a-progn-form progn-form))
+  (let ((last-form (last (?form-list a-progn-form))))
+    (setf (car last-form) (transform-tail-calls (car last-form)))
+    a-progn-form))
 
-(defmethod transform-form ((a-let/cc-form let/cc-form))
-  (setf (?body a-let/cc-form )
-        (transform-form (?body a-let/cc-form )))
-  a-let/cc-form)
-
-(defmethod transform-form ((a-if-form if-form))
-  (setf (?then a-if-form) (transform-form (?then a-if-form)))
-  (setf (?else a-if-form) (transform-form (?else a-if-form)))
-  a-if-form)
-
-(defmethod transform-form ((a-app app))
-  (let ((functional (?form a-app)))
-    (if (fun-p functional)
-        (if (eq functional *current-function*)
-            (make-a-tail-rec-call a-app)
-            a-app)
-        a-app)))
-            
-
-(defmethod transform-form ((a-mv-lambda mv-lambda))
-  (setf (?body a-mv-lambda)
-        (transform-form (?body a-mv-lambda)))
-  a-mv-lambda)
-
-(defmethod transform-form ((a-labels labels-form))
-  (setf (?body a-labels)
-        (transform-form (?body a-labels)))
-  a-labels) 
-
-;;;------------------------------------------------------------------------
-;;; die naechsten Formen liefern keine resultatswerte zuerueck 
-;;;------------------------------------------------------------------------
-
-(defmethod transform-form ((tagbody tagbody-form))
+(defmethod transform-tail-calls ((tagbody tagbody-form))
+  (let ((last-tagged-form (car (last (?tagged-form-list tagbody)))))
+    (setf (?form last-tagged-form)
+          (transform-tail-calls (?form last-tagged-form))))
   tagbody)
 
-(defmethod transform-form ((a-tagged-form tagged-form))
-  a-tagged-form)
+;;--------------------------------------------------------------------------
+;; In der rechten Seite einer Zuweisung können keine rekursive Aufrufe durch
+;; Sprünge ersetzt werden, weil die letzte Berechnung die Zuweisung an die
+;; Variable ist.
+;;--------------------------------------------------------------------------
+(defmethod transform-tail-calls ((a-setq-form setq-form))
+  a-setq-form)
 
-(defmethod transform-form ((a-labeled-form labeled-form))
-  a-labeled-form)
+(defmethod transform-tail-calls ((a-let-form let*-form))
+  (unless (dynamic-var-bound-p (?var-list a-let-form))
+    (setf (?body a-let-form) (transform-tail-calls (?body a-let-form))))
+  a-let-form)
 
-(defmethod transform-form ((a-class-def class-def))
-  a-class-def)
+(defmethod transform-tail-calls ((a-mv-lambda mv-lambda))
+  (unless (dynamic-var-bound-p (?all-vars (?params a-mv-lambda)))
+    (setf (?body a-mv-lambda) (transform-tail-calls (?body a-mv-lambda))))
+  a-mv-lambda)
 
-(defmethod transform-form ((a-cont cont))
+(defmethod transform-tail-calls ((a-switch-form switch-form))
+  (dolist (one-case (?case-list a-switch-form))
+    (setf (?form one-case) (transform-tail-calls (?form one-case))))
+  (setf (?otherwise a-switch-form)
+        (transform-tail-calls (?otherwise a-switch-form)))
+  a-switch-form)
+
+(defmethod transform-tail-calls ((a-let/cc-form let/cc-form))
+  (setf (?body a-let/cc-form ) (transform-tail-calls (?body a-let/cc-form)))
+  a-let/cc-form)
+
+(defmethod transform-tail-calls ((a-if-form if-form))
+  (setf (?then a-if-form) (transform-tail-calls (?then a-if-form)))
+  (setf (?else a-if-form) (transform-tail-calls (?else a-if-form)))
+  a-if-form)
+
+(defmethod transform-tail-calls ((a-labels labels-form))
+  (let ((*level* (1+ *level*)))
+    (dolist (fun (?fun-list a-labels))
+      (tail-rec-fun fun)))
+  (setf (?body a-labels) (transform-tail-calls (?body a-labels)))
+  a-labels)
+
+;;------------------------------------------------------------------------
+;; Die anderen Ausdr"ucke enthalten keine Komponenten, die Tail-rekursive
+;; Aufrufe sind.
+;;------------------------------------------------------------------------
+(defmethod transform-tail-calls ((a-cont cont))
   a-cont)
 
-;;;------------------------------------------------------------------------
-;;; Alle anderen Formen , die auf Ergebnisposition stehen, muessen durch
-;;; eine Sequenz ersetzt werden :
-;;; Kopieren dieser Form in *RESULT-VAR*.
-;;; ein Sprung zum Ende der Funktion (also zum TAG "*body-tag*".
-;;;-------------------------------------------------------------------------
-(defmethod transform-form ((any-thing-else form))
+(defmethod transform-tail-calls ((any-thing-else form))
   any-thing-else)
-
-(defmethod transform-form ((a-var-ref var-ref))
-  a-var-ref)
 
 ;;------------------------------------------------------------------------------
 (provide "tail")

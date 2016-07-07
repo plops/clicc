@@ -1,23 +1,26 @@
 #------------------------------------------------------------------------------
-#  Projekt : CLICC - a Common Lisp to C Compiler
-#            -----------------------------------
+# CLiCC: The Common Lisp to C Compiler
+# Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+# Christian-Albrechts-Universitaet zu Kiel, Germany
+#------------------------------------------------------------------------------
 # Function : Generates Lisp runtime-modules for CLICC.
 #            Uses optional parameter OPTIMIZE = <-{O | g}>.
 #            Uses environment variable CLICCROOT.
 #
-#  $Source: /home3/apply/public/clicc-0.6.4/src/runtime/lisp2c/RCS/GNUmakefile,v $
-#  $Author: uho $
-#  $Revision: 1.9 $
-#  $Date: 1994/02/18 12:11:46 $
+#  $Revision: 1.14 $
+#  $Id: GNUmakefile,v 1.14 1994/11/22 14:57:56 hk Exp $
 #------------------------------------------------------------------------------
 
-CC	= acc
-LIB	= $(CLICCROOT)/lib
-OPTIMIZE = -g # alternative to -O is -g
-CFLAGS	= -I$(LIB) $(OPTIMIZE)
-ARFLAGS	= r
-RANLIB  = ranlib
-RM      = rm
+CC	 = gcc
+LIB	 = $(CLICCROOT)/lib
+OPTIMIZE = -O # alternative to -O is -g
+CFLAGS	 = -I$(LIB) $(OPTIMIZE)
+ARFLAGS	 = r
+RANLIB   = ranlib
+CAT      = cat
+CP       = cp
+MV       = mv
+RM       = rm -f
 
 SOURCES 	= $(wildcard *.c)
 SYNTAX		= $(LIB)/lisp.syntax
@@ -41,21 +44,22 @@ all:  $(LISPH) $(INLINEH) $(LIBRARY) $(SYNTAX) $(DEF)
 
 $(LISPH): lisp.h	
 	echo '#include "inline.h"' > lisp.hh
-	cat lisp.h >> lisp.hh
-	mv lisp.hh lisp.h
-	cp lisp.h $(LISPH)
+	$(CAT) lisp.h >> lisp.hh
+	$(MV) lisp.hh lisp.h
+	$(CP) lisp.h $(LISPH)
 
 $(INLINEH): inline.h
-	cp inline.h $(INLINEH)
+	$(CP) inline.h $(INLINEH)
 
 $(SYNTAX): lisp.syntax
-	cp lisp.syntax $(SYNTAX)
+	$(CP) lisp.syntax $(SYNTAX)
 
 $(DEF): lisp.def
-	cp lisp.def $(DEF)
+	$(CP) lisp.def $(DEF)
 
 $(LIBRARY): $(SOURCES)
-	-$(COMPILE.c) $?
+	$(COMPILE.c) $?
+	$(RM) $(LIBRARY)
 	$(AR) $(ARFLAGS) $@ *.o
 	$(RM) *.o
 	$(RANLIB) $@

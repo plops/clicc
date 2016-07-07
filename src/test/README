@@ -1,16 +1,33 @@
------------------------------------------------------------------------------
- Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
------------------------------------------------------------------------------
- Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-            ------------------------------------------------------
- Funktion : README for the directory src/test
+---------------------------------------------------------------------
+ CLiCC: The Common Lisp to C Compiler
+ Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ Christian-Albrechts-Universitaet zu Kiel, Germany
+---------------------------------------------------------------------
+ CLiCC has been developed as part of the APPLY research project,
+ funded by the German Ministry of Research and Technology.
+ 
+ CLiCC is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
 
- $Revision: 1.2 $
- $Id: README,v 1.2 1994/01/10 11:07:50 hk Exp $
+ CLiCC is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License in file COPYING for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+------------------------------------------------------------------------------
+ Function : README for the directory src/test
+
+ $Revision: 1.5 $
+ $Id: README,v 1.5 1994/12/13 16:45:17 hk Exp $
 -----------------------------------------------------------------------------
 
-This directory contains a test suite for CLiCC
-----------------------------------------------
+This directory contains a test suite for CLiCC and an example of the FFI
+------------------------------------------------------------------------
 
 Compile the file testmain.lisp with CLiCC, run the command
 ../../bin/cl testmain and execute the resulting file testmain.
@@ -27,3 +44,11 @@ two failed tests:
 This is ok, because CLiCC currently implements the declaration scope
 rules of CLtL1 and these tests expect the declaration scope rules of
 CLtL2. 
+
+In the file time.lisp you will find an implementation of the TIME
+macro wich is not supported by CLiCC, because it is considered to be
+part of a CL development environment. time.lisp uses the foreign
+function interface of CLiCC to call the UNIX times function. This
+function and some related types are defined in time.def.
+You may compile the file boyer.lisp to see a working example of using
+the foreign function interface.

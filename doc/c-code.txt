@@ -1,0 +1,137 @@
+Anmerkungen zum verwendeten Sprachumfang in den generierten C Programmen.
+-------------------------------------------------------------------------
+
+Lokale Variablen vom Typ:
+-------------------------
+CONTENV new_cont
+CL_FORM *caller_base
+static double local_float
+static CL_INIT local_string[2]
+CL_FORM *display['maxlevel']
+CL_FORM *array
+static GLOBAL_FUNARG extern_closure
+CL_FORM *new_display[]
+DOWN_FUNARG 'df-name'
+CL_FORM *new_display'*downfun-count*'[]
+int nargs
+int i
+CL_FORM *from
+CL_FORM *to
+BOOL supl_flags['nkey']
+static CL_FORM *keylist[]
+
+Globale Variablen vom Typ:
+--------------------------
+static double 'float-array-name'
+static long 'fixnum-array-name'
+CL_INIT 'array-name'
+CL_INIT symbols[]
+static GLOBAL_FUNARG C'name'
+
+Deklarationen:
+--------------
+extern GLOBAL_FUNARG C'name of global function'   ;;global Closure
+
+Parameter von Funktionen
+------------------------
+CL_FORM *base
+CL_FORM *display[]
+int nargs
+
+Boolesche Ausdr"ucke
+--------------------
+Test, ob ein Speicherplatz einen Lisp-Wert ungleich nil enth"alt.
+Die C-Konstanten FALSE (0) und TRUE (1).
+
+
+Anweisungen
+-----------
+Initialisierung von new_cont mit
+- letzter Continuation,
+- Top of Binding Stack
+- Mit SETJMP initialisierte Jump Buffer
+- Eindeutiger Kennung
+Setzen von last-cont auf new_cont
+R"ucksetzen von last_cont
+Sprungmarken f"ur lokale Continuations.
+Zugriff auf den Lisp-stack mittels STACK(base, 'n') im aktuellen
+Activation Record.
+Zugriff auf den Lisp-stack mittels STACK(caller_base, 'n') auf das
+Activation Record einer in Ausf"uhrung befindlichen Continuation.
+Zuweisung eines Wahrheitswertes an bool_result.
+Kopieren von Lisp-Daten mittels COPY('source-address', 'dest-address').
+Aufruf einer Continuation mittels call_cont(caller_base).
+Sprung zu einer lokalen Continuation.
+
+Initialisieren einer Speicherstelle mit Konstanten:
+- LOAD_NIL
+- LOAD_T
+- LOAD_FIXNUM
+- LOAD_CHAR
+- LOAD_FLOAT, Zahl in lokaler Variablen, Zeiger darauf
+- LOAD_SYMBOL, Zeiger auf das Symbol an bekantter Adresse
+- LOAD_SMSTR, String in lokalem 2-elt. Array, Zeiger darauf.
+- LOAD_CONS
+- LOAD_SMSTR
+- LOAD_SMVEC_T
+- LOAD_SMAR_T
+- LOAD_STRUCT
+
+Parameterlisten:
+---------------
+while Schleife, um angegebene Parameter zu verschiben, wenn Platz f"ur
+suppliedp-Parameter benoetigt wird.
+
+
+Globale Variablen des Laufzeitsystems
+-------------------------------------
+bind_top
+last_cont
+bool_result
+
+Strukturierung des Codes
+------------------------
+Verwendung von C-Bl"ocken ({ ... }), um Folgen von Anweisungen
+zusammenzufassen; das ist n"otig f"ur den if- und
+else-Zweig des der C-if-Anweisung, f"ur den Rumpf von
+C-while-Schleifen, die generiert werden, um Speicherbereiche zu
+verschieben, f"ur den Rumpf von C-switch-Ausdr"ucken und f"ur den
+Rumpf von C-Funktionen.
+Und um lokale C-Variablen deklarieren zu k"onnen.
+Verwendung von { ... } f"ur die Initialisierung von strukturierten
+Konstanten. 
+
+Verwaltung
+----------
+#include <c_decl.h>
+#include "sys.h"
+#include "lisp.h"
+#include "'declaration of global functions, closures and symbol array'"
+
+Strukturierte Anweisungen
+-------------------------
+Block-Anweisungen werden benutzt, um Folgen von Anweisungen
+zusammenzufassen und um Variablen definieren zu k"onnen, deren
+G"ultigkeitsbereich auf die Anweisungen der Block-Anweisung
+beschr"ankt ist und die nur eine sehr kurze Lebensdauer haben.
+
+If-Else-Anweisungen werden benutzt, um If-Anweisungen der
+Zwischensprache auszudr"ucken, f"ur den Test, ob ein Let/cc irregul"ar
+verlassen wurde und f"ur den Test, ob ein Keyword-Parameter angegeben
+wurde.
+
+If-Anweisungen werden benutzt f"ur den Test, ob die variable Anzahl
+von Argumenten einer Funktion die maximale Parameterzahl "ubersteigt
+und f"ur den Test, ob die die Anzahl der Argumente bei MV-lambda
+korrekt, zu klein, zu gro"s ist.
+
+Switch-Anweisungen werden nur verwendet, um die optionalen Parameter
+abh"angig von der tats"achlichen Anzahl der Argumente zu bearbeiten.
+
+Eine While-Anweisung wird generiert, um in einem Activation Record
+Platz f"ur die supplied-p Parameter von optionalen Parametern zu
+schaffen. 
+
+Eine For-Anweisung wird benutzt, um eine unbekannte Zahl von multiple
+Values aus einem Buffer in das aktuelle Activation Record zu kopieren.
+

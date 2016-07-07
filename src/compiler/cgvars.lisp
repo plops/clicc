@@ -1,8 +1,25 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Codegenerierung
 ;;;            - Lambda Listen
 ;;;            - Variablenzugriffe
@@ -10,131 +27,8 @@
 ;;;            - Restaurieren von Special Variablen
 ;;;            - SETQ
 ;;;
-;;; $Revision: 1.36 $
-;;; $Log: cgvars.lisp,v $
-;;; Revision 1.36  1994/05/25  14:06:18  sma
-;;; Aufruf der Restlistenoptimierung aus cg-params herausgezogen.
-;;;
-;;; Revision 1.35  1994/05/24  09:34:43  sma
-;;; Berechnung der local-Variable bei closures korrigiert.
-;;;
-;;; Revision 1.34  1994/05/19  13:27:17  hk
-;;; Klammerfehler behoben.
-;;;
-;;; Revision 1.33  1994/05/19  13:13:26  sma
-;;; Closures-Argument bei Closures im Zusammenhang mit Restlisten wird
-;;; nicht mehr von Restargument verdeckt.
-;;;
-;;; Revision 1.32  1994/04/14  17:01:44  sma
-;;; Fehler in gc-form Methode für let*-form beim gemischten Vorkommen von
-;;; Rest-Variablen und normalen Variablen behoben.
-;;;
-;;; Revision 1.31  1994/04/11  12:44:38  sma
-;;; Korrektur für rest-variablen, die auf Prädikatsposition stehen.
-;;;
-;;; Revision 1.30  1994/03/03  13:47:14  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.29  1994/02/10  16:00:30  sma
-;;; Korrektur für closures; cdr-rest-funcall-p -> rlo-rest-form;
-;;; Erweiterung für (setq rest-var (let () ... (progn restform))).
-;;;
-;;; Revision 1.28  1994/02/08  15:39:24  sma
-;;; Statistik verändert und Test auf Benutzung der rest-Variable in
-;;; rest-optimization-p verschoben.
-;;;
-;;; Revision 1.27  1994/02/08  13:58:55  sma
-;;; Diverse Änderungen für rest-Parameter-Optimierungen.
-;;;
-;;; Revision 1.26  1994/02/03  17:33:50  sma
-;;; Änderungen für Optimierung von &rest-Paramtern. Wenn möglich, wird das
-;;; Erzeugen einer Restliste mittels Flist unterdrückt und die Restliste
-;;; direkt auf dem LISP-Stack verwaltet.
-;;;
-;;; Revision 1.25  1994/01/07  12:51:06  hk
-;;; Unbenutzte local-static haben die Annotation write = 1, wenn sie nicht
-;;; benutzt werden. Das wird nun berücksichtigt, um unbenutzte &rest
-;;; Parameter zu erkennen.
-;;;
-;;; Revision 1.24  1993/09/10  15:33:24  hk
-;;; Fehler in cg-form (var-ref) behoben
-;;;
-;;; Revision 1.23  1993/09/10  12:16:14  hk
-;;; Vorhergehende Korrektur korrigiert.
-;;;
-;;; Revision 1.22  1993/09/10  10:05:41  hk
-;;; Fehler behoben: Bearbeitung optionaler Parameter hat vorausgesetzt,
-;;; daß die Argumentliste immer mit Offset 0 im Activation-Record liegt.
-;;; Das ist bei der Bearbeitung von mv-lambda nicht unbedingt gegeben.
-;;;
-;;; Revision 1.21  1993/09/06  14:33:00  hk
-;;; Fehler in (cg-form var-ref) behoben: bei Zugriff auf dynamisch
-;;; gebundene Variablen auf Prädikatsposition eines if.
-;;;
-;;; Revision 1.20  1993/07/20  15:46:27  hk
-;;; (cg-form named-const) ist nun definiert, falls der Wert ein Literal
-;;; oder ein Symbol ist.
-;;;
-;;; Revision 1.19  1993/06/28  15:29:18  hk
-;;; Fehler in CC-heapenv behoben und die Funktion vereinfacht.
-;;;
-;;; Revision 1.18  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.17  1993/05/12  15:01:33  hk
-;;; Sonderbehandlung fuer Vorwaertsreferenzen auf Funktionen entfernt.
-;;;
-;;; Revision 1.16  1993/03/22  17:36:22  hk
-;;; Keywords in LZS Slots.
-;;;
-;;; Revision 1.15  1993/02/16  15:48:45  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.14  1992/12/21  11:29:41  hk
-;;; Schreibfehler in der letzten Aenderung.
-;;;
-;;; Revision 1.13  1992/12/21  11:25:48  hk
-;;; ?read von nicht aufgeloesten Referenzen auf undefinierte Funktionen
-;;; wird auf -1 gesetzt, um anzuzeigen, dass keine erneute Fehlermeldung
-;;; ausgegeben zu werden braucht.
-;;;
-;;; Revision 1.12  1992/10/02  14:07:22  hk
-;;; Fehlerbehandlung jetzt lokal
-;;;
-;;; Revision 1.11  1992/09/24  15:27:46  hk
-;;; Fehler bei der Bearbeitung von Special-Parametern behoben.
-;;;
-;;; Revision 1.10  1992/09/23  12:31:59  hk
-;;; Fehler bei der Bearbeitung von Key-supplied-p Variablen behoben.
-;;;
-;;; Revision 1.9  1992/09/21  11:18:52  hk
-;;; Die eigentliche C-Codegenerierung uebersichtlicher gestaltet
-;;;
-;;; Revision 1.8  1992/08/11  12:47:53  hk
-;;; C-Ln --> C-Decl, fuer Deklarationen.
-;;;
-;;; Revision 1.7  1992/08/10  12:04:25  hk
-;;; *mv-spec* und *mv-produced* gestrichen, da Analyse komplett in Pass3.
-;;;
-;;; Revision 1.6  1992/07/09  16:48:34  hk
-;;; Vernuenftige Fehlermeldung bei nicht aufgeloesten Forwarts-Referenzen.
-;;;
-;;; Revision 1.5  1992/07/06  15:00:47  hk
-;;; In cg-var-bind (dynamic) wird die variable nur noch dann mit
-;;; *result-spec* verglichen, wenn es ungleich nil ist.
-;;;
-;;; Revision 1.4  1992/06/04  14:44:34  hk
-;;; Schreibfehler in Bearbeitung von setq-form.
-;;;
-;;; Revision 1.3  1992/06/04  12:59:17  hk
-;;; Auf Rumpf von Let* wird mittels ?body und nicht mehr ?form zugegriffen.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.39 $
+;;; $Id: cgvars.lisp,v 1.39 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -268,18 +162,13 @@
                          (?opt-list params)
                          :key #'?var))
 
-        (C-if (CC-op> C-nargs nsimpopt))
-        (C-blockstart)
-        (C-goto C-ALL_OPT_SUPPLIED)
-        (C-blockend)
-
         ;; initialisierte optionale Parameter bearbeiten
         ;;----------------------------------------------
         (C-switch C-nargs)
         (C-blockstart)
-        (setq suppl-index *stack-top*)
-        (let ((first-CASE t)
-              (i nopt)
+        (C-defaultcase)
+        
+        (let ((i nopt)
 
               ;; Weil cg-var-bind 2x f"ur special und closure Variablen
               ;; aufgerufen wird, soll der erste Aufruf keinen Effekt auf
@@ -287,38 +176,33 @@
               ;;----------------------------------
               (*special-count* *special-count*)
               (*do-not-restore* *do-not-restore*))
+          (setq suppl-index *stack-top*)
           (dolist (opt-spec (reverse (?opt-list params)))
 
             ;; erzeugt :
             ;;----------
             ;; switch (nargs)
             ;; {
-            ;; case <nsimple+nopt>:
-            ;; ALL_OPT_SUPPLIED   : <hdl-opt(nopt-1)>
+            ;; default:
+            ;; case <nsimple+nopt>: <hdl-opt(nopt-1)>
             ;;   ....
             ;; case <nsimple+1   >: <hdl-opt(0)>
             ;; }
 
-            ;; CASE nur einfuegen, wenn ueberhaupt etwas mit
-            ;; dem i. Parameter geschieht.
-            ;;----------------------------------------------
-            (when (or (?suppl opt-spec)
-                      (dynamic-p (?var opt-spec))
-                      (and (local-static-p (?var opt-spec))
-                           (?closure (?var opt-spec))))
-              (C-Case (+ nsimple i))
-              (when first-CASE
-                (setq first-CASE nil)
-                (C-label C-ALL_OPT_SUPPLIED))
-              (cg-var-bind
-               (?var opt-spec) (+ *stack-top* i -1) C-stacktop)
-              (when (?suppl opt-spec)
-                (decf suppl-index)
-                (C-T (CC-Stack suppl-index))
-                (cg-var-bind (?suppl opt-spec) suppl-index C-stacktop)))
-            (decf i)))
-        
-        (C-blockend))
+            ;; alle CASE Marken m"ussen generiert, werden, auch wenn f"ur
+            ;; eine einzelne Marke nichts geschieht, da nur so der Code f"ur
+            ;; die kleineren F"alle zur Ausf"uhrung gelangt
+            ;;---------------------------------------------
+            (C-Case (+ nsimple i))
+            (cg-var-bind (?var opt-spec) (+ *stack-top* i -1) C-stacktop)
+            (when (?suppl opt-spec)
+              (decf suppl-index)
+              (C-T (CC-Stack suppl-index))
+              (cg-var-bind (?suppl opt-spec) suppl-index C-stacktop))
+            (decf i))
+
+          (C-Case nsimple)
+          (C-blockend)))
 
       ;; Hier werden die nicht belegten optionalen Parameter
       ;; mit ihrem Defaultwert initialisiert.

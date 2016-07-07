@@ -1,8 +1,25 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Codegenerierung
 ;;;            Generierung von konstanten Daten
 ;;;            - Arrays
@@ -15,228 +32,12 @@
 ;;;            - Global Closures
 ;;;            - Klassen
 ;;;
-;;; $Revision: 1.59 $
-;;; $Log: cgconst.lisp,v $
-;;; Revision 1.59  1994/05/22  15:03:31  sma
-;;; Die neue globale Variable *OBREP* regelt die Art der
-;;; Datenrepräsentation. Sie ist auf 1 für die bisherige Datenrepräsenatation
-;;; gesetzt. Die Anpassungen beziehen sich auf die Größe von CONS-Zellen
-;;; und die Codeerzeugung für FIXNUMs und FLOATs.
-;;;
-;;; Revision 1.58  1994/04/29  10:59:32  hk
-;;; Der exported Slot eines Symbols kann auch den Wert 'inline haben. Nur
-;;; aus dem Package exportieren, wenn der Wert T vorliegt.
-;;;
-;;; Revision 1.57  1994/04/28  10:12:56  sma
-;;; Und noch ein Fehler in C-string beseitigt (es fehlte das 3. Argument).
-;;; Sorry.
-;;;
-;;; Revision 1.56  1994/04/28  10:07:16  sma
-;;; Auskommentiere Programmteile gelöscht; falsche Kommentar-Bilder
-;;; gelöscht; C-const-t und CC-const-t gelöscht; C-integer, C-float und
-;;; C-character geändert, das 3. Argument stacktop generiert wird; statt
-;;; CL_INIT2(x) wird wieder `CL_INIT x =' erzeugt; Erzeugung von
-;;; statischen konstanten String und Floats abstrahiert.
-;;;
-;;; Revision 1.55  1994/01/26  13:35:28  ft
-;;; Änderung der Darstellung von ungebundenen Slots.
-;;;
-;;; Revision 1.54  1994/01/21  16:49:38  ft
-;;; Behelfskorrektur an *SECRET-UNBOUND-SLOT-VALUE*.
-;;;
-;;; Revision 1.53  1994/01/21  08:20:06  ft
-;;; Änderung der Zwischensprachrepr. des Werts unbound für Slots.
-;;;
-;;; Revision 1.52  1994/01/21  08:13:30  sma
-;;; Erneute Änderung der Symbolrepräsentation (letzte Änderung war keine
-;;; so gute Idee)
-;;;
-;;; Revision 1.51  1994/01/13  16:34:56  sma
-;;; Änderung der Symbol-Repräsentation.
-;;;
-;;; Revision 1.50  1993/12/09  14:05:35  sma
-;;; Verwendet jetzt MAKE_CONSREF statt MAKE_LIST.
-;;;
-;;; Revision 1.49  1993/11/30  08:39:00  ft
-;;; Verarbeitung von Slotbeschreibungen korrigiert.
-;;;
-;;; Revision 1.48  1993/10/29  15:01:04  sma
-;;; (C-CL_INIT-Decl ...) statt (C-ArrayInitDecl "CL_INIT" ...)
-;;;
-;;; Revision 1.47  1993/09/06  16:51:49  sma
-;;; Statt direkt CL-INIT-Strukturen zu erzeugen werden MAKE_* Makros
-;;; generiert. Siehe für deren Implementierung obrep?.h.
-;;;
-;;; Revision 1.46  1993/08/26  09:32:42  hk
-;;; C-const-string verändert, daß keine Problem mehr mit
-;;; CALL-ARGUMENTS-LIMIT auftreten. CCC-character kann jetzt auch \ooo
-;;; Zeichen und Umlaute ausgeben.
-;;;
-;;; Revision 1.45  1993/08/20  10:41:44  hk
-;;; :element-type eingefuegt bei make-array mit :displaced-to.
-;;;
-;;; Revision 1.44  1993/07/20  18:20:19  pm
-;;; ?named-constant-base in named-const-base umbenannt
-;;;
-;;; Revision 1.43  1993/07/20  15:44:33  hk
-;;; cg-named-constants und calc-named-const-base definiert, (cg-form
-;;; float-form) traegt nur die Adresse ein, wenn diese bei der Bearbeitung
-;;; einer named-const schon gesetzt wurde.
-;;;
-;;; Revision 1.42  1993/07/19  15:55:17  hk
-;;; big-float nicht mehr notwendig, da float-form nun einen Slot adr hat
-;;;
-;;; Revision 1.41  1993/07/19  11:25:31  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.40  1993/07/19  11:24:24  hk
-;;; Initialisierung von fixnum-array-name und float-array-name verschoben.
-;;;
-;;; Revision 1.39  1993/07/19  11:20:14  hk
-;;; Fehler in cg-floats und cg-fixnums behoben: or -> and
-;;;
-;;; Revision 1.38  1993/07/13  11:08:16  uho
-;;; Bei Instruktionen, die Simple-Strings ansprechen, wird der String in
-;;; einem Kommentar zur Instruktion genannt ('cg-form (simple-literal)').
-;;; In 'calc-symbol-base' wird nun die Hilfsfunktion 'calc-C-name'
-;;; aufgerufen, die einen gueltigen C-Identifkator generiert.
-;;;
-;;; Revision 1.37  1993/07/09  15:29:19  hk
-;;; Keine Unterdrueckung von Warnings ueber uninterned Symbols
-;;; im Lisp Modul.
-;;;
-;;; Revision 1.36  1993/07/07  15:49:56  uho
-;;; CALC-SYMBOL-BASE wandelt den Modulnamen jetzt in einen gueltigen
-;;; C-Namen um.
-;;;
-;;; Revision 1.35  1993/06/19  22:17:47  hk
-;;; Keine Warnings ueber uninterned Symbols im Lisp Modul.
-;;;
-;;; Revision 1.34  1993/06/17  12:47:44  ft
-;;; Codeerzeugung für Klassen ohne Slots korrigiert.
-;;;
-;;; Revision 1.33  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.32  1993/05/22  10:35:20  ft
-;;; Erweiterung um Codeerzeugung für globale Funktionen in konstanten Daten.
-;;;
-;;; Revision 1.31  1993/05/08  18:46:52  hk
-;;; (cg-form structured-literal) korrigiert, Methoden fuer sym, class-def,
-;;; simple-literal nach hier.
-;;;
-;;; Revision 1.30  1993/04/22  11:13:20  hk
-;;; Anpassung an die neue Definition von SYMVAL und SYMBOL.
-;;; Fehler behoben: uninterned Syms haben im Package Slot :uninterned,
-;;; nicht nil. Symbol-Array bekommt den Namen S<module name>. Das Symbol NIL
-;;; ist schon in Ssys definiert.
-;;;
-;;; Revision 1.29  1993/03/25  10:11:43  ft
-;;; Codeerzeugung fuer Klassen korrigiert.
-;;;
-;;; Revision 1.28  1993/03/22  17:31:49  hk
-;;; Keywords in LZS Slots.
-;;;
-;;; Revision 1.27  1993/03/18  14:53:00  ft
-;;; gen-literals erzeugt jetzt code fuer ungebundene Slots.
-;;;
-;;; Revision 1.26  1993/03/17  15:54:15  hk
-;;; Aufruf von add-comment in CC-special eingefuegt. Aufrufe von
-;;; add-comment an die Aenderung der Definition (auto Space) angepasst.
-;;;
-;;; Revision 1.25  1993/03/12  09:39:56  ft
-;;; Codeerzeugung fuer die Klassen.
-;;;
-;;; Revision 1.24  1993/02/16  16:08:02  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.23  1993/01/28  15:25:26  uho
-;;; Generierung von Kommentaren fuer die Tabelle der Symbole
-;;;
-;;; Revision 1.22  1993/01/26  13:52:38  uho
-;;; Fuer LOAD_SYMBOL erscheint nun der Namen des Symbols als Kommentar
-;;;
-;;; Revision 1.21  1993/01/26  08:45:24  sma
-;;; integer overflow extra behandelt
-;;;
-;;; Revision 1.20  1992/10/02  14:07:22  hk
-;;; Fehlerbehandlung jetzt lokal
-;;;
-;;; Revision 1.19  1992/09/29  21:12:37  hk
-;;; Message 'generating Symbols' entfernt.
-;;;
-;;; Revision 1.18  1992/09/25  17:27:25  kl
-;;; Umstellung auf die neue Repraesentation der einfachen Literale.
-;;; Zusaetzlich einige Fehlermeldungen eingefuegt bzw. verbessert.
-;;;
-;;; Revision 1.17  1992/09/24  08:49:24  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.16  1992/09/24  08:27:57  hk
-;;; Das Symbol Nil wird extra generiert, da es nicht mehr in ?sym-list von
-;;; *module* enthalten ist.
-;;;
-;;; Revision 1.15  1992/09/23  08:29:05  hk
-;;; Schreibfehler
-;;;
-;;; Revision 1.14  1992/09/21  11:18:52  hk
-;;; Die eigentliche C-Codegenerierung uebersichtlicher gestaltet
-;;;
-;;; Revision 1.13  1992/08/11  12:37:38  hk
-;;; C-Ln --> C-Decl, falls Variablen deklariert werden.
-;;;
-;;; Revision 1.12  1992/07/28  10:43:51  hk
-;;; Paramterliste von cg-gen-symbols ist nun (), Schreibfehler beseitigt.
-;;;
-;;; Revision 1.11  1992/07/23  12:43:19  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.10  1992/07/22  12:58:52  hk
-;;; Fehlermeldung von cg-package-cell geaendert.
-;;;
-;;; Revision 1.9  1992/07/07  15:33:15  hk
-;;; Forwaertsdeklaration auf static Variablen mittels "extern".
-;;;
-;;; Revision 1.8  1992/07/02  15:23:12  hk
-;;; Inhalt von class in literal-instance ist zur Zeit sym und nicht symbol.
-;;;
-;;; Revision 1.7  1992/06/11  11:17:02  hk
-;;; cg-error -> error.
-;;;
-;;; Revision 1.6  1992/06/10  16:43:32  hk
-;;; In Fehlermeldung von cg-package-cell Symbol angeben, nicht sym.
-;;;
-;;; Revision 1.5  1992/06/05  11:17:38  hk
-;;; Argument von CC-special ist vom Typ dynamic und nicht sym.
-;;;
-;;; Revision 1.4  1992/06/05  11:15:42  hk
-;;; *** empty log message ***
-;;;
-;;; Revision 1.3  1992/06/04  12:39:10  hk
-;;; ?const -> ?constant-value
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
-;;;
-;;; 05.02.91 hk
-;;; Konstanten werden nicht mehr global in 'const_forms', sondern
-;;; direkt vor der jeweiligen globalen Funktion angelegt.
-;;;
-;;; 05.08.91 hk
-;;; Konstante Strings und Floats werden direkt im Code und
-;;; nicht mehr dem Array 'const_forms' abgelegt.
+;;; $Revision: 1.66 $
+;;; $Id: cgconst.lisp,v 1.66 1994/12/06 15:42:25 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")     
 
-;;------------------------------------------------------------------------------
-;; Datenrepräsentationsverfahren (Objekt-Repräsentation)
-;;------------------------------------------------------------------------------
-(defvar *OBREP* 1)                      ; 1, 2 oder 3 möglich
 (defconstant min-smallfixnum -1000)     ; Bereich der vordefinierten 
 (defconstant max-smallfixnum  1000)     ; Konstanten bei Obrep = 2
 
@@ -310,7 +111,7 @@
              
              (cons
               (add-comment (format nil "CONS(~A)" adr))
-              (case *OBREP*
+              (ecase *OBREP*
                 (1 (incf adr 2))
                 ((2 3) (C-init (CC-MacroCall "MAKE_CONS"))
                  (incf adr 3)))
@@ -385,7 +186,7 @@
          (sizeof (elt)
            (typecase elt
              (cons (+ (sizeof (car elt)) (sizeof (cdr elt))
-                      (case *OBREP* (1 2) ((2 3) 3))))
+                      (ecase *OBREP* (1 2) ((2 3) 3))))
              (string 2)
              (vector
               (let ((size (1+ (length elt))))

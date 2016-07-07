@@ -1,0 +1,411 @@
+% Projekt  : APPLY - A Practicable And Portable Lisp Implementation
+%            ------------------------------------------------------
+%            CLOS_0 Sprachbeschreibung fuer cl0-engl.tex
+% 
+% $Revision: 1.1 $
+% $Id: clos-0.tex,v 1.1 1993/09/03 15:01:38 wg Exp $
+
+Like \cl0, which essentially is defined in order to exclude {\em
+reflection} from \CL, \clos0\ will be defined as a subset of \CLOS,
+which essentially excludes unrestricted uses of reflection.  The
+reason again is, that we want to ensure the quality of {\em global}
+program analysis and optimization for \cl0\ application programs which
+use object oriented programming.
+
+But, unlike reflection in \CL, in \CLOS\ the notion of reflection has
+various aspects. First of all, the distinction between program and
+data is not as simple and wellknown for the object system as for the
+non object oriented kernel of \CL. Instances are data, of course. But
+should classes, i.e.\ types, be program or data? Should classes be
+instances of metaclasses?  At present, there are many different
+answers to questions like this. The intention of \clos0\ is to call
+those operations, which work on classes or generic functions as data
+objects, {\em reflective}.  Hence, they are excluded from the
+language. On the other hand, metaobject programming, at least in a
+restricted manner, seems to be very useful even for application
+programming. At least some parts of the metaobject protocol should be
+supported by \clos0, whereas other parts, like class redefinition,
+definitely belong to the development environment.  Although some
+reflection should be part of \clos0, at present it is not. We
+have to be very careful in improving the present definition in this
+aspect, because we have to ensure both, the strict subset property,
+and the quality of static program analysis.
+
+The strategy we will use to improve \clos0\ in order to include
+metaobject programming will be to keep those operations apart from
+runtime, like runtime macro expansion has been removed from  the
+modern \Lisp\ language versions. 
+
+The definition on \clos0\ included here has to be taken as a
+first attempt in order to define a suitable subset of \CLOS. At
+present, the restrictions are very rigorous in order to achieve our
+goals: There is no meta object protocol. Classes, generic functions
+and methods are program, not data. There is no possibility to define
+or redefine classes, methods, or generic functions at runtime,
+nor to add methods to generic functions. Changing an
+instance's class is impossible. There are objects representing classes,
+but they have no class. It is an error to access a class's
+class. Moreover, \clos0\ ensures class objects only to represent
+classes which are statically defined within the program text.
+
+%%% Internally they are represented as instances of the one and only
+%%% invisible and illegal metaclass {\tt standard-class}.
+
+Again, not every useful \CL\ $+$ \CLOS\ program belongs and will
+belong to the subset defined within this document. But we hope that it
+will be rich enough to express the most requirements of \Lisp\
+application programs.
+
+%%------------------------------------------------------------------------------
+\subsection{Programmer Interface Concepts}
+\label{concepts}
+
+As before, we will follow the section headings of the original
+specification, i.e.\ the chapter 28 of \cite{Steele90}, in order to
+define \clos0\ by stating changes and differences with respect to the
+original.  Section \ref{functions} then will summarize both the
+functionality that is supported by \clos0\, together with the
+restrictions defined, and those functions, macros, or generic
+functions which are not.
+
+Restrictions are defined both for the {\em metaobject protocol} and
+the {\em functional interface}, which \CLOS\ provides in order to define
+classes, generic functions, and methods at runtime. Therefore, in \clos0\ 
+the only legal method to create classes, generic functions or methods is to 
+use {\tt defclass}, {\tt defgeneric}, or {\tt defmethod}, which are {\em 
+defining forms} and hence are restricted to occur as extended toplevel 
+forms only. (cf.\ section \ref{progstructure})
+
+The generic functions which are classified to be part of the
+metaobject protocol, are:
+
+\begin{itemize}
+\item[$\bullet$] {\tt shared-initialize}
+\item[$\bullet$] {\tt update-instance-for-different-class}
+\item[$\bullet$] {\tt update-instance-for-redefined-class}
+\item[$\bullet$] {\tt compute-applicable-methods}
+\item[$\bullet$] {\tt ensure-generic-function}
+\item[$\bullet$] {\tt compute-effective-method}
+\item[$\bullet$] {\tt allocate-instance}
+\item[$\bullet$] {\tt make-instances-obsolete}
+\end{itemize}
+
+They do not belong to \clos0. 
+As a consequence, many functions and generic functions which remain in
+\clos0, like {\tt initialize-instance},
+actually do behave as this is defined for the standard
+situation, but their behavior is not customizable using method
+definitions for generic functions of the metaobject protocol. 
+
+We classify {\tt add-method}, {\tt remove-method}, {\tt generic-function}, and calls to 
+{\em make-instance} with metaclasses
+as class arguments to belong to the functional interface. \clos0\ does not 
+support them. Moreover, \clos0\ does not support metaclasses at all.
+Thus, there is no way to create instances of metaclasses, like anonymous classes or generic 
+functions, nor to dynamically change or enlarge the set of methods which 
+belong to a generic function.
+
+The lists above are intended to give a first impression of the 
+nature of 
+the restrictions defined within this document. Hence, they are not complete, 
+i.e.\ there are more important restrictions, and more functions, like {\tt 
+change-class}, are excluded, although they are neither part of the metaobject 
+protocol nor do belong to the functional interface.
+We refer to the subsequent sections for details.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Classes}
+\label{classes}
+
+The classes {\tt standard-class}, {\tt standard-generic-function}, and {\tt 
+standard-method} are metaclasses in \CLOS. Therefore, they do not belong to \clos0. 
+
+Unlike in \CLOS, {\tt find-class} is restricted to be defined on constant
+symbols which name user defined classes, i.e.\ a classes which are defined 
+using {\tt defclass}.
+
+The function {\tt make-instance} is not generic. It is restricted to be 
+defined only on class objects, which, in turn, only can be accessed using 
+{\tt find-class}. Hence, \clos0\ ensures class objects only to represent 
+classes which are defined using the extended toplevel form {\tt 
+defclass} and which, therefore, are statically known from the program text. 
+In order to avoid unnecassary syntactical transformations, {\tt 
+(make-instance '<{\it name}\/> ...)} internally is transformed to {\tt 
+(make-instance (find-class '<{\it name}\/>) ...)}, and hence, is legal in 
+\clos0.
+
+The {\tt defclass} macro does not support the class option {\tt 
+:metaclass}.
+
+Moreover, the {\tt :allocation} slot option must not override the {\tt 
+:allocation} option of an inherited slot. 
+
+The standard methods defined for {\tt slot-unbound} and {\tt 
+slot-missing} will signal and uncontinuable error and hence will abort the 
+program execution. Note, that, according to the current definition of 
+\clos0, there is no way to define methods for {\tt slot-unbound} and {\tt 
+slot-missing} because they would have to be specialized over metaclasses. 
+This is true for {\tt no-applicable-method} and {\tt no-next-method} as 
+well (cf. section \ref{methodselection}). Hence, an implementation can choose to 
+call simple error functions instead of these generic functions.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Inheritance}
+\label{inheritance}
+
+The {\tt :allocation} slot option is restricted not to override specified {\tt 
+:allocation} options of inherited slots. Thus, unlike in \CLOS, shared 
+slots cannot be shadowed in \clos0.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Integrating Types and Classes}
+\label{classtypes}
+
+The functions {\tt typep}, {\tt type-of}, and {\tt subtypep} are restricted 
+according to the sections \ref{predicates} and \ref{type} of the 
+\cl0\ part of this document. As 
+mentioned there already, these very rigorous restrictions will be weakened 
+with respect to classes in future versions of \cl0\ + \clos0.
+
+The metaclasses {\tt built-in-class} and {\tt structure-class} do not 
+belong to \clos0.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Determining the Class Precedence List}
+\label{classprecedence}
+
+No changes.
+
+%%%------------------------------------------------------------------------------
+\subsubsection{Generic Functions and Methods}
+\label{generic}
+
+As mentioned earlier, the {\em functional interface} in \CLOS\ is intended 
+to enable runtime creation and changes to classes, generic functions and 
+methods. It does not belong to \clos0. Hence, only the extended top level forms 
+{\tt defgeneric} and {\tt defmethod} can be used in order to create generic 
+functions or to define methods. Moreover, \clos0\ does not support anonymous 
+global generic functions.
+
+Consequently, {\tt add-method}, {\tt remove-method}, {\tt with-added-methods} 
+as well as the macro {\tt generic-function} do not belong to \clos0. 
+Neither {\tt with-added-methods} not the special forms {\tt generic-flet} 
+and {\tt generic-labels} do belong to the ANSI \CL\ proposal.
+The present definition of \clos0\ does not support local generic functions, 
+either. According to the results of the ANSI \CL\ discussion, {\tt 
+generic-flet} and {\tt generic-labels} might be added to future versions of 
+\clos0.
+
+The {\tt defgeneric} and {\tt defmethod} defining forms do not support the 
+options {\tt :generic-function-class} and {\tt :method-class}.
+
+With respect to \cl0\ modules, there is one more restriction which has to hold: If methods 
+for one generic function {\it f} are to be defined within two different 
+modules, the appropriate generic function definition for {\it f}, either 
+explicitly or implicitely using {\tt defmethod}, has to occur within one 
+common imported module.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Method Selection and Combination}
+\label{methodselection}
+
+Only the standard method combination and the {\em simple built in} method 
+combination types are available in \clos0. The macro {\tt 
+define-method-combination} is not part of \clos0. Hence, the {\tt 
+:method-combination} option to {\tt defgeneric}, if supplied, is restricted 
+to the constant keys {\tt :+}, {\tt :and}, {\tt :append}, {\tt :list}, {\tt 
+:max}, {\tt :min}, {\tt :nconc}, {\tt :or}, {\tt :or}, and, of course, {\tt 
+:standard}, which is the default. Although method combinations will not 
+become {\em meta objects}, the macro {\tt define-method-combination} might 
+become part of future versions of \clos0.
+
+Calls to {\tt call-next-method} must not specify arguments. In \clos0\ the 
+set of next methods will be determined statically. If {\tt 
+call-next-method} were called with incompatible arguments, the chain of 
+next methods could be broken and hence could change at runtime. This is a 
+wellknown problem in \CLOS\ which the definition of \clos0\ intends to 
+avoid.
+
+The generic functions {\tt no-applicable-method} and {\tt 
+no-next-method} will signal an uncontinuable error and hence will abort the 
+program execution. (Cf. section \ref{classes}.)
+
+The functions {\tt invalid-method-error} and {\tt method-combination-error} 
+as well as the macro {\tt call-method} do not belong to \clos0.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Meta-objects}
+\label{metaobjects}
+
+\clos0\ does not support any of the {\em meta objects} built into \CLOS, 
+nor does it support {\em metaclasses}. Therefore, creating meta objects is 
+impossible in \clos0. It is an error to apply {\tt class-of} to classes, generic 
+functions, or methods. The function {\tt class-of} is restricted only to be 
+defined on instances of user defined classes. Moreover, method 
+combinations are not objects, and, therefore, do not belong to a class 
+either. 
+
+%%------------------------------------------------------------------------------
+\subsubsection{Object Creation and Initialization}
+\label{objects}
+
+In \clos0, the function {\tt make-instance} is not generic. It is restricted 
+only to be defined on class objects, which, in turn, only can be created 
+using {\tt find-class} applied to a constant symbol which has to denote a defined 
+named class. {\tt (make-instance '<{\it name}\/> ...)} is a syntactical 
+abbreviation for {\tt (make-instance (find-class '<{\it name}\/>) ...)}.
+
+The generic functions {\tt shared-initialize} and {\tt allocate-instance} 
+do not belong to \clos0. Thus, \clos0\ defines the standard behavior as 
+specified for \CLOS\ to be the semantics of {\tt make-instance}. The one 
+and only exception is that {\tt initialize-instance} might be customized 
+using specialized method definitions. With respect to \cl0\ modules, one 
+more restriction has to hold: If a {\tt (defclass {\it A} ...)} defining 
+form occurs within one module, all of the method definitions specializing 
+{\tt initialize-instance} over {\it A}\/ have to be defined within the same 
+module.
+
+Although {\tt reinitialize-instance} does belong to \clos0, it will not be 
+called implicitely. The reason is that neither class redefinitions nor 
+changing the class on an instance, i.e.\ {\tt change-class}, are allowed.
+
+The generic functions {\tt update-\-instance-\-for-\-redefined-\-class} and {\tt 
+update-\.instance-\.for-\.different-\.class} do not belong to \clos0.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Redefining Classes}
+\label{classredefine}
+
+We classify class redefinitions to belong to the program development 
+interface and, thus, they are rejected in \clos0. The complete metaobject 
+protocol defined in this section of \cite{Steele90} does not belong to 
+\clos0. Class redefinition will not be supported in future versions of 
+\clos0, whereas some parts of the metaobject protocol, like {\tt 
+shared-initialize}, might become part of future versions.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Changing the Class of an Instance}
+\label{changeclass}
+
+The function {\tt change-class} and the complete metaobject protocol 
+defined here are not, and will not be supported by \clos0. The reason is 
+that we want to ensure the correctness of type inference results, which, of 
+course, would be impossible with respect to objects eventually changing 
+their classes.
+
+One possible way in order to weaken this restriction is to allow a {\em 
+monotonic} version of {\tt change-class}, i.e.\ changing the class of an 
+instance only to more specific classes. But even this restricted version 
+would disable many optimizations which rely on the concrete knowledge of 
+the direct class of an instance. Hence, we decided to drop {\tt 
+change-class} at all.
+
+%%------------------------------------------------------------------------------
+\subsubsection{Reinitializing an Instance}
+\label{reinitialize}
+
+Since {\tt shared-initialize} does not belong to \clos0, the generic 
+function {\tt reinitialize-instance} does not call {\tt  
+shared-initialize}.
+
+%------------------------------------------------------------------------------
+\subsection{Functions in the Programmer Interface}
+\label{functions}
+
+The following two lists are intended to summarize those operators, which 
+are, and those, which are not part of \clos0. 
+
+\begin{itemize}
+
+\item \code{call-next-method} \\ 
+Restricted. Cf. section \ref{methodselection} for details.
+%Um die M"oglichkeit der Inlinekompilation in
+%einem Modul zu schaffen k"onnte man an dieser Stelle noch die Monotonie
+%der \cpl s auf den Teilb"aumen des Klassengraphen fordern.
+
+\item \code{class-of} \\ 
+Restricted. Cf. section \ref{metaobjects} for details.
+
+\item \code{class-name}
+
+\item \code{defclass} \\ 
+Restricted. Cf. section \ref{classes} for details.
+
+\item \code{defgeneric} \\ 
+Restricted. Cf. section \ref{generic} and section \ref{methodselection} for details.
+
+\item \code{defmethod} \\ 
+Restricted. Cf. section \ref{generic} for details.
+
+\item \code{find-class} \\ 
+Restricted. Cf. section \ref{classes} and section \ref{objects} for details.
+
+\item \code{initialize-instance} \\ 
+Restricted. Cf. section \ref{objects} for details.
+
+\item \code{make-instance} \\ 
+Restricted. Cf. section \ref{objects} for details.
+
+\item \code{next-method-p}
+
+\item \code{no-applicable-method} \\
+Restricted. Cf. section \ref{methodselection} for details.
+
+\item \code{no-next-method} \\
+Restricted. Cf. section \ref{methodselection} for details.
+
+\item \code{print-object}
+
+\item \code{reinitialize-instance} \\ 
+Restricted. Cf. section \ref{reinitialize} for details.
+
+\item \code{slot-boundp} 
+
+\item \code{slot-makunbound}  
+
+\item \code{slot-missing} 
+Restricted. Cf. section \ref{classes} for details.
+
+\item \code{slot-unbound}
+Restricted. Cf. section \ref{classes} for details.
+
+\item \code{slot-value} 
+
+\item \code{with-accessors}
+
+\item \code{with-slots}
+
+\end{itemize}
+
+The following list summarizes those operators which do not belong to 
+\clos0:
+
+\begin{itemize} 
+\item[$-$] \code{add-method}
+\item[$-$] \code{call-method}  
+\item[$-$] \code{change-class}
+\item[$-$] \code{compute-applicable-methods}
+\item[$-$] \code{define-method-combination}
+\item[$-$] \code{documentation}
+\item[$-$] \code{ensure-generic-function}
+\item[$-$] \code{find-method}
+\item[$-$] \code{function-keywords}
+\item[$-$] \code{generic-flet}
+\item[$-$] \code{generic-funtion}
+\item[$-$] \code{generic-labels}
+\item[$-$] \code{invalid-method-error}
+\item[$-$] \code{make-instances-obsolete}
+\item[$-$] \code{method-combination-error}
+\item[$-$] \code{remove-method}
+\item[$-$] \code{shared-initialize}
+\item[$-$] \code{slot-exists-p}
+\item[$-$] \code{update-instance-for-different-class}
+\item[$-$] \code{update-instance-for-redefined-class}
+\item[$-$] \code{with-added-methods}
+\end{itemize}
+
+
+% Local Variables: 
+% mode: latex
+% TeX-master: "cl0-engl"
+% End: 

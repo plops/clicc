@@ -1,52 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
  * Funktion : obrep2.h - datenrepräsentationsspezifisch
  *
- * $Revision: 1.11 $
- * $Log: obrep2.h,v $
- * Revision 1.11  1994/06/17  15:16:56  sma
- * MAKE_FIXNUM und ALLOC_CONS rufen nur noch form_alloc auf, wenn eine GC
- * durchgefuehrt werden muss, ansonsten geschieht das allozieren von
- * Speicher inline. FIXN_TAG und FIXN_FIELD eingefuehrt, die
- * vorzeichenbehaftete Zahlen in das Bitfeld fuer Groesse/Char/Fixnum
- * schreiben.
- *
- * Revision 1.10  1994/05/31  14:52:22  sma
- * CL_UNBOUND eingefuehrt, CL_LISTP verbessert (dazu Tagnummern
- * umgestellt) und TAG_BITS-Konstante in SYM_CONST_FLAG benutzt.
- *
- * Revision 1.9  1994/05/26  08:49:25  sma
- * Ein paar kosmetische Aenderungen das SIZE_TAG Makro betreffend.
- *
- * Revision 1.8  1994/05/25  12:45:56  uho
- * Aufruf des undefinierten Makros FNUM in SIZE_TAG entfernt.
- *
- * Revision 1.7  1994/05/24  14:04:15  sma
- * Tag-Größe mal probehalber von 8 auf 5 bits reduziert (macht die
- * fixnums größer).
- *
- * Revision 1.6  1994/05/22  15:00:08  sma
- * LOAD_SMALLFIXNUM-Makro eingefügt.
- *
- * Revision 1.5  1994/05/18  15:15:42  sma
- * Komplett neu geschrieben. Funktionsfähig bis auf
- * foreign-function-interface-Funktionen.
- *
- * Revision 1.4  1993/11/12  13:09:42  sma
- * Neue Konstante BITS_PER_FIXNUM.
- *
- * Revision 1.3  1993/11/04  14:10:26  sma
- * Neues internes Makro: LOAD_MASK
- *
- * Revision 1.2  1993/10/29  15:01:53  sma
- * Alle notwendigen Änderungen für korrektes Funktionieren.
- *
- * Revision 1.1  1993/10/14  15:55:12  sma
- * Initial revision
- *
+ * $Revision: 1.20 $
+ * $Id: obrep2.h,v 1.20 1995/03/06 17:45:00 wg Exp $
  *----------------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------------------
@@ -158,8 +135,10 @@ typedef CL_FORM CL_INIT;
 #define CL_INSTANCE         18  /* CLOS Instanz */
 
 #define CL_UNBOUND          19
-/* foreign-Datentypen */
-/* ... */
+
+#define CL_FOREIGN          20
+/* Alle weiteren Tags werden hier definiert */
+#include "foreign2.h"
 
 /*------------------------------------------------------------------------------
  * Zugriff auf tag und Größen/Char/Fixnum-Feld
@@ -170,7 +149,7 @@ typedef CL_FORM CL_INIT;
 #define TAG_FIELD(form) ((int)((form)->d & TAG_MASK))
 #define SIZE_FIELD(form) ((long)((form)->d >> TAG_BITS))
 #define CHAR_FIELD(form) ((unsigned char)((form)->d >> TAG_BITS))
-#define FIXN_FIELD(form) ((long)((form)->d / (1 << TAG_BITS)))
+#define FIXN_FIELD(form) ((long)(((form)->d - CL_FIXNUM) / (1 << TAG_BITS)))
 #define SIZE_TAG(tag,sz) (((long)(sz) << TAG_BITS) + (tag))
 #define FIXN_TAG(tag,n) (((long)(n) << TAG_BITS) + (tag))
 
@@ -200,9 +179,6 @@ typedef CL_FORM CL_INIT;
 #define CL_GLOBFUNP(loc) (TYPE_OF(loc) == CL_GLOBFUN)
 #define CL_DOWNFUNP(loc) (TYPE_OF(loc) == CL_DOWNFUN)
 
-/* foreign typtests */
-/* ... */
-
 #define CL_NUMBERP(loc) (CL_FIXNUMP(loc) || CL_FLOATP(loc))
 #define CL_LISTP(loc) (TYPE_OF(loc) <= CL_CONS)
 #define CL_FUNCTIONP(loc) \
@@ -230,9 +206,6 @@ typedef CL_FORM CL_INIT;
 #define GET_CFILE(loc) ((loc)->form[1].file)
 #define INDIRECT(loc) (&(loc)->form[1])
 
-/* foreign-GETs */
-/* ... */
-
 /*------------------------------------------------------------------------------
  * Datum auf LISP-Laufzeitstack laden
  *----------------------------------------------------------------------------*/
@@ -240,10 +213,11 @@ typedef CL_FORM CL_INIT;
 #define LOAD_NIL(loc) ((loc)->form = NIL_VALUE)
 #define LOAD_T(loc) LOAD_CHAR(loc,'T',loc)
 #define LOAD_UNBOUND(loc) ((loc)->form = UNBOUND_VALUE)
+
 #define LOAD_FIXNUM(top,i,loc) do { long _i = (i); \
   if (_i >= -1000 && _i < 1000) LOAD_SMALLFIXNUM(_i, loc); \
-  else { if (((loc)->form = form_toh++) > form_eoh) \
-  (loc)->form = form_alloc(top, 1); INIT_FIXNUM((loc)->form, _i); }} while(0)
+  else { (loc)->form = (form_toh < form_eoh)?form_toh++:form_alloc(top, 1); \
+  INIT_FIXNUM((loc)->form, _i); }} while(0)
 
 #define LOAD_SMALLFIXNUM(i, loc) ((loc)->form = &fixnum_ob[(i) + 1000])
 #define LOAD_FLOAT(top,fl,loc) ((loc)->form = make_flt(top, fl))
@@ -276,9 +250,6 @@ typedef CL_FORM CL_INIT;
 #define LOAD_UNIQUE_TAG(loc) \
    (loc)->form = form_alloc(loc, 1); \
    (loc)->form->d = SIZE_TAG(CL_UNIQUE_TAG, tag_counter++)
-
-/* foreign-loads */
-/* ... */
 
 /*------------------------------------------------------------------------------
  * Cons-Zellen
@@ -317,6 +288,17 @@ typedef CL_FORM CL_INIT;
 #define SYM_PACKAGE(s)  OFFSET(GET_FORM(s), OFF_SYM_PACKAGE)
 #define SYM_NAME(s)     OFFSET(GET_FORM(s), OFF_SYM_NAME)
 
+#define GET_SYM_NAME(top,sym,loc) \
+if(FO_CONSTANTq(GET_FORM(sym))) \
+LOAD_SMSTR(SYM_NAME(sym), loc); \
+else \
+{ \
+   CL_FORM *str = form_alloc(top, 2); \
+   COPY(OFFSET(SYM_NAME(sym),0), str); \
+   COPY(OFFSET(SYM_NAME(sym),1), str+1); \
+   LOAD_SMSTR(str, loc); \
+}
+
 #define SYM_SET_NAME(name,s)  COPY(OFFSET(name,0), OFFSET(SYM_NAME(s),0));\
                               COPY(OFFSET(name,1), OFFSET(SYM_NAME(s),1))
 
@@ -349,7 +331,6 @@ typedef CL_FORM CL_INIT;
 #define AR_BASE(ar)          OFFSET(ar, 1)
 #define AR_STRING(ar)        GET_CHAR_PTR(AR_BASE(ar))
 
-#define FORM_AR(ar)          GET_FORM(AR_BASE(ar))
 #define FIXNUM_AR(ar)        GET_FIXNUM_PTR(AR_BASE(ar))
 #define FLOAT_AR(ar)         GET_FLOAT_PTR(AR_BASE(ar))
 #define CHAR_AR(ar)          GET_CHAR_PTR(AR_BASE(ar))
@@ -361,8 +342,16 @@ typedef CL_FORM CL_INIT;
 #define EQ(x, y) (GET_FORM(x) == GET_FORM(y))
 
 #define EQL(x, y) (EQ(x, y) \
-|| (CL_FIXNUMP(x) && (GET_FORM(x)->d == GET_FORM(y)->d)) \
-|| (CL_FLOATP(x) && (GET_FLOAT(x) == GET_FLOAT(y))))
+                   || (CL_FIXNUMP(x) && CL_FIXNUMP(y) && \
+                       (GET_FORM(x)->d == GET_FORM(y)->d)) \
+                   || (CL_FLOATP(x) && CL_FLOATP(y) && (GET_FLOAT(x) == GET_FLOAT(y))) \
+                   || (CL_C_PRIMITIVE_P(x) && CL_C_PRIMITIVE_P(y) && \
+                       ((x)->form[1].d == (y)->form[1].d))\
+                   || (CL_C_FLOATING_P(x) && CL_C_FLOATING_P(y) && \
+                       (GET_FLOAT(x) == GET_FLOAT(y))) \
+                   || (CL_C_STRUCTURED_P(x) && CL_C_STRUCTURED_P(y) && \
+                       (GET_C_TYPESYMBOL(x) == GET_C_TYPESYMBOL(y)) && \
+                       ((x)->form[2].str == (y)->form[2].str)))
 
 /*------------------------------------------------------------------------------
  * Kopieren einer statischer Variablen in den Heap

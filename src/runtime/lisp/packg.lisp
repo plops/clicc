@@ -1,77 +1,31 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem
-;;;            - Definition von PACKAGE als LISP-Struktur
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : - Definition von PACKAGE als LISP-Struktur
 ;;;            - alle Package-Funktionen
 ;;;            - Initialisierung der Packages beim Start des Programms
 ;;;
-;;; $Revision: 1.17 $
-;;; $Log: packg.lisp,v $
-;;; Revision 1.17  1994/06/02  13:20:18  hk
-;;; Print-Funktion f"ur package-Struktur von write2 nach hier.
-;;;
-;;; Revision 1.16  1994/01/21  13:26:34  sma
-;;; set-symbol-package statt (setf rt::symbol-package).
-;;;
-;;; Revision 1.15  1994/01/13  16:44:57  sma
-;;; rt::set-symbol-package -> setf rt::set-symbol-package. Sourcecode
-;;; verschönert.
-;;;
-;;; Revision 1.14  1993/12/09  17:12:38  sma
-;;; *package-array* und *keyword-package* jetzt statt in startup.lisp hier
-;;; als toplevel-Form definiert. rt::string-hash -> string-hash. Teilweise
-;;; neu eingerückt.
-;;;
-;;; Revision 1.13  1993/12/08  00:01:00  hk
-;;; in-package nimmt nur dann den Defaultwert '("LISP") für die Use-List,
-;;; wenn das Package neu generiert wird und kein anderer Wert angegeben
-;;; ist.
-;;;
-;;; Revision 1.12  1993/12/08  00:00:00  wg
-;;; unuse-package: package-name coerced to package.
-;;;
-;;; Revision 1.11  1993/10/12  14:48:43  hk
-;;; Fehler in unexport behoben: find-package wurde nur mit 1 Argument
-;;; aufgerufen, so daß der Wert von *package* statt von package gelesen
-;;; wurde.
-;;;
-;;; Revision 1.10  1993/07/06  15:23:35  hk
-;;; rt:ensure-package ruft nun make-package mit :use () auf.
-;;;
-;;; Revision 1.9  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.8  1993/05/19  11:47:47  hk
-;;; *package-info* gestrichen.
-;;;
-;;; Revision 1.7  1993/05/12  11:35:39  hk
-;;; rt:setup-symbol benutzt nun rt::symbol-package-index, statt symbol-package.
-;;;
-;;; Revision 1.6  1993/05/07  08:57:48  hk
-;;; package exportiert.
-;;;
-;;; Revision 1.5  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.4  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; Revision-Keyword eingefuegt
-;;;
-;;; Revision 1.3  1992/09/25  13:40:43  hk
-;;; Sichergestellt, dass string-hash nur Strings als Argument erhaelt.
-;;;
-;;; Revision 1.2  1992/07/06  09:15:38  hk
-;;; Text anders formatiert.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.20 $
+;;; $Id: packg.lisp,v 1.20 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -147,8 +101,6 @@
     (setq p (symbol-name p)))
   (when (stringp p)
     (setq p (find-package p)))
-  (unless (packagep p)
-    (error "there is no Package with name ~S" p))
   p)
 
 ;;--------------------------------------------------------------------------
@@ -245,7 +197,7 @@
   (%package-use-list (coerce-to-package package)))
 
 ;;--------------------------------------------------------------------------
-;; package-use-list package
+;; package-used-by-list package
 ;;--------------------------------------------------------------------------
 (defun package-used-by-list (package)
   (%package-used-by-list (coerce-to-package package)))
@@ -287,8 +239,6 @@
 ;; find-symbol string &optional package
 ;;--------------------------------------------------------------------------
 (defun find-symbol (string &optional (package *package*))
-  (unless (stringp string)
-    (error "~a is not a string" string))
   (let ((hash-index (string-hash string PACKAGE-HASHTAB-SIZE)))
     
     (setq package (coerce-to-package package))
@@ -564,7 +514,7 @@
     (setf (%package-use-list package)
           (delete unuse (%package-use-list package) :count 1))
     (setf (%package-used-by-list unuse)
-          (delete package (%package-use-list unuse) :count 1)))
+          (delete package (%package-used-by-list unuse) :count 1)))
   t)
 
 ;;--------------------------------------------------------------------------

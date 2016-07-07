@@ -1,108 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Foreign Functions
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.30 $
-;;; $Log: p1foreign.lisp,v $
-;;; Revision 1.30  1994/05/22  16:16:24  sma
-;;; Erzeugen einer leeren '*-ffi.h'-Datei verhindert.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.29  1994/05/19  08:00:32  pm
-;;; <file>-ffi.h wird nun nur noch bei Bedarf angelegt.
-;;; Alle diese Relikte duerfen geloescht werden
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Foreign Functions
 ;;;
-;;; Revision 1.28  1994/04/27  16:37:03  pm
-;;; Fehler behoben.
-;;;
-;;; Revision 1.27  1994/04/22  14:14:24  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Packages korrigiert.
-;;;   - Symbole werden gleich beim expandieren des C-Types exportiert.
-;;; - C-Macros und C-Typdefinitionen werden erst spaeter herausgeschrieben.
-;;;
-;;; Revision 1.26  1994/04/18  12:16:09  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Alle Allgemeinen Funktionen des FFI stehen hier
-;;;
-;;; Revision 1.25  1993/12/16  16:38:03  pm
-;;; def-c-type an die neuen Typen angepasst.
-;;;
-;;; Revision 1.24  1993/11/03  11:40:19  pm
-;;; Inkonsistenzen in den Symbolnamen behoben.
-;;;
-;;; Revision 1.23  1993/08/24  11:20:29  pm
-;;; Erweiterungen um C-Pointer
-;;;
-;;; Revision 1.22  1993/07/26  16:45:56  pm
-;;; Erweiterungen um C-Strukturen
-;;;
-;;; Revision 1.21  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.20  1993/06/10  11:02:38  pm
-;;; Quelltext bereinigt
-;;;
-;;; Revision 1.19  1993/05/31  17:06:02  pm
-;;; Abarbeiten von call-ins eingebaut
-;;;
-;;; Revision 1.18  1993/05/23  17:52:44  pm
-;;; p1-def-c-type um das Argument package erweitert
-;;;
-;;; Revision 1.17  1993/05/21  13:58:02  pm
-;;; c-int in int umbenannt
-;;;
-;;; Revision 1.16  1993/05/12  08:36:57  pm
-;;; packages verstanden und ueberarbeitet
-;;;
-;;; Revision 1.15  1993/04/23  09:42:35  pm
-;;; Aufruf von p1-foreign-fun-call optimiert
-;;;
-;;; Revision 1.14  1993/04/08  12:52:32  pm
-;;; Tippfehler beseitigt
-;;;
-;;; Revision 1.13  1993/04/08  09:16:52  pm
-;;; Angefangen aufs C-Typ-System umzustellen
-;;; p1-call-foreign-fun in p1-foreign-fun-call umbenannt
-;;;
-;;; Revision 1.12  1993/03/18  07:40:57  ft
-;;; Tippfehler beseitigt.
-;;;
-;;; Revision 1.11  1993/03/17  14:32:11  pm
-;;; struct eingebaut
-;;;
-;;; Revision 1.10  1993/02/18  10:22:01  kl
-;;; Fehler mit den im Package FFI unbekannten Funktionen export und
-;;; in-package behoben.
-;;;
-;;; Revision 1.9  1993/02/17  16:41:37  hk
-;;; Package FFI soll KEINE anderen Packages usen, auch nicht Lisp.
-;;;
-;;; Revision 1.8  1993/02/16  16:58:24  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.7  1992/12/01  15:11:11  pm
-;;; c-char* eingebaut
-;;;
-;;; Revision 1.6  1992/11/10  10:24:00  pm
-;;; Fluechtigkeitsfehler behoben
-;;;
-;;; Revision 1.5  1992/11/05  10:52:02  pm
-;;; Ueberarbeitet
-;;;
-;;; Revision 1.4  1992/11/04  12:41:28  pm
-;;; p1-call-foreign-fun
-;;;
-;;; Revision 1.3  1992/10/19  14:17:44  pm
-;;; kleinere Aenderungen
-;;;
-;;; Revision 1.2  1992/10/19  12:00:50  pm
-;;; parser fuer foreign-funs
-;;;
-;;; Revision 1.1  1992/10/13  14:28:39  pm
-;;; Initial revision
+;;; $Revision: 1.37 $
+;;; $Id: p1foreign.lisp,v 1.37 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 ;;------------------------------------------------------------------------------
@@ -138,52 +59,56 @@
 ;;     (:name <c-name>)
 ;;   | (:arguments ({<c-type>}*))
 ;;   | (:return-type <c-type>)
-;;   | (:callback <boolean>)
 ;;
 ;;------------------------------------------------------------------------------
 (defun p1-def-call-out 
     (name_options &key
-                  macro   ; Keine Signatur herausschreiben
-                  intern) ; Keine Meldung ausgeben
+                  macro                 ; Keine Signatur herausschreiben
+                  intern                ; Keine Meldung ausgeben
+                  (typechecking t))     ; Kein Typtest erzeugen
   
   (unless intern (clicc-message ANALYSE-CALL-OUT (first name_options)))
   
   (multiple-value-bind 
-        (name c-name arguments return-type callback)
+        (name c-name arguments return-type)
       (parse-foreign-fun-args name_options)
-    
     (let ((operator-def (get-operator-def name)))
       
       (case (car operator-def)
         ;; Neue Definition eintragen
         ;;--------------------------
         ((nil)
-         (let* ((argument-length (length-of-arguments arguments))
-                (exp-arg-length (if (< argument-length 0)
-                                    (1- argument-length)
-                                    (1+ argument-length)))
+         (let* ((modifier
+                 (multiple-value-bind (key old-name old-type)
+                     (select-type return-type return-type return-type)
+                   (declare (ignore old-name old-type))
+                   (case key
+                     ((old-struct old-union old-array old-handle ptr) 1)
+                     (otherwise 0))))
+                (argument-length (+ (length arguments) modifier))
                 (gen-sym (gensym))
                 (foreign-fun
                  (make-instance 'foreign-fun
                                 :arguments arguments
                                 :name c-name
                                 :return-type return-type
-                                :callback callback
                                 :symbol name
                                 :par-spec argument-length
-                                :other-sym gen-sym))
-                (expanded-fun
-                 (make-instance 'foreign-fun
-                                :arguments arguments
-                                :name c-name
-                                :return-type return-type
-                                :callback callback
-                                :symbol name
-                                :par-spec exp-arg-length
                                 :other-sym gen-sym)))
-           (set-unexpanded-foreign-fun name foreign-fun)
-           (set-foreign-fun gen-sym expanded-fun)
            
+           (set-foreign-fun gen-sym foreign-fun)
+           
+           (if (null arguments)
+               (ff-make-simple-defun name return-type gen-sym)
+               (let* ((argument-liste 
+                       (ff-make-argument-liste arguments))
+                      (let-liste
+                       (ff-make-let-liste argument-liste arguments))
+                      (and-liste 
+                       (ff-make-and-liste argument-liste arguments)))
+                 (ff-make-difficult-defun name typechecking argument-liste
+                                          let-liste and-liste 
+                                          return-type gen-sym)))
            
            ;; Signatur herausschreiben
            ;;-------------------------
@@ -198,11 +123,126 @@
         ;;---------------------------------
         (t (redef-op-error (car operator-def) name)))
       
-      ;; Symbol exportieren
-      ;;-------------------
-      (export name *package*)
-
       (values))))
+
+;;------------------------------------------------------------------------------
+;; C-Funktion hat kein Argument
+;;------------------------------------------------------------------------------
+(defun ff-make-simple-defun (name return-type new-name)
+  (p1-defun
+   `(,name ()
+     ,(ff-make-foreign-call '() return-type new-name))))
+
+;;------------------------------------------------------------------------------
+;; C-Funktion hat mindestens ein Argument
+;;------------------------------------------------------------------------------
+(defun ff-make-difficult-defun 
+    (name typechecking argument-liste let-liste and-liste return-type new-name)
+  (if typechecking
+      (p1-defun
+       `(,name ,argument-liste
+         (let* ,let-liste
+           (if (and ,@and-liste)
+               ,(ff-make-foreign-call argument-liste return-type new-name)
+               (error "illegal argument-type for foreign-fun")))))
+      (p1-defun
+       `(,name ,argument-liste
+         (let* ,let-liste
+           ,(ff-make-foreign-call argument-liste return-type new-name))))))
+
+;;------------------------------------------------------------------------------
+;; Erzeuge die Argumentliste, das heist eine Liste mit passender Anzahl an mit
+;; gensym erzeugten Symbolen.
+;;------------------------------------------------------------------------------
+(defun ff-make-argument-liste (arguments)
+  (let* (liste)
+    (dotimes (count (length arguments))
+      (push (gensym) liste))
+    liste))
+
+;;------------------------------------------------------------------------------
+;; Erzeuge die Liste der Typtests.
+;;------------------------------------------------------------------------------
+(defun ff-make-let-liste (argument-liste arguments)
+  (let* (liste)
+    (dotimes (count (length arguments))
+      (let* ((argument (nth count arguments))
+             (gensym (nth count argument-liste)))
+        (multiple-value-bind (key old-name old-type)
+            (select-type argument argument argument)
+          (declare (ignore old-name))
+          (case key
+            (primitive
+             (push `(,gensym (,old-type ,gensym))
+                   liste))))))
+    liste))
+
+;;------------------------------------------------------------------------------
+;; Erzeuge die Liste der Typtests.
+;;------------------------------------------------------------------------------
+(defun ff-make-and-liste (argument-liste arguments)
+  (let* (liste)
+    (dotimes (count (length arguments))
+      (let* ((argument (nth count arguments))
+             (gensym (nth count argument-liste)))
+        (multiple-value-bind (key old-name old-type)
+            (select-type argument argument argument)
+          (declare (ignore old-name old-type))
+          (case key
+            (primitive
+             ;; do nothing
+             )
+            (otherwise
+             (push (ff-make-type-test gensym argument)
+                   liste))))))
+    liste))
+
+;;------------------------------------------------------------------------------
+;; Erzeuge einen Typtest
+;;------------------------------------------------------------------------------
+(defun ff-make-type-test (var type)
+  (multiple-value-bind (key old-name old-type)
+      (select-type type type type)
+    (case key
+      (ptr
+       (let* ((ptr-type (second old-type)))
+         (multiple-value-bind (key old-ptr-name old-ptr-type)
+             (select-type ptr-type ptr-type ptr-type)
+           (declare (ignore key old-ptr-type))
+           (let* ((test-name
+                   (intern-postfixed old-ptr-name "-P")))
+             `(,test-name ,var)))))
+      (otherwise
+       (let* ((test-name (intern-postfixed old-name "-P")))
+         `(,test-name ,var))))))
+
+;;------------------------------------------------------------------------------
+;; Erzeuge den Aufruf der foreign-Function.
+;;------------------------------------------------------------------------------
+(defun ff-make-foreign-call (argument-liste return-type new-name)
+  (multiple-value-bind (key old-name old-type)
+      (select-type return-type return-type return-type)
+    (case key
+      ((old-struct old-handle old-union old-array) 
+       (let* ((typesym (intern-postfixed (intern-prefixed "--" old-name) "--")))
+         `(,new-name ,typesym ,@argument-liste)))
+
+      (ptr
+       (let* ((ptr-type (second old-type)))
+         (multiple-value-bind (key old-ptr-name old-ptr-type)
+             (select-type ptr-type ptr-type ptr-type)
+           (declare (ignore old-ptr-type))
+           (case key
+             ((old-struct old-handle old-union old-array) 
+              (let* ((typesym 
+                      (intern-postfixed 
+                       (intern-prefixed "--" old-ptr-name) "--")))
+                `(,new-name ,typesym ,@argument-liste)))
+             (otherwise
+              `(,new-name ,@argument-liste))))))
+
+      (otherwise
+       `(,new-name ,@argument-liste)))))
 
 ;;******************************************************************************
 ;; Hilfsfunktionen von def-call-out
@@ -212,7 +252,7 @@
 ;; Fehlerquellen ab.
 ;;
 ;; Resultat:
-;; (MV) <name> <c-name> <arguments> <return-type> <callback>
+;; (MV) <name> <c-name> <arguments> <return-type>
 ;;------------------------------------------------------------------------------
 (defun parse-foreign-fun-args (name_options)
   (let (name
@@ -236,9 +276,9 @@
     
     ;; Uebrige Werte generieren
     ;;-------------------------
-    (multiple-value-bind (c-name arguments return-type callback)
+    (multiple-value-bind (c-name arguments return-type)
         (parse-ff-key-list name options)
-      (values name c-name arguments return-type callback))))
+      (values name c-name arguments return-type))))
 
 ;;------------------------------------------------------------------------------
 ;; Parsed die Key-Liste einer Call-Out-Definition. Es werden
@@ -249,12 +289,11 @@
 ;; das letzte Auftreten eines Keywords den endgueltigen Wert festlegt.
 ;; [entgegen den ueblichen LISP-Konventionen.]
 ;;
-;; Resultat: (MV) <c-name> <arguments> <return-type> <callback>
+;; Resultat: (MV) <c-name> <arguments> <return-type>
 ;;------------------------------------------------------------------------------
 (defun parse-ff-key-list (name options)
   (let ((c-name (c-name-string name))
         (arguments '())
-        (callback nil)
         (return-type 'ffi:c-int))
     
     ;; Key-Word-Liste muss gerade sein
@@ -295,24 +334,23 @@
            ;;-------------
            ((and (listp arg) (= (length arg) 1))
             (setq arguments (list (parse-c-type (first arg)
-                                                :could-be-void t
-                                                :could-be-vararg t
-                                                :could-be-ptr t
-                                                :could-be-fixnum t))))
+                                                :struktur nil
+                                                :union nil
+                                                :feld nil
+                                                :handle nil))))
            ;; mehr als ein Argument
            ;;----------------------
            ((listp arg)
             (setq arguments
-                  (append (mapcar #'(lambda (r-l)
-                                      (parse-c-type 
-                                       r-l 
-                                       :could-be-ptr t
-                                       :could-be-fixnum t))
-                                  (butlast arg))
-                          (list (parse-c-type (car (last arg))
-                                              :could-be-vararg t
-                                              :could-be-ptr t
-                                              :could-be-fixnum t)))))
+                  (mapcar #'(lambda (r-l)
+                              (parse-c-type r-l 
+                                            :struktur nil
+                                            :union nil
+                                            :feld nil
+                                            :handle nil
+                                            :void nil))
+                          arg)))
+
            ;; Keine Liste ist ein Fehler
            ;;---------------------------
            (t
@@ -322,36 +360,23 @@
         ;;--------------
         (:return-type
          (setq return-type (parse-c-type arg
-                                         :could-be-ptr t
-                                         :could-be-void t
-                                         :could-be-fixnum t)))
-        
-        ;; Callback
-        ;;---------
-        (:callback
-         (setq callback arg))
-        
+                                         :struktur nil
+                                         :union nil
+                                         :feld nil
+                                         :handle nil)))
+
         ;; Ungueltiger Key
         ;;----------------
         (otherwise
          (internal-error 'parse-ff-key-list
-          ILLEGAL_KEY '(:NAME :ARGUMENTS :RETURN-TYPE :CALLBACK) key))))
+          ILLEGAL_KEY '(:NAME :ARGUMENTS :RETURN-TYPE) key))))
     
     ;; Tests:
     ;;-------
     (when (equal arguments '(ffi:c-void))
       (setq arguments '()))
 
-    (values c-name arguments return-type callback)))
-
-;;------------------------------------------------------------------------------
-;; Liefert die Laenge einer Parameterlist entsprechend dem par-spec
-;;------------------------------------------------------------------------------
-(defun length-of-arguments (arguments)
-  (cond 
-    ((eq (first arguments) 'ffi:c-void) (values 0))
-    ((eq (last arguments) 'ffi:c-vararg) (- 0 (length arguments)))
-    (t (length arguments))))
+    (values c-name arguments return-type)))
 
 ;;******************************************************************************
 ;; DEF-CALL-IN
@@ -419,7 +444,7 @@
 
     ;; Es muessen immer Name und Typ angegeben werden
     ;;-----------------------------------------------
-    (unless (>= (length name_type) 2)
+    (unless (= (length name_type) 2)
       (clicc-error "You must specify a name and a type"))
 
     ;; Der Name muss ein Symbol sein
@@ -427,18 +452,26 @@
     (setq name (first name_type))
     (unless (symbolp name) (clicc-error NO_NAME name 'DEF-C-TYPE))
 
-    ;; Der Typ darf nicht redefiniert werden
-    ;;--------------------------------------
+    ;; Der Name darf nicht redefiniert werden
+    ;;---------------------------------------
     (when (or (get-fftype name) (member-of-ffi name))
       (clicc-error "It is illegal to redefine the c-type ~S" name))      
 
     ;; Die Typdefinition parsen
     ;;-------------------------
-    (setq type (parse-c-type (second name_type)))
+    (setq type (parse-c-type (second name_type)
+                             :lisp nil
+                             :void nil
+                             :ptr nil))
  
     ;; Typ ins globale Environment eintragen.
     ;;---------------------------------------
     (set-fftype name type)
+
+    ;; markieren, ob Typ in die Signatur geschrieben werden soll.
+    ;;-----------------------------------------------------------
+    (unless *ffi-include-flag*
+      (add-q name *ffi-type-queue*))
 
     ;; Die Lisp-Zugriffsfunktionen erzeugen.
     ;;--------------------------------------
@@ -454,9 +487,7 @@
         (new-struct (ff-new-struct name type))
         (old-struct (ff-old-struct name old-name old-type))
         (new-union  (ff-new-union name type))
-        (old-union  (ff-old-union name old-name old-type))
-        
-        (otherwise  (clicc-error "Unknown Type: ~A" type))))))
+        (old-union  (ff-old-union name old-name old-type))))))
 
 ;;------------------------------------------------------------------------------
 ;; Finalisieren der Typen, erzeugen der Funktionen (in fftypes.lisp)
@@ -469,7 +500,10 @@
     (unless (or fftypes *ffi-signatures*) (return-from finalize-fftypes))
 
     (setq *interface-file-stream* 
-          (open (concatenate 'string (pathname-name *FILENAME*) "-ffi.h")
+          (open (make-pathname :name (ffi-include-name
+                                      (pathname-name *OUT-FILENAME*))
+                               :type "h"
+                               :defaults *OUT-FILENAME*)
                 :direction :output
                 :if-exists :supersede
                 :if-does-not-exist :create))
@@ -491,34 +525,37 @@
                     (define-name-malloc (c-macro-string malloc-name))
                     (define-name-size (c-macro-string size-of-name))
                     (slots (rest type)))
-
-               ;; Typ definieren
-               ;;---------------
-               (write-to-header-file
-                (format nil
-                        "struct ~A {~%~:{~T~A ~A;~%~}};"
-                        c-type (mapcar #'make-c-struct-component slots)))
-
+               
+               ;; Nur rausschreiben, wenn nicht aus include-Datei extrahiert
+               ;;-----------------------------------------------------------
+               (when (member name (queue2list *ffi-type-queue*))
+                 ;; Typ definieren
+                 ;;---------------
+                 (write-to-header-file
+                  (format nil
+                          "struct ~A {~%~:{~T~A ~A;~%~}};"
+                          c-type (mapcar #'make-c-struct-component slots))))
+                 
                ;; Typedef auf den Typ
                ;;--------------------
                (write-to-header-file
                 (format nil 
                         "typedef struct ~A ~A;" 
                         c-type c-type))
-
+               
                ;; Alloziiere Speicher fuer die Struktur
                ;;--------------------------------------
                (write-to-header-file 
                 (format nil
-                        "#define ~A() malloc(sizeof(~A))" 
+                        "#define ~A() must_malloc(sizeof(~A))" 
                         define-name-malloc c-type))
-
+               
                ;; Groesse der Struktur
                ;;---------------------
                (write-to-header-file
                 (format nil "#define ~A() sizeof(~A)"
                         define-name-size c-type))
-
+               
                ;; Zugriffsfunktionen fuer die einzelnen slots
                ;;--------------------------------------------
                (finalise-access name type name)))
@@ -534,33 +571,36 @@
                     (define-name-size (c-macro-string size-of-name))
                     (slots (rest type)))
 
-               ;; Typ definieren
-               ;;---------------
-               (write-to-header-file
-                (format nil
-                        "union ~A {~%~:{~T~A ~A;~%~}};"
-                        c-type (mapcar #'make-c-union-component slots)))
-
+               ;; Nur rausschreiben, wenn nicht aus include-Datei extrahiert
+               ;;-----------------------------------------------------------
+               (when (member name (queue2list *ffi-type-queue*))
+                 ;; Typ definieren
+                 ;;---------------
+                 (write-to-header-file
+                  (format nil
+                          "union ~A {~%~:{~T~A ~A;~%~}};"
+                          c-type (mapcar #'make-c-union-component slots))))
+                 
                ;; Typedef auf den Typ
                ;;--------------------
                (write-to-header-file
                 (format nil 
                         "typedef union ~A ~A;" 
                         c-type c-type))
-
-               ;; Alloziiere Speicher fuer die Struktur
-               ;;--------------------------------------
+               
+               ;; Alloziiere Speicher fuer die Union
+               ;;-----------------------------------
                (write-to-header-file 
                 (format nil
                         "#define ~A() malloc(sizeof(~A))" 
                         define-name-malloc c-type))
-
-               ;; Groesse der Struktur
-               ;;---------------------
+               
+               ;; Groesse der Union
+               ;;------------------
                (write-to-header-file
                 (format nil "#define ~A() sizeof(~A)"
                         define-name-size c-type))
-
+               
                ;; Zugriffsfunktionen fuer die einzelnen slots
                ;;--------------------------------------------
                (finalise-access name type name)))
@@ -578,34 +618,37 @@
                     (define-name-malloc (c-macro-string malloc-name))
                     (define-name-size (c-macro-string size-of-name))
                     (aref-name (intern-prefixed "AREF-" name))
-                    (retreive-name (intern-prefixed "RETREIVE-" aref-name))
-                    (retreive-name-string (c-macro-string retreive-name))
-                    (give-name (intern-prefixed "GIVE-" aref-name))
-                    (give-name-string (c-macro-string give-name))
+                    (get-name (intern-prefixed "GET-" aref-name))
+                    (get-name-string (c-macro-string get-name))
+                    (set-name (intern-prefixed "SET-" aref-name))
+                    (set-name-string (c-macro-string set-name))
                     dimension-desc
                     )
-
-               ;; Typ definieren
-               ;;---------------
-               (write-to-header-file
-                (format nil "typedef ~A ~A~{[~A]~};" 
-                        (convert-c-type-to-string array-type)
-                        c-type dimension-list))
+               
+               ;; Nur rausschreiben, wenn nicht aus include-Datei extrahiert
+               ;;-----------------------------------------------------------
+               (when (member name (queue2list *ffi-type-queue*))
+                 ;; Typ definieren
+                 ;;---------------
+                 (write-to-header-file
+                  (format nil "typedef ~A ~A~{[~A]~};" 
+                          (convert-c-type-to-string array-type)
+                          c-type dimension-list)))
                
                ;; Alloziiere Speicher fuer das Array
                ;;-----------------------------------
                (write-to-header-file
                 (format nil "#define ~A() malloc(sizeof(~A))" 
                         define-name-malloc c-type))
-
+               
                ;; Groesse des Arrays
                ;;-------------------
                (write-to-header-file
                 (format nil "#define ~A() sizeof(~A)" 
                         define-name-size c-type))
-
-               ;; erzeuge die lesende Zugriffsfunktion
-               ;;-------------------------------------
+               
+               ;; erzeuge die lesenden und schreibenden Zugriffsfunktionen
+               ;;---------------------------------------------------------
                (multiple-value-bind (key old-array-name old-array-type)
                    (select-type name array-type array-type)
                  (declare (ignore old-array-type old-array-name))
@@ -615,8 +658,8 @@
                  
                  (write-to-header-file 
                   (format nil 
-                          "#define ~A(ptr~{,~A~}) (*(((~A *)(ptr)))~{[~A]~})"
-                          retreive-name-string dimension-desc 
+                          "#define ~A(ptr~{,~A~}) ((*((~A *)(ptr)))~{[~A]~})"
+                          get-name-string dimension-desc 
                           c-type dimension-desc))
                  
                  (case key
@@ -624,20 +667,20 @@
                     (write-to-header-file
                      (format
                       nil
-                      "#define ~A(ptr~{,~A~},value) ((*(((~A *)(ptr)))~{[~A]~}) = ((~A)(value)))"
-                      give-name-string dimension-desc 
+                      "#define ~A(ptr~{,~A~},value) (((*((~A *)(ptr)))~{[~A]~}) = ((~A)(value)))"
+                      set-name-string dimension-desc 
                       c-type dimension-desc c-type-2)))
                    (otherwise
                     (write-to-header-file
                      (format 
                       nil
                       "#define ~A(ptr~{,~A~},value) memcpy((void *)&((((~A *)(ptr))~{[~A]~})), (void *)(&((~A)(value))), sizeof(~A))"
-                      give-name-string dimension-desc 
+                      set-name-string dimension-desc 
                       c-type dimension-desc c-type-2 c-type-2)))))))))))
-
+    
     (dolist (sig *ffi-signatures*)
       (write-to-header-file sig))
-
+    
     (close *interface-file-stream*)))
 
 ;;------------------------------------------------------------------------------
@@ -647,7 +690,7 @@
   (dolist (slot (rest type))
     (let* ((*print-circle* nil)
            (c-type (convert-c-type-to-string original-name))
-           (slot-name (first slot))
+           (slot-name (c-name-string (first slot)))
            (slot-type (second slot))
            (slot-reader 
             (intern (concatenate 'string (string name) "-" (string slot-name))))
@@ -660,16 +703,16 @@
         (case key
           ((string primitive old-handle old-struct old-union old-array ptr)
            (let* 
-               ((retreive-name (intern-prefixed "RETREIVE-" slot-reader))
-                (retreive-name-string (c-macro-string retreive-name))
-                (give-name (intern-prefixed "GIVE-" slot-reader))
-                (give-name-string (c-macro-string give-name))
+               ((get-name (intern-prefixed "GET-" slot-reader))
+                (get-name-string (c-macro-string get-name))
+                (set-name (intern-prefixed "SET-" slot-reader))
+                (set-name-string (c-macro-string set-name))
                 (c-type-2 (convert-c-type-to-string slot-type))
                 )
              
              (write-to-header-file
               (format nil "#define ~A(ptr) (((~A *)(ptr))->~A~A)"
-                      retreive-name-string c-type access slot-name))
+                      get-name-string c-type access slot-name))
              
              (case key
                ((string primitive old-handle ptr)
@@ -677,13 +720,13 @@
                  (format
                   nil
                   "#define ~A(ptr, value) ((((~A *)(ptr))->~A~A) = ((~A)(value)))"
-                  give-name-string c-type access slot-name c-type-2)))
-               (otherwise
+                  set-name-string c-type access slot-name c-type-2)))
+               (otherwise               ; *** to be checked ***
                 (write-to-header-file
                  (format 
                   nil
                   "#define ~A(ptr, value) memcpy(&(((~A *)(ptr))->~A~A), &((~A)(value)), sizeof(~A))"
-                  give-name-string c-type 
+                  set-name-string c-type 
                   access slot-name c-type-2 c-type-2))))))
           
           ((new-struct new-union)
@@ -701,17 +744,25 @@
 ;;------------------------------------------------------------------------------
 ;; Parsen eine C-Typspezifikation
 ;;------------------------------------------------------------------------------
-(defun parse-c-type (type-spec &key 
-                               could-be-void 
-                               could-be-ptr
-                               could-be-vararg
-                               could-be-fixnum
-                               called-by-ptr)
+(defun parse-c-type (type-spec &key
+                               (primitiv t)
+                               (zeichenkette t)
+                               (struktur t)
+                               (union t)
+                               (feld t)
+                               (handle t)
+                               (lisp t)
+                               (void t) (ptr t)
+                               (synonym t)
+                               (called-by-ptr nil))
+  
   (cond 
     ;; String
     ;;-------
     ((eq type-spec 'ffi:c-string)
-     (values type-spec))
+     (if (and zeichenkette (not called-by-ptr))
+         (values type-spec)
+         (clicc-error "Misuse of c-string")))
     
     ;; vordefinierter Typ
     ;;-------------------
@@ -724,47 +775,54 @@
          (eq type-spec 'ffi:c-unsigned-int) 
          (eq type-spec 'ffi:c-unsigned-long)
          (eq type-spec 'ffi:c-float)
-         (eq type-spec 'ffi:c-double)
-         (eq type-spec 'ffi:c-long-double))
-     (values type-spec))
+         (eq type-spec 'ffi:c-double))
+     (if primitiv
+         (values type-spec)
+         (clicc-error "Misuse of c-<primitive>")))
 
     ;; Handle
     ;;-------
     ((eq type-spec 'ffi:c-handle)
-     (values type-spec))
+     (if handle
+         (values type-spec)
+         (clicc-error "Misuse of c-handle")))
     
-    ;; Speziell behandelter Typ
-    ;;-------------------------
+    ;; Speziell behandelte Typen
+    ;;--------------------------
     ((eq type-spec 'ffi:c-void)
-     (if (or could-be-void 
-             called-by-ptr)
+     (if void
          (values 'ffi:c-void)
          (clicc-error "Misuse of c-void")))
     
-    ((eq type-spec 'ffi:c-vararg)
-     (if could-be-vararg
-         (values 'ffi:c-vararg)
-         (clicc-error "Misuse of c-vararg")))
-    
-    ((eq type-spec :fixnum)
-     (if could-be-fixnum
-         (values :fixnum)
-         (clicc-error "Misuse of :fixnum")))
+    ((or (eq type-spec :integer)
+         (eq type-spec :short)
+         (eq type-spec :int)
+         (eq type-spec :long)
+         (eq type-spec :character)
+         (eq type-spec :float))
+     (if lisp
+         (values type-spec)
+         (clicc-error "Misuse of :<lisp-val>")))
     
     ;; Synonymtyp
     ;;-----------
     ((atom type-spec)
-     (unless (or (get-fftype type-spec) 
-                 (member-of-ffi type-spec)
-                 called-by-ptr)
-       (clicc-error "Unknown type-specifier ~S" type-spec))
-     (values type-spec))
+     (if synonym
+         (if (get-fftype type-spec)
+             (values type-spec)
+             (if called-by-ptr
+                 (values type-spec)
+                 (clicc-error "Unknown type-specifier ~S" type-spec)))
+         (clicc-error "Misuse of Synonym-Type")))
+
+;;;*** ptr auf nicht-strukturierte sind nicht moeglich***!!!
+
 
     ;; Struktur  (ffi:c-struct (<bezeichner> <typ>)+)
     ;;---------
     ((and (listp type-spec) 
           (eq (first type-spec) 'ffi:c-struct))
-     (if (>= (length type-spec) 2) 
+     (if (and struktur (>= (length type-spec) 2))
          (values 
           `(ffi:c-struct 
             ,@(maplist
@@ -777,7 +835,8 @@
                        (if (= (length (car r-l)) 2)
                            (values `(,(caar r-l)
                                      ,(parse-c-type (cadar r-l)
-                                                    :could-be-ptr t)))
+                                                    :lisp nil
+                                                    :void nil)))
                            (clicc-error ILLEGAL_ARGUMENT 'c-struct))))
                (rest type-spec))))
          (clicc-error ILLEGAL_ARGUMENT 'c-struct)))
@@ -786,7 +845,7 @@
     ;;------
     ((and (listp type-spec) 
           (eq (first type-spec) 'ffi:c-union))
-     (if (>= (length type-spec) 2) 
+     (if (and union (>= (length type-spec) 2))
          (values 
           `(ffi:c-union
             ,@(maplist
@@ -799,7 +858,8 @@
                        (if (= (length (car r-l)) 2)
                            (values `(,(caar r-l)
                                      ,(parse-c-type (cadar r-l)
-                                                    :could-be-ptr t)))
+                                                    :lisp nil
+                                                    :void nil)))
                            (clicc-error ILLEGAL_ARGUMENT 'c-union))))
                (rest type-spec))))
          (clicc-error ILLEGAL_ARGUMENT 'c-union)))
@@ -808,37 +868,42 @@
     ;;------
     ((and (listp type-spec)
           (eq (first type-spec) 'ffi:c-array))
-     (if (= (length type-spec) 3)
+     (if (and feld (= (length type-spec) 3))
          (flet ((parse-dimensions (number-or-list)
-                  (cond ((typep number-or-list 'fixnum)
+                  (cond ((integerp number-or-list)
                          (values (list number-or-list)))
                         ((listp number-or-list)
                          (mapcar 
                           #'(lambda (a-num) 
-                              (if (typep a-num 'fixnum)
+                              (if (integerp a-num)
                                   (values a-num)
-                                  (clicc-error "~A must be a fixnum"
+                                  (clicc-error "~A must be an integer"
                                                a-num)))
                           number-or-list))
                         (t
-                         (clicc-error "~A must be a fixnum" 
-                                      number-or-list)))))
+                         (clicc-error 
+                          "~A must be an integer or list of integers"
+                          number-or-list)))))
            (values
             `(ffi:c-array
-              ,(parse-c-type (second type-spec) 
-                             :could-be-ptr t)
+              ,(parse-c-type (second type-spec)
+                             :lisp nil
+                             :void nil)
               ,(parse-dimensions (third type-spec)))))
          (clicc-error ILLEGAL_ARGUMENT 'c-array)))
     
     ;; Pointer
     ;;--------
     ((and (listp type-spec)
-          could-be-ptr
           (eq (first type-spec) 'ffi:c-ptr))
-     (if (= (length type-spec) 2)
+     (if (and ptr (= (length type-spec) 2))
          (values
           `(ffi:c-ptr ,(parse-c-type (second type-spec) 
-                                     :called-by-ptr t)))
+                                     :called-by-ptr t
+                                     :ptr nil
+                                     :lisp nil
+                                     :primitiv nil
+                                     :handle nil)))
          (clicc-error ILLEGAL_ARGUMENT 'c-pointer)))
     
     ;; Keine andere Moeglichkeit
@@ -862,7 +927,7 @@
 ;;  - new-handle
 ;;  - ptr
 ;;  - void
-;;  - *** noch andere ***
+;;  - lisp
 ;;  sonst Fehler
 ;;------------------------------------------------------------------------------
 (defun select-type (name type ref-type &key iterate)
@@ -903,6 +968,16 @@
     ;;-----
     ((eq type 'ffi:c-void)
      (values 'void name type))
+
+    ;; Lisp-Typen
+    ;;-----------
+    ((or (eq type :float)
+         (eq type :integer)
+         (eq type :short)
+         (eq type :int)
+         (eq type :long)
+         (eq type :character))
+     (values 'lisp name type))
           
     ;; Synonym
     ;;--------
@@ -951,118 +1026,33 @@
           '(ffi:c-char ffi:c-short ffi:c-int ffi:c-long 
             ffi:c-unsigned-char ffi:c-unsigned-short 
             ffi:c-unsigned-int ffi:c-unsigned-long 
-            ffi:c-float ffi:c-double ffi:c-long-double 
-            ffi:c-handle ffi:c-string ffi:c-void ffi:c-vararg)))
+            ffi:c-float ffi:c-double 
+            ffi:c-handle ffi:c-string ffi:c-void)))
 
-;;******************************************************************************
-;; 
-;;******************************************************************************
+
 ;;------------------------------------------------------------------------------
-;; 
-;;------------------------------------------------------------------------------
-(defun p1-foreign-fun-call (operator form)
-  (let* ((form-arg-list (rest form))    ; Arg-List der Applikation
-         (let-arg-list '())             ; Liste der mit gensym erz. Namen
-         (type-list 
-          (?arguments operator))    ; Liste der Foreign-Types
-         )
-    
-    ;; Lokale Funktionen zum Zusammenbasteln des Aufrufes
-    ;;---------------------------------------------------
-    (labels (
-             ;; Deklarationsteil des let-Konstruktes
-             ;;-------------------------------------
-             (make-let-arg-list ()
-               (let (liste)
-                 (dolist (arg form-arg-list liste)
-                   (let ((generated-sym (gensym)))
-                     (setq let-arg-list `(,@let-arg-list ,generated-sym))
-                     (setq liste `(,@liste (,generated-sym ,arg)))))))
-             
-             ;; Typtests
-             ;;---------
-             (make-type-test (var type)
-               (multiple-value-bind (key old-name old-type)
-                   (select-type type type type)
-                 (case key
-                   ((new-handle new-union new-struct new-array)
-                    'nil)
-                   (ptr
-                    (let* ((ptr-type (second old-type)))
-                      (multiple-value-bind (key old-ptr-name old-ptr-type)
-                          (select-type ptr-type ptr-type ptr-type)
-                        (declare (ignore old-ptr-type))
-                        (case key
-                          ((new-handle new-union new-struct new-array)
-                           'nil)
-                          (otherwise
-                           (let* ((package (symbol-package old-ptr-name))
-                                  (test-name
-                                   (intern-postfixed-package old-ptr-name
-                                                             "-P" package)))
-                             `(,test-name ,var)))))))
-                   (otherwise
-                    (let* ((package (symbol-package old-name))
-                           (test-name
-                            (intern-postfixed-package old-name "-P" package)))
-                      `(,test-name ,var))))))
-             
-             ;; Liste fuer die Typueberpruefung durch AND
-             ;;------------------------------------------
-             (make-and-list ()
-               (let (liste)
-                 (dotimes (count (length form-arg-list) liste)
-                   (setq liste `(,@liste ,(make-type-test
-                                           (nth count let-arg-list)
-                                           (nth count type-list)))))))
-             
-             ;; Aufruf der C-Funktion
-             ;;----------------------
-             (foreign-call (let-arg-list)
-               (let* ((return-type (?return-type operator))
-                      (new-name (?other-sym operator)))
-                 (multiple-value-bind (key old-name old-type)
-                     (select-type return-type return-type return-type)
-                   (case key
-                     ((new-struct new-union new-handle new-array)
-                      `(,new-name ',(gensym) ,@let-arg-list))
-                     
-                     (ptr
-                      (let* ((ptr-type (second old-type)))
-                        (multiple-value-bind (key old-ptr-name old-ptr-type)
-                            (select-type ptr-type ptr-type ptr-type)
-                          (declare (ignore old-ptr-type))
-                          (case key
-                            ((new-struct new-union new-handle new-array)
-                             `(,new-name ',(gensym) ,@let-arg-list))
-                            (otherwise 
-                             `(,new-name ',old-ptr-name ,@let-arg-list))))))
-                     
-                     (otherwise 
-                      `(,new-name ',old-name ,@let-arg-list)))))))
-
-
-      ;; Den Aufruf zusammenbasteln
-      ;;---------------------------
-      (if (null form-arg-list)
-          ;; Keine Argumente
-          ;;----------------
-          (foreign-call let-arg-list)
-
-          ;;Hat Argumente
-          ;;-------------
-          `(let* ,(make-let-arg-list)
-            (if (and ,@(make-and-list))
-                ,(foreign-call let-arg-list)
-                (error "illegal argument-type")))))))
+(defun ffi-include-name (name)
+  (concatenate 'string name "-ffi"))
 
 
 ;;------------------------------------------------------------------------------
 ;; 
 ;;------------------------------------------------------------------------------
-(defun intern-postfixed-package (symbol-or-string postfix package)
-  (intern (concatenate 'string (string symbol-or-string) postfix) package))
 
+(defun p1-ffi-include (forms flag)
+  (cond ((and (= (length forms) 1)
+              (typep (first forms) 'string))
+         (if (equal flag 'user)
+             (add-q (format nil "\"~A\"" (first forms)) *ffi-include-queue*)
+             (add-q (format nil "<~A>" (first forms)) *ffi-include-queue*)))
+        ((typep (first forms) 'string)
+         (internal-error 
+          'p1-ffi-include 
+          "Too many/few arguments to FFI:~A-INCLUDE" flag))
+        (t
+         (internal-error
+          'p1-ffi-include
+          "Wrong type to FFI:~A-INCLUDE" flag))))
 
 ;;------------------------------------------------------------------------------
 (provide "p1foreign")

@@ -1,125 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Inhalt   : Funktionen zum Aufspueren und Beseitigen von unbenutzten
 ;;;            Funktionen, Symbolen und benannten Konstanten.
 ;;;
-;;; $Revision: 1.33 $
-;;; $Log: delete.lisp,v $
-;;; Revision 1.33  1994/04/05  15:07:54  jh
-;;; ?used-Methode fuer importierte Funktionen definiert.
-;;;
-;;; Revision 1.32  1994/03/03  13:47:57  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.31  1994/02/08  11:27:11  sma
-;;; Klammer eingefügt (hätte ich bloß nix geändert...)
-;;;
-;;; Revision 1.30  1994/02/08  11:07:31  sma
-;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
-;;;
-;;; Revision 1.29  1994/02/04  14:25:06  kl
-;;; Formatstring zur Meldung über unbenutzte Klassen korrigiert.
-;;;
-;;; Revision 1.28  1994/02/01  12:10:22  hk
-;;; dec-used-slot nur auf definierte, nicht auf importierte Funktionen
-;;; anwenden.
-;;;
-;;; Revision 1.27  1994/01/31  13:49:19  hk
-;;; inc-used-slot nur auf definierte, nicht auf importierte Funktionen
-;;; anwenden.
-;;;
-;;; Revision 1.26  1993/09/21  15:02:53  jh
-;;; dec-used-slot hinzugefuegt.
-;;;
-;;; Revision 1.25  1993/09/20  14:17:58  jh
-;;; is-used verbessert.
-;;;
-;;; Revision 1.24  1993/09/06  13:03:37  jh
-;;; Jetzt werden in set-used-slots-for-cg wirklich alle Funktionen (auch
-;;; die lokalen) analysiert.
-;;;
-;;; Revision 1.23  1993/09/06  10:00:29  jh
-;;; set-used-slots-for-cg analysiert alle Funktionen, ob benutzt oder nicht.
-;;; Dies wird benoetigt, damit der Codegenerator bei ausgeschalteter Optimierung
-;;; mit den noetigen Informationen versorgt werden kann.
-;;;
-;;; Revision 1.22  1993/09/02  08:13:09  jh
-;;; Die class-precedence-list ist ein structured-literal und enthaelt die
-;;; Klasse T nicht. Der Aufruf von inc-used-slot ist jetzt entsprechend
-;;; angepasst.
-;;;
-;;; Revision 1.21  1993/09/01  11:50:05  ft
-;;; Beim erhoehen der used-slots von Elementen der class-precedence-list
-;;; einer Klasse die erste (die Klasse selbst) und das letzte (die Klasse
-;;; T) Element ausgenommen.
-;;;
-;;; Revision 1.20  1993/09/01  11:45:45  ft
-;;; inc-used-slot zaehlt jetzt den used-slot aller Elemente der
-;;; class-precedence-list einer Klasse rauf, statt denen der super-list.
-;;;
-;;; Revision 1.19  1993/08/04  09:39:03  ft
-;;; Die Meldung ueber unbenutzte Klassen bildet jetzt den richtigen
-;;; Plural von 'class'.
-;;;
-;;; Revision 1.18  1993/07/24  07:59:56  ft
-;;; Erweiterung um das Löschen ungenutzter Klassen.
-;;;
-;;; Revision 1.17  1993/07/15  12:27:37  hk
-;;; ~:*~[s~; ~:;s~] durch ~:p ersetzt
-;;;
-;;; Revision 1.16  1993/06/29  11:20:54  jh
-;;; Schreibfehler beseitigt.
-;;;
-;;; Revision 1.15  1993/06/29  10:55:38  jh
-;;; Das Entfernen von let/cc-forms mit unbenutzter Continuation und labels-forms
-;;; mit leerer fun-list nach simplifier.lisp verlegt.
-;;; Generische Funktion is-used eingebaut.
-;;;
-;;; Revision 1.14  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.13  1993/06/14  10:28:12  jh
-;;; Nicht benutzte continuations werden entfernt.
-;;;
-;;; Revision 1.12  1993/03/19  08:46:42  ft
-;;; sym aus *objects-to-delete* entfernt, da noch Konflikte mit dem
-;;; Modul-System bestehen.
-;;;
-;;; Revision 1.11  1993/03/18  15:18:58  jh
-;;; Fehler bei vorhandenen importierten Symbolen etc. beseitigt.
-;;;
-;;; Revision 1.10  1993/03/18  13:11:22  jh
-;;; Fehler in inc-used-slot(let*-form) behoben.
-;;;
-;;; Revision 1.9  1993/03/18  11:05:02  hk
-;;; Fehler in inc-used-slot(var-ref) behoben.
-;;;
-;;; Revision 1.8  1993/03/16  16:52:49  jh
-;;; Fehler beseitigt.
-;;;
-;;; Revision 1.7  1993/03/16  14:14:24  jh
-;;; set-used-slots benutzt jetzt eigenes Traversierverfahren.
-;;;
-;;; Revision 1.6  1993/02/25  13:16:44  jh
-;;; Lokale Funktionen werden jetzt ebenfalls entfernt.
-;;;
-;;; Revision 1.5  1993/02/16  15:24:21  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.4  1993/02/16  12:44:03  jh
-;;; Fehler bei structured-literal beseitigt.
-;;;
-;;; Revision 1.3  1993/02/11  13:27:41  jh
-;;; mv-lambda eingebaut.
-;;;
-;;; Revision 1.2  1993/02/10  13:32:31  jh
-;;; Fehler beseitigt und Ausgabe geaendert.
-;;;
-;;; Revision 1.1  1993/01/27  13:25:04  jh
-;;; Initial revision
+;;; $Revision: 1.36 $
+;;; $Id: delete.lisp,v 1.36 1994/11/22 14:49:16 hk Exp $
 ;;------------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -128,7 +33,7 @@
 
 ;;------------------------------------------------------------------------------
 (defvar *objects-to-delete* '(fun local-fun named-constant class))
-(defvar *delete-verbosity* 1)
+(defvar *delete-verbosity* 2)
 (defvar *unused-local-funs* nil)
 (defvar *delete-path* nil)
 
@@ -577,6 +482,10 @@
       (inc-used-slot (?constant-value a-sym))))
   ;; Traversierung, ausgehend von den toplevel-forms:
   (inc-used-slot (?toplevel-forms a-module))
+  ;; Annahme, dass alle call-in-Funktionen auch verwendet werden:
+  (dolist (a-global-fun (?all-global-funs a-module))
+    (when (?call-in a-global-fun)
+      (inc-used-slot a-global-fun)))
   ;; Traversierung, ausgehend von den exportierten Funktionen:
   (dolist (a-global-fun (?fun-list a-module))
     (when (?exported a-global-fun)

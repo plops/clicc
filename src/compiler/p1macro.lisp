@@ -1,110 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Der Makroexpansinsmechanismus
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.32 $
-;;; $Log: p1macro.lisp,v $
-;;; Revision 1.32  1994/06/07  15:35:23  hk
-;;; In p1-expand-user-macro: case -> ecase
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.31  1994/06/03  14:10:27  hk
-;;; Bessere Fehlermeldung, falls Makro-Expansion scheitert
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Expansion of user defined macros
 ;;;
-;;; Revision 1.30  1994/03/03  13:49:48  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.29  1993/11/30  08:15:49  hk
-;;; Fehlermeldung für undefinierte Funktionen bei Makroexpansion
-;;; verschönert
-;;;
-;;; Revision 1.28  1993/07/02  11:31:59  ft
-;;; Anpassung an die geaenderte Definition von p1-named-lambda.
-;;;
-;;; Revision 1.27  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.26  1993/05/10  11:56:44  hk
-;;; Fehlerhaftes when durch if ersetzt.
-;;;
-;;; Revision 1.25  1993/04/15  09:26:33  hk
-;;; init-macro-error-funs benutzt in-compile-time-env.
-;;;
-;;; Revision 1.24  1993/04/07  11:42:07  hk
-;;; Fehlermeldung in p1-expand-user-macro neu formatiert.
-;;;
-;;; Revision 1.23  1993/02/16  16:54:41  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.22  1993/01/20  10:02:52  ft
-;;; In init-macro-error-funs defined-fun durch global-fun ersetzt.
-;;;
-;;; Revision 1.21  1993/01/19  11:12:04  hk
-;;; In p1-gen-macro-function werden keine &aux Variablen sondern let*
-;;; generiert.
-;;;
-;;; Revision 1.20  1993/01/12  15:37:12  ft
-;;; Aufruf von redef-op-error in p1-defmacro korrigiert.
-;;;
-;;; Revision 1.19  1993/01/08  16:23:36  hk
-;;; Fehler behoben.
-;;;
-;;; Revision 1.18  1993/01/08  15:48:45  hk
-;;; clicc-error -> clcerror, redef-op-error benutzt.
-;;;
-;;; Revision 1.17  1993/01/06  13:17:17  hk
-;;; init-macro-error-funs von p0init nach hier kopiert.
-;;;
-;;; Revision 1.16  1993/01/05  17:01:31  hk
-;;; In p1-macrolet wurde in-compile-time-env eingefuegt.
-;;;
-;;; Revision 1.15  1992/11/25  16:05:03  ft
-;;; Aenderungen in der Behandlung des Expansionsabbruchs.
-;;;
-;;; Revision 1.14  1992/11/20  13:51:11  ft
-;;; p1-expand-user-macro an die Aenderungen in zw-apply angepasst.
-;;;
-;;; Revision 1.13  1992/11/19  12:18:27  ft
-;;; Entfernen der Fehlerbehandlungsfunktionen (dm-...).
-;;;
-;;; Revision 1.12  1992/10/08  16:55:44  hk
-;;; Prueft auf Mehrfachdefinition in macrolet.
-;;;
-;;; Revision 1.11  1992/09/04  16:33:20  kl
-;;; Supplied-Parameter liefern jetzt einheitlich nil oder T.
-;;;
-;;; Revision 1.10  1992/08/07  11:30:12  hk
-;;; Neu: p1-macrolet.
-;;;
-;;; Revision 1.9  1992/07/29  16:10:45  hk
-;;; Ueberarbeitet.
-;;;
-;;; Revision 1.8  1992/07/23  10:03:54  hk
-;;; :SYSTEM-MACRO --> :SYS-MACRO
-;;;
-;;; Revision 1.7  1992/07/23  08:55:27  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.6  1992/07/23  08:37:06  hk
-;;; set-global-operator-def --> set-macro.
-;;;
-;;; Revision 1.5  1992/07/23  08:34:50  hk
-;;; Ignore Decl. eingefuegt.
-;;;
-;;; Revision 1.4  1992/07/22  19:12:03  hk
-;;; Nicht benutze Var. gestrichen.
-;;;
-;;; Revision 1.3  1992/07/22  17:22:35  hk
-;;; Aenderungen an der Uebersetzungszeitumgebung.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.33 $
+;;; $Id: p1macro.lisp,v 1.33 1994/11/22 14:49:16 hk Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "CLICC")

@@ -1,159 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Hilfsfunktionen, Makros und Fehlerbehandlung zur Typinferenz
 ;;;
-;;; $Revision: 1.45 $
-;;; $Log: timisc.lisp,v $
-;;; Revision 1.45  1993/11/21  22:15:45  kl
-;;; In den Typumgebungen treten jetzt keine doppelten Elemente mehr auf.
-;;; Referenz auf *ti-level* entfernt.
-;;;
-;;; Revision 1.44  1993/10/22  16:18:12  kl
-;;; Umstellung von has-no-side-effect auf is-side-effect-free.
-;;;
-;;; Revision 1.43  1993/10/12  19:53:06  kl
-;;; Die Funktion not-destructive von Anour wird nun benutzt.
-;;;
-;;; Revision 1.42  1993/10/10  18:00:53  kl
-;;; Veraendern von Vorgaengertypumgebungen geaendert.
-;;;
-;;; Revision 1.41  1993/10/08  22:38:19  kl
-;;; Praezisere Behandlung von Seiteneffekten eingebaut. Einige Funktionen zur
-;;; Handhabung von Typumgebungen arbeiten nun destruktiv.
-;;;
-;;; Revision 1.40  1993/10/05  15:42:09  hk
-;;; Fehler in join-pred-type-env-with-type-env (vorläufig ?) behoben.
-;;;
-;;; Revision 1.39  1993/09/17  11:45:57  kl
-;;; Aufruf von assoc geschieht jetzt mit einem eq-Test.
-;;;
-;;; Revision 1.38  1993/09/12  16:10:06  kl
-;;; Anpassung an die neue Einteilung der Typinferenz-Stufen.
-;;;
-;;; Revision 1.37  1993/09/12  15:21:08  kl
-;;; Ruecksetzen dynamisch gebundener Variablen in let*-Ausdruecken korrigiert.
-;;;
-;;; Revision 1.36  1993/06/24  14:05:01  kl
-;;; Debug-Funktion nach timain.lisp verlegt. Ruecksetzen der Typbindungen nach
-;;; einem destruktiven Seiteneffekt aendert nur noch die strukturiert
-;;; modellierten Typen (zur Zeit nur Listen).
-;;;
-;;; Revision 1.35  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.34  1993/06/10  10:32:08  kl
-;;; Binden und Setzen von Funktionsparametern vereinheitlicht.
-;;;
-;;; Revision 1.33  1993/06/07  10:10:57  kl
-;;; Binden aktueller Parameter vereinheitlicht.
-;;;
-;;; Revision 1.32  1993/05/18  16:16:53  kl
-;;; Umstellung auf die neue Implementierung des Typverbands.
-;;;
-;;; Revision 1.31  1993/05/15  13:41:13  kl
-;;; Behandlung der Initialisierungsausdruecke umgestellt.
-;;;
-;;; Revision 1.30  1993/05/11  11:22:54  kl
-;;; Bindung der supplied-Parameter geaendert.
-;;;
-;;; Revision 1.29  1993/05/03  10:20:05  kl
-;;; Debugfunktionen verbessert.
-;;;
-;;; Revision 1.28  1993/04/20  15:04:56  kl
-;;; Ausgabemeldung geaendert.
-;;;
-;;; Revision 1.27  1993/04/19  12:30:15  kl
-;;; Umstellung auf die neue Handhabung der besonderen Aufrufer.
-;;;
-;;; Revision 1.26  1993/02/16  16:10:38  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.25  1993/02/15  14:43:22  kl
-;;; Operationen auf Typumgebungen beschleunigt.
-;;;
-;;; Revision 1.24  1993/02/03  09:56:51  kl
-;;; Aufruf von get-decoded-time entfernt.
-;;;
-;;; Revision 1.23  1993/02/02  10:12:24  kl
-;;; join-pred-type-env-with-type-env als Spezialfall der Vereinigung zweier
-;;; Typumgebungen eingefuegt.
-;;;
-;;; Revision 1.22  1993/02/02  09:49:04  kl
-;;; Sicherheitsabfrage in get-type verbessert. Ausgabe der Groesse der
-;;; *ti-fun-workset* um eine Uhrzeitangabe erweitert.
-;;;
-;;; Revision 1.21  1993/01/27  13:03:06  kl
-;;; Makrodefinitionen umgestellt.
-;;;
-;;; Revision 1.20  1993/01/26  18:38:32  kl
-;;; Die Suche nach funktionalen Objekten nach tipass1.lisp verlegt.
-;;;
-;;; Revision 1.19  1993/01/25  13:13:58  kl
-;;; Fehler von Joerg korrigiert und Algorithmus zum Erstellen der
-;;; called-by-Komponenten der definierten Funktionen eingebaut.
-;;;
-;;; Revision 1.18  1993/01/21  14:24:25  kl
-;;; Typfehler und -warnungen werden nun nur noch einmal ausgegeben.
-;;;
-;;; Revision 1.17  1993/01/19  11:32:18  kl
-;;; Anwendung von list-type in bind-parameter-types korrigiert.
-;;;
-;;; Revision 1.16  1993/01/12  12:48:49  kl
-;;; Binden der Parametertypen geaendert. Bei Parametern wird jetzt der
-;;; Vereinigungstyp ueber die entsprechenden Argumenttypen gebildet.
-;;;
-;;; Revision 1.15  1993/01/06  18:00:09  kl
-;;; assert-type in ein Makro umgewandelt.
-;;;
-;;; Revision 1.14  1993/01/06  13:32:49  kl
-;;; Ruecksetzen der Typumgebungen verbessert.
-;;;
-;;; Revision 1.13  1993/01/05  15:00:00  kl
-;;; join-type-environments erweitert.
-;;;
-;;; Revision 1.12  1992/12/10  10:17:57  kl
-;;; Umstellung auf den neuen Ort der Funktionsbeschreibungen.
-;;;
-;;; Revision 1.11  1992/12/08  14:35:04  kl
-;;; Zur Zeit werden gar keine Typwarnungen mehr ausgegeben.
-;;;
-;;; Revision 1.10  1992/12/02  09:41:26  kl
-;;; Zugriffe auf Funktionsbeschreibungen hierher verlegt und verbessert.
-;;;
-;;; Revision 1.9  1992/12/01  15:49:56  kl
-;;; ti-warning implementiert. Dabei *ti-errors* und *ti-warnings* verwendet.
-;;;
-;;; Revision 1.8  1992/11/26  11:40:23  kl
-;;; Beim Abfragen einer Typbindung wird getestet, ob sie vorhanden ist.
-;;; wrong-argument-types um den Parameter
-;;;
-;;; Revision 1.7  1992/11/24  16:38:04  kl
-;;; initialize-function-descriptions beruecksichtigt nun lokal definierte
-;;; Funktionen. list-type nach titypes.lisp verlegt. Kommentare erweitert.
-;;;
-;;; Revision 1.6  1992/11/23  13:33:53  kl
-;;; Typen globaler Variablen werden an die Variable und nicht mehr an das
-;;; zugehoerige Symbol gebunden.
-;;; In bind-parameter-types werden jetzt alle Parameterarten gebunden.
-;;;
-;;; Revision 1.5  1992/11/05  14:37:23  kl
-;;; Update-type-f eingefuehrt und Typbindungen verbessert.
-;;;
-;;; Revision 1.4  1992/11/04  13:25:48  kl
-;;; bind-type erweitert und Kommentare korrigiert.
-;;;
-;;; Revision 1.3  1992/11/02  12:13:18  kl
-;;; Dynamische Variablen haben jetzt eine eigene Typumgebung.
-;;;
-;;; Revision 1.2  1992/10/15  19:04:11  kl
-;;; Funktionen und Makros zu den Typbindungen umgestellt.
-;;;
-;;; Revision 1.1  1992/10/13  18:26:13  kl
-;;; Initial revision
-;;;
+;;; $Revision: 1.46 $
+;;; $Id: timisc.lisp,v 1.46 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

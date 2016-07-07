@@ -1,99 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : System-Funktionen (15. Lists)                                  
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.24 $
-;;; $Log: list.lisp,v $
-;;; Revision 1.24  1994/02/08  13:18:55  sma
-;;; :my-last-arg-may-be-rest-var bei car, cdr, endp, list-length, first
-;;; und rest.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.23  1994/02/02  09:43:08  hk
-;;; car, cdr, rplaca, replacd und assoc mit Deklarationen versehen, die
-;;; Optimierungen erlauben. Definition von simple-assoc vor assoc gezogen,
-;;; da es in der Deklaration verwendet wird.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Lists
 ;;;
-;;; Revision 1.22  1994/01/13  13:04:40  ft
-;;; Die Faelle CONS und NULL im TYPECASE von CAR und CDR vertauscht.
-;;;
-;;; Revision 1.21  1994/01/05  12:40:37  sma
-;;; rt::simple-assoc jetzt (endgültig) in Lisp implementiert. assoc auf
-;;; allgemeinen Fall reduziert. assoc wird von clicc zur compile-Zeit durch
-;;; rt::simple-assoc ersetzt wenn möglich.
-;;;
-;;; Revision 1.20  1993/12/13  13:15:55  sma
-;;; Auskommentierte Funktion raw-list-length gelöscht
-;;;
-;;; Revision 1.19  1993/09/20  08:07:36  sma
-;;; unnötigen Test in assoc entfernt.
-;;;
-;;; Revision 1.18  1993/09/16  14:34:41  sma
-;;; raw-list-length ist jetzt eine C-Funktion in list.c
-;;; assoc hat jetzt eine Unterfunktion simple-assoc (in C geschrieben),
-;;; welche aufgerufen wird, wenn der Test eq ist und weder test-not noch
-;;; key angegeben wurde. Dies sollte assoc deutlich beschleunigen, wenn
-;;; als test 'eq angegeben wird.
-;;;
-;;; Revision 1.17  1993/08/16  17:20:00  hk
-;;; copy-list kennt nun auch die leere Liste
-;;;
-;;; Revision 1.16  1993/07/19  16:12:50  hk
-;;; Klammerfehler in asoc behoben
-;;;
-;;; Revision 1.15  1993/07/15  11:56:47  hk
-;;; Macro apply-key zum optimierten Zugriff bei :key #'identity.
-;;; assoc und rassoc optimiert fuer :test #'eql.
-;;;
-;;; Revision 1.14  1993/07/15  10:14:07  hk
-;;; (copy-alist nil) -> nil
-;;;
-;;; Revision 1.13  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.12  1993/05/11  10:59:52  hk
-;;; Kommentar geaendert.
-;;;
-;;; Revision 1.11  1993/05/11  10:53:27  hk
-;;; first, .., fourth, rest und (setf first), .. definiert.
-;;;
-;;; Revision 1.10  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.9  1993/04/07  09:13:23  hk
-;;; cons -> inline.lisp
-;;;
-;;; Revision 1.8  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.24 $ eingefuegt
-;;;
-;;; Revision 1.7  1993/02/16  10:25:01  ft
-;;; Erweiterung um eine 'dumme' Version von nunion.
-;;;
-;;; Revision 1.6  1992/12/18  07:43:22  ft
-;;; Erweiterung um SUBSETP.
-;;;
-;;; Revision 1.5  1992/12/16  09:09:07  ft
-;;; Optimierung von INTERSECTION und SET-DIFFERENCE.
-;;;
-;;; Revision 1.4  1992/12/15  10:25:02  ft
-;;; Erweiterung um SET-DIFFERENCE.
-;;;
-;;; Revision 1.3  1992/11/26  17:03:27  hk
-;;; Funktionen aus list.c nach hier, car, cdr, set-car, etc.
-;;;
-;;; Revision 1.2  1992/07/06  09:10:46  hk
-;;; Neue Syntax fuer declaim fun-spec.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
-;;;
+;;; $Revision: 1.26 $
+;;; $Id: list.lisp,v 1.26 1994/11/22 14:55:56 hk Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -462,14 +392,6 @@
 ;;-----------------------------------------------------------------------------
 ;; 15.4. Substitution of Expressions                                          
 ;;-----------------------------------------------------------------------------
-
-;;-----------------------------------------------------------------------------
-;; APPLY-KEY saves us a function call sometimes.
-;;-----------------------------------------------------------------------------
-(defmacro apply-key (key element)
-  `(if ,key
-       (funcall ,key ,element)
-       ,element))
 
 ;;-----------------------------------------------------------------------------
 ;; SUBST new old tree &key :test :test-not :key

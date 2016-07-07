@@ -1,84 +1,32 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practible And Portable Lisp Implementation
-;;;            ----------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : search-fun-calls ermittelt, zu welchen Funktionen die form einer
 ;;;            app-form ausgewertet werden kann. Ausserdem wird zu jeder
 ;;;            Funktion bestimmt, in welchen Funktionen sie aufgerufen werden
 ;;;            und ob alle Aufrufstellen bekannt sind.
 ;;;
-;;; $Revision: 1.21 $
-;;; $Log: appfuns.lisp,v $
-;;; Revision 1.21  1994/03/03  13:45:23  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.20  1994/02/02  09:12:49  hk
-;;; (defvar *current-fun*) nach clcdef
-;;;
-;;; Revision 1.19  1994/01/31  13:44:32  hk
-;;; Nur bei definierten Funktionen wird der Slot unknown-caller gesetzt,
-;;; bei importierten Funktionen ist das nicht notwendig.
-;;;
-;;; Revision 1.18  1994/01/28  07:47:09  ft
-;;; Ausnahmetest in sfc-class auf nil erweitert.
-;;;
-;;; Revision 1.17  1994/01/26  13:52:23  ft
-;;; Änderung der Darstellung von ungebundenen Slots.
-;;;
-;;; Revision 1.16  1993/11/18  14:49:28  pm
-;;; Methode fuer sfc-form ueber foreign-funs
-;;;
-;;; Revision 1.15  1993/11/18  14:34:57  pm
-;;; Methode fuer sfc-form ueber foreign-funs
-;;;
-;;; Revision 1.14  1993/10/18  10:36:35  hk
-;;; Fehler bei der Brechnung des Slots called-by von Funktionen behoben.
-;;; Code umgestellt und übersichtlicher gestaltet.
-;;;
-;;; Revision 1.13  1993/10/15  13:03:52  hk
-;;; Die Analyse lieferte zu unpräzise Resultate und analysierte einige
-;;; Knoten unvollständig. Diese Unzulänglichkeiten bzw. Fehler wurden behoben.
-;;; Den Code besser strukturiert und kommentiert.
-;;;
-;;; Revision 1.12  1993/08/31  09:28:28  uho
-;;; Aenderungen fuer die 22Aug93 Version von CLISP
-;;;
-;;; Revision 1.11  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.10  1993/05/19  14:43:57  uho
-;;; Aenderungen fuer CLISP, wegen seines seltsamen IN-PACKAGE Verahltens,
-;;; eingebaut.
-;;;
-;;; Revision 1.9  1993/05/14  10:53:32  jh
-;;; Fehler bei der Initialisierung des unknown-caller-Slots behoben.
-;;;
-;;; Revision 1.8  1993/04/22  11:11:37  hk
-;;; Bearbeitung von (?toplevel-forms *module*) eingebaut.
-;;;
-;;; Revision 1.7  1993/04/22  08:56:59  jh
-;;; Fehler beseitigt.
-;;;
-;;; Revision 1.6  1993/04/20  14:34:26  jh
-;;; Auf die Annotation special-caller von special-sys-fun angepasst.
-;;;
-;;; Revision 1.5  1993/04/20  12:27:54  jh
-;;; search-fun-calls setzt jetzt auch die called-by-slots von Funktionen.
-;;; Fehler im Zusammenhang mit *other-funs* behoben.
-;;;
-;;; Revision 1.4  1993/04/14  07:16:15  kl
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.3  1993/04/07  15:42:42  hk
-;;; ?form in (sfc-form tagbody-form) war vergessen worden.
-;;;
-;;; Revision 1.2  1993/04/02  09:47:38  kl
-;;; provide eingefuegt.
-;;;
-;;; Revision 1.1  1993/03/31  14:11:14  jh
-;;; Initial revision
-;;;
+;;; $Revision: 1.23 $
+;;; $Id: appfuns.lisp,v 1.23 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC") 
@@ -233,8 +181,7 @@
 ;;------------------------------------------------------------------------------
 (defmethod sfc-form ((a-progn-form progn-form))
   (mapc-progn-form-list (?form-list a-progn-form)
-                        #'(lambda (a-form)
-                            (sfc-no-caller a-form))
+                        #'sfc-no-caller
                         #'sfc-form))
 
 ;;------------------------------------------------------------------------------

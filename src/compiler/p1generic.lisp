@@ -1,300 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Behandlung definierender Vorkommen generischer Funktionen und
 ;;;            Methoden, Finalisierung generischer Funktionen.
 ;;;
-;;; $Revision: 1.91 $
-;;; $Log: p1generic.lisp,v $
-;;; Revision 1.91  1994/01/14  08:53:47  sma
-;;; extract-specializer hoffentlich endgültig korrigiert. (then und else
-;;; Fall im if vertauscht)
-;;;
-;;; Revision 1.90  1994/01/13  07:49:05  ft
-;;; extract-specializer korrigiert.
-;;;
-;;; Revision 1.89  1994/01/12  11:13:39  ft
-;;; extract-specializers verschoenert.
-;;;
-;;; Revision 1.88  1993/12/07  14:39:32  ft
-;;; Der Methodencache enthaelt jetzt als Vergleichsobjekt die Klasse des
-;;; spezialisierten Parameters, statt der Klasse des typecase-Falls.
-;;;
-;;; Revision 1.87  1993/12/03  09:58:27  ft
-;;; Staerkere Ueberpruefung der Methoden-Lambda-Listen implementiert,
-;;; Fehler im Test auf Multimethoden beseitigt.
-;;;
-;;; Revision 1.86  1993/11/30  08:41:47  ft
-;;; Test auf Multimethoden vereinfacht und die Berechnung der
-;;; Spezialisierer-Positionen korrigiert.
-;;;
-;;; Revision 1.85  1993/11/25  14:41:15  ft
-;;; Bei fehlenden Default-Methoden werden jezt auch in den obersten
-;;; typecase-Ebenen Aufrufe von no-applicable-method erzeugt.
-;;;
-;;; Revision 1.84  1993/11/25  13:38:53  ft
-;;; Modifikation des specializer-pos Slots von gen. Funktionen korrigiert.
-;;;
-;;; Revision 1.83  1993/11/25  13:11:01  ft
-;;; Erweiterung um Multimethoden.
-;;;
-;;; Revision 1.82  1993/11/18  08:27:40  ft
-;;; Routinen zur Berechnung der Dispatch-Funktion ueberarbeitet.
-;;;
-;;; Revision 1.81  1993/10/07  08:03:47  ft
-;;; ll-par-spec befindet sich ab jetzt in p1lambda.lisp
-;;;
-;;; Revision 1.80  1993/09/29  14:10:58  ft
-;;; Bei der Analyse von Methoden mit mehr als einem spezialisierten
-;;; Parameter wird jetzt ein forsetzbarer Fehler ausgegeben.
-;;;
-;;; Revision 1.79  1993/09/17  13:52:53  ft
-;;; Explizite Angabe des Tests bei allen Aufrufen von assoc die nur eq
-;;; benoetigen.
-;;;
-;;; Revision 1.78  1993/09/09  14:18:19  ft
-;;; Fehler in der Bearbeitung von Methoden ueber T beseitigt.
-;;;
-;;; Revision 1.77  1993/09/09  09:06:49  ft
-;;; Sortierung der Vorlaeufer der Methodenlisten korrigiert.
-;;;
-;;; Revision 1.76  1993/09/07  09:46:59  ft
-;;; Fehler in der Sortierung der Spezialisierer behoben.
-;;;
-;;; Revision 1.75  1993/09/06  08:51:19  ft
-;;; Das Compiler-Flag *OPTIMIZE* wird jetzt beachtet.
-;;;
-;;; Revision 1.74  1993/09/02  13:39:44  ft
-;;; Fehler beseitigt: beim Methodencaching wird jetzt vor dem Vergleich
-;;; mit dem Inhalt des Cache erst geprueft ob der spezialisierende
-;;; Parameter ueberhaupt eine Instanz ist.
-;;;
-;;; Revision 1.73  1993/08/24  12:32:18  ft
-;;; Fehler beim Caching unspezialisierter Methoden behoben.
-;;;
-;;; Revision 1.72  1993/08/23  14:55:11  ft
-;;; Fehler behoben: Aufruf von built-in-class-def-p statt
-;;; built-in-class-p.
-;;;
-;;; Revision 1.71  1993/08/23  13:50:23  ft
-;;; Fehler im Aufruf gecacheter Methoden und in der Behandlung von
-;;; Methoden, die ueber built-in-classes spezialisieren, behoben.
-;;;
-;;; Revision 1.70  1993/08/23  09:53:54  ft
-;;; Fehler beim caching der next-method-lists behoben.
-;;;
-;;; Revision 1.69  1993/08/20  11:52:21  ft
-;;; Fuer generische Funktionen die mehr als *METHOD-CACHE-LIMIT* effektive
-;;; Methoden besitzen wird jetzt ein Methoden-Cache angelegt.
-;;;
-;;; Revision 1.68  1993/07/30  11:14:00  ft
-;;; Prädikate für die Sortierung von Methodenlisten in finalize-generic-fun
-;;; geändert.
-;;;
-;;; Revision 1.67  1993/07/24  08:18:04  ft
-;;; Verarbeitung von generischen Funktionen mit nur einer, unspezialisierten Methode implementiert.
-;;;
-;;; Revision 1.66  1993/07/23  11:50:48  ft
-;;; Fehlermeldungen verschönert.
-;;;
-;;; Revision 1.65  1993/07/22  13:28:37  ft
-;;; Erweiterung um Kongruenzprüfung der Lambda Listen von Methoden
-;;; und generischen Funktionen.
-;;;
-;;; Revision 1.64  1993/07/21  12:33:04  ft
-;;; Fehler im Resultat generischer Funktionen beseitigt.
-;;;
-;;; Revision 1.63  1993/07/20  13:21:09  ft
-;;; Benennung von generischen Funktionen korrigiert; Umbenennungen.
-;;;
-;;; Revision 1.62  1993/07/14  15:46:50  hk
-;;; collect-keywords ohne parse-lambda-list implementiert, weil es die
-;;; Funktion nicht mehr gibt.
-;;;
-;;; Revision 1.61  1993/07/09  13:05:51  ft
-;;; Falsche Fehlermeldung in extract-specializers geaendert.
-;;;
-;;; Revision 1.60  1993/07/09  12:33:43  ft
-;;; clc-error durch clicc-warning ersetzt.
-;;;
-;;; Revision 1.59  1993/07/02  13:43:34  ft
-;;; Anpassung an die Aenderung von p1-defun
-;;;
-;;; Revision 1.58  1993/07/02  11:31:45  ft
-;;; Anpassung an die geaenderte Definition von p1-named-lambda.
-;;;
-;;; Revision 1.57  1993/07/01  11:39:02  ft
-;;; Fehler in ll-par-spec behoben.
-;;;
-;;; Revision 1.56  1993/06/30  12:05:32  ft
-;;; Symbol-slot gebunden (s.u.).
-;;;
-;;; Revision 1.55  1993/06/29  12:25:38  ft
-;;; Der par-spec Slot an Dispatch-Funktionen wird jetzt zur
-;;; Definitionszeit gesetzt.
-;;;
-;;; Revision 1.54  1993/06/17  12:44:59  ft
-;;; Fehler in den lokalen Funktionen einer Methode, sowie
-;;; in den Prädikaten über Beziehungen im Klassenbaum behoben.
-;;;
-;;; Revision 1.53  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.52  1993/06/17  07:08:59  ft
-;;; noch zwei L:: vergessen.
-;;;
-;;; Revision 1.51  1993/06/16  15:04:33  ft
-;;; an diversen Stellen L:: eingefügt.
-;;;
-;;; Revision 1.50  1993/06/16  11:32:52  ft
-;;; Fehlermeldungen geändert.
-;;;
-;;; Revision 1.49  1993/06/15  14:25:28  ft
-;;; defgeneric-parser ignoriert nichts mehr; es können jetzt auch
-;;; Methoden mittels defgeneric definiert werden.
-;;;
-;;; Revision 1.48  1993/05/11  08:24:52  ft
-;;; parse-defmethod-args geht jetzt korrekt mit doc-strings, declarations
-;;; und Methodenrümpfen um.
-;;;
-;;; Revision 1.47  1993/05/11  07:35:19  ft
-;;; Unterklassen die mehrfach erben, aber keine eigenen Methoden definieren,
-;;; werden jetzt, falls nötig, auch in die Dispatch-Funktion aufgenommen.
-;;;
-;;; Revision 1.46  1993/05/05  08:49:18  ft
-;;; Benennung von Methoden-Funtionen, Dispatch-Funktionen und deren
-;;; Unterfunktionen verschönert.
-;;;
-;;; Revision 1.45  1993/05/04  06:10:33  ft
-;;; Definition von Methoden mit komplexen Lambda Listen korrigiert.
-;;;
-;;; Revision 1.44  1993/04/20  14:32:24  ft
-;;; Anpassung an die neuen Built-In-Klassen.
-;;;
-;;; Revision 1.43  1993/03/31  07:49:51  ft
-;;; Neues Praedikat ueber Beziehungen im Klassengraph eingefuehrt.
-;;;
-;;; Revision 1.42  1993/03/30  13:11:05  ft
-;;; Ausgabe von Debug Informationen entfernt.
-;;;
-;;; Revision 1.41  1993/03/30  12:35:43  ft
-;;; Korrekturen an der Konstruktion des 'case' der Dispatch-Funktion.
-;;;
-;;; Revision 1.40  1993/03/25  10:15:48  ft
-;;; Anpassung an die geaenderten Klassennamen.
-;;;
-;;; Revision 1.39  1993/03/19  08:59:32  ft
-;;; Fehler bei der Berchnung der next-method-lists im typecase der
-;;; Dispatch-Funktion beseitigt.
-;;;
-;;; Revision 1.38  1993/03/12  09:46:08  ft
-;;; Anpassung an der veraenderte Wert der c-p-l Slots von class-defs.
-;;;
-;;; Revision 1.37  1993/02/26  14:52:47  ft
-;;; Fehler beseitigt, Aufruf von no-applicable-method angepasst.
-;;;
-;;; Revision 1.36  1993/02/23  08:32:04  ft
-;;; Umstellung von der Erzeugung von Zwischensprache auf Quellsprache
-;;; bei der Finalisierung. Ausgabe einer Meldung bei der Finalisierung.
-;;;
-;;; Revision 1.35  1993/02/16  16:57:56  hk
-;;; Revision Keyword eingefuegt, CLOS Symbole des zu uebersetzenden Programms
-;;; durch clicc-lisp:: statt durch rt:: gekennzeichnet.
-;;;
-;;; Revision 1.34  1993/02/10  09:41:28  ft
-;;; Erweiterung der Spezialisierungsmoeglichkeit auf
-;;;
-;;; Revision 1.33  1993/02/01  14:51:45  ft
-;;; Bindungsfehler in den erzeugten Dispatch-Fun's behoben.
-;;;
-;;; Revision 1.32  1993/01/29  15:33:10  ft
-;;; Fehler in parse-defgeneric-args beseitigt.
-;;;
-;;; Revision 1.31  1993/01/29  07:36:27  ft
-;;; Aufruf von parse-named-lambda in die Parser-Funktionen eingebunden.
-;;;
-;;; Revision 1.30  1993/01/28  10:18:19  ft
-;;; Fehler in der Benennung generischer Setf-Funktionen beseitigt.
-;;;
-;;; Revision 1.29  1993/01/25  09:58:14  kl
-;;; Aufruf von rt::no-applicable-method eingebaut. Umbennenung der Variable
-;;;  von *SETF-FUN* in SETF-FUN durchgefuehrt.
-;;;
-;;; Revision 1.28  1993/01/22  14:58:42  ft
-;;; Erweiterung um die Verarbeitung von erweiterten Funktionsnamen.
-;;;
-;;; Revision 1.27  1993/01/15  12:10:13  ft
-;;; Ein catch fuer clicc-error in finalize-generic-fun installiert.
-;;;
-;;; Revision 1.26  1993/01/15  11:56:19  ft
-;;; clicc-error durch clc-error ersetzt.
-;;;
-;;; Revision 1.25  1993/01/14  15:50:16  ft
-;;; Key-Parameter zum unterdruecken der lokalen Funktionen
-;;; von Methoden eingefuegt.
-;;;
-;;; Revision 1.24  1993/01/13  12:22:20  ft
-;;; Setzen von *CURRENT-FORM* fuer Aufrufe von clicc-error.
-;;;
-;;; Revision 1.23  1993/01/12  09:39:49  ft
-;;; Aufrufe von sort korrigiert.
-;;;
-;;; Revision 1.22  1992/12/21  07:40:58  ft
-;;; Message-String verschoenert.
-;;;
-;;; Revision 1.21  1992/12/18  07:21:15  ft
-;;; Klammerungsfehler behoben.
-;;;
-;;; Revision 1.20  1992/12/17  15:15:33  ft
-;;; Verschoenerung.
-;;;
-;;; Revision 1.19  1992/12/10  11:01:41  ft
-;;; Benutzung von SETF-Methoden statt Writern.
-;;;
-;;; Revision 1.18  1992/12/04  08:53:28  ft
-;;; Eineige CASE durch ECASE ersetzt.
-;;;
-;;; Revision 1.17  1992/12/03  16:37:46  ft
-;;; 'forward referenced'-Warnung entfernt.
-;;;
-;;; Revision 1.16  1992/12/03  15:37:41  ft
-;;; Erweiterung um optionale Parameter und Zwischenstand.
-;;;
-;;; Revision 1.15  1992/11/12  10:56:50  ft
-;;; call-next-method und next-method-p als lokale Funktionen jeder
-;;; Methoden-Funktion.
-;;;
-;;; Revision 1.14  1992/11/05  12:12:35  ft
-;;; Erweiterung um finalize-generic-funs.
-;;;
-;;; Revision 1.13  1992/10/13  09:34:58  ft
-;;; multiple-value-bind so geaendert, dass Warnings entfallen.
-;;;
-;;; Revision 1.12  1992/09/01  14:31:51  ft
-;;; Verschoenerung der Kommentare
-;;;
-;;; Revision 1.11  1992/07/23  10:02:32  hk
-;;; :SYSTEM-MACRO --> :SYS-MACRO.
-;;;
-;;; Revision 1.10  1992/07/23  08:58:34  hk
-;;; Noch mal ersetzt.
-;;;
-;;; Revision 1.9  1992/07/23  08:47:12  hk
-;;; ?const --> ?value, set-global-operator-def --> set-global-op.
-;;;
-;;; Revision 1.8  1992/07/22  17:19:18  hk
-;;; global-operator-def --> get-operator-def.
-;;;
-;;; Revision 1.7  1992/07/10  09:54:49  ft
-;;; Tippfehler beseitigt
-;;;
-;;; Revision 1.6  1992/07/09  12:42:04  ft
-;;; Inkonsistente Benennungen korrigiert
-;;;
-;;; Revision 1.5  1992/07/07  14:29:25  ft
-;;; Datei-Header eingefuegt
+;;; $Revision: 1.95 $
+;;; $Id: p1generic.lisp,v 1.95 1995/03/05 11:02:55 wg Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")  
@@ -393,7 +123,12 @@
            (specializer-pos             ; Position des ersten spez. Param.
             (if specializer-list
                 (list
-                 (position-if #'consp specialized-lambda-list)
+                 (if is-complex-ll
+                     (position-if
+                      #'consp specialized-lambda-list
+                      :end (position-if #'lambda-list-keyword-p
+                                        specialized-lambda-list))
+                     (position-if #'consp specialized-lambda-list))
                  (if is-complex-ll
                      (position-if
                       #'consp specialized-lambda-list
@@ -502,7 +237,7 @@
           ((and dont-generate-local-funs is-complex-ll)
            (setf extended-method-body
                  `((labels 
-                       ((method-body ,lambda-list ,@method-body))
+                       ((method-body ,lambda-list ,doc-decl ,@method-body))
                      (apply #'method-body
                             ,@(ll2fp (replace-keywords lambda-list)))))))
           (dont-generate-local-funs
@@ -517,16 +252,17 @@
                                          (L::first next-method-list))
                                      (next-method-list
                                       (L::rest next-method-list)))
-                                (L::funcall next-method
+                                (L::apply next-method
                                          ,@(ll2fp extended-lambda-list)))))
                         (L::next-method-p ()
                           next-method-list)
-                        (method-body ,lambda-list ,@method-body))
+                        (method-body ,lambda-list ,doc-decl ,@method-body))
                      (L::apply #'method-body
                             ,@(ll2fp (replace-keywords lambda-list)))))))
           (T
            (setf extended-method-body
-                 `((L::labels 
+                 `(,doc-decl
+                   (L::labels 
                        ((L::call-next-method ()
                           (if (L::null next-method-list)
                               (L::no-next-method)
@@ -543,7 +279,7 @@
       ;; erzeuge method-fun durch Aufruf von p1-defun
       ;;---------------------------------------------
       (let ((*SDF* T))                  ; System-Defined-Function
-        (p1-defun `(,method-symbol ,extended-lambda-list ,doc-decl
+        (p1-defun `(,method-symbol ,extended-lambda-list
                     ,@extended-method-body)
                   (if (consp method-name) (second method-name) method-name)))
       (setq method-fun (cdr (get-operator-def method-symbol)))

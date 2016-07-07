@@ -1,78 +1,31 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Codegenerierung,
 ;;;            - mv-lambda
 ;;;            - VALUES (inline)
 ;;;
-;;; $Revision: 1.20 $
-;;; $Log: cgvalues.lisp,v $
-;;; Revision 1.20  1994/05/25  14:07:05  sma
-;;; Aufruf der Restlistenoptimierung aus cg-params herausgezogen.
-;;; Restlistenoptimierung fuer mv-lambda korrigiert, d.h. jetzt gehts
-;;; erst.
-;;;
-;;; Revision 1.19  1994/02/08  15:40:47  sma
-;;; Zusätzlichen Block um cg-params-Aufruf herum eingefügt.
-;;;
-;;; Revision 1.18  1994/01/07  11:56:33  hk
-;;; opt-args wird nun auch in cg-values verwendet.
-;;;
-;;; Revision 1.17  1993/09/10  10:06:29  hk
-;;; Fehler beim Aufruf von cg-params behoben.
-;;;
-;;; Revision 1.16  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.15  1993/04/07  16:22:56  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.14  1993/04/07  16:21:42  hk
-;;; Fehlermeldung verschoenert.
-;;;
-;;; Revision 1.13  1993/04/05  10:06:59  hk
-;;; Ueberzaehlige Argumente von values werden im Fehlerfall ignoriert.
-;;;
-;;; Revision 1.12  1993/04/05  10:02:38  hk
-;;; Fehlerbehandlung verbessert.
-;;;
-;;; Revision 1.11  1993/04/05  09:48:33  hk
-;;; Code verschoenert.
-;;;
-;;; Revision 1.10  1993/02/16  15:48:55  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.9  1992/09/26  16:00:43  hk
-;;; In cg-values nil durch empty-list ersetzt.
-;;;
-;;; Revision 1.8  1992/09/23  14:34:58  hk
-;;; In einem Fall ILLEGAL_ARGS durch TOO_FEW_ARGS ersetzt.
-;;;
-;;; Revision 1.7  1992/09/21  11:18:52  hk
-;;; Die eigentliche C-Codegenerierung uebersichtlicher gestaltet
-;;;
-;;; Revision 1.6  1992/08/11  12:45:40  hk
-;;; C-Ln --> C-Decl, fuer Deklarationen.
-;;;
-;;; Revision 1.5  1992/08/10  16:53:19  hk
-;;; Keine globalen Variablen *mv-spec* und *mv-produced* mehr, sondern
-;;; neue Slots mv-used in app und mv-spec und mv-calls in mv-lambda.
-;;;
-;;; Revision 1.4  1992/07/29  11:16:40  hk
-;;; Kleiner Fehler.
-;;;
-;;; Revision 1.3  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.2  1992/05/22  09:11:25  hk
-;;; cg-mv-args laeuft mit beliebig vielen Argumenten, auch wenn
-;;; die Anzahl der generierten MV nicht zur Uebersetzungszeit bekannt ist.
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.21 $
+;;; $Id: cgvalues.lisp,v 1.21 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC") 

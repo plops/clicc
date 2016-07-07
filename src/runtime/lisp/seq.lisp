@@ -1,130 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion  : Laufzeitsystem (14. Sequences)                             
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.36 $
-;;; $Log: seq.lisp,v $
-;;; Revision 1.36  1994/02/09  14:16:27  hk
-;;; Keyword Parameter in {remove|delete}-if-[not] gestrichen, da die
-;;; Rest-Liste an eine Funktion weitergereicht wird, die die Keyword
-;;; Parameter Zuordnung und Prüfung vornimmt.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.35  1994/02/08  13:19:25  sma
-;;; :my-last-arg-may-be-rest-var bei length.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function  : Sequences
 ;;;
-;;; Revision 1.34  1993/12/14  12:40:42  sma
-;;; Aufruf von rt::%vector-length aus length entfernt. Alle (besser)
-;;; internen Funktionen nach vector-length aus array.lisp verlagert.
-;;;
-;;; Revision 1.33  1993/12/09  16:53:41  sma
-;;; length verändert, C-funktion raw-list-length wird nicht mehr benutzt.
-;;;
-;;; Revision 1.32  1993/12/07  15:36:53  ft
-;;; fehlende lokale Variable result in list-find hinzugefuegt
-;;;
-;;; Revision 1.31  1993/12/03  10:20:31  ft
-;;; Austausch von list-position und list-find gegen korrektere und
-;;; effizientere Versionen.
-;;;
-;;; Revision 1.30  1993/10/15  13:01:42  ft
-;;; REMOVE optimiert.
-;;;
-;;; Revision 1.29  1993/09/30  09:44:01  wg
-;;; Ueberfluessige Klammer-Zu in subseq geloescht.
-;;;
-;;; Revision 1.28  1993/09/28  16:25:23  hk
-;;; subseq für Listen optimiert: verwendet nicht mehr length, prüft die
-;;; Argumente nicht mehr so genau auf Zulässigkeit.
-;;;
-;;; Revision 1.27  1993/09/16  14:24:48  sma
-;;; raw-list-length ist jetzt eine C-Funktion ist list.c
-;;;
-;;; Revision 1.26  1993/08/20  08:48:53  hk
-;;; check-seq-test ist nun ein Macro
-;;;
-;;; Revision 1.25  1993/07/15  10:52:30  hk
-;;; In check-seq-test eql statt eq als Defaultwert.
-;;;
-;;; Revision 1.24  1993/07/13  13:46:01  hk
-;;; Fehler in list-position behoben: Resultat war um 1 zu gross.
-;;;
-;;; Revision 1.23  1993/07/13  06:52:09  ft
-;;; MAP, SOME und EVERY optimiert.
-;;;
-;;; Revision 1.22  1993/07/12  04:29:26  ft
-;;; Parameter in list-position richtig benannt.
-;;;
-;;; Revision 1.21  1993/07/11  07:30:18  ft
-;;; Erste Optimierungen an MAP vorgenommen.
-;;;
-;;; Revision 1.20  1993/07/08  09:16:49  ft
-;;; CONCATENATE optimiert.
-;;;
-;;; Revision 1.19  1993/07/07  06:47:55  ft
-;;; Falsche Klammerung korrigiert.
-;;;
-;;; Revision 1.18  1993/07/06  15:39:59  ft
-;;; POSITION optimiert.
-;;;
-;;; Revision 1.17  1993/07/06  15:30:28  ft
-;;; NREVERSE optimiert.
-;;;
-;;; Revision 1.16  1993/07/06  13:17:37  ft
-;;; Rückwärts-find auf Listen optimiert, die Optimierungen arbeiten
-;;; jetzt auch auf NIL.
-;;;
-;;; Revision 1.15  1993/07/06  08:03:59  ft
-;;; Abstrakten Datentyp Queue in das Lisp-Modul integriert.
-;;;
-;;; Revision 1.14  1993/07/06  07:57:33  ft
-;;; REVERSE optimiert.
-;;;
-;;; Revision 1.13  1993/07/06  07:45:19  ft
-;;; Abstrakten Datentyp Queue lokal in list-subseq eingefügt.
-;;;
-;;; Revision 1.12  1993/07/06  07:25:52  ft
-;;; SUBSEQ optimiert.
-;;;
-;;; Revision 1.11  1993/07/02  12:45:31  ft
-;;; Debug-Ausgabe entfernt.
-;;;
-;;; Revision 1.10  1993/07/01  14:18:49  ft
-;;; find optimiert.
-;;;
-;;; Revision 1.9  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.8  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.7  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.36 $ eingefuegt
-;;;
-;;; Revision 1.6  1993/01/15  08:45:46  ft
-;;; Erweiterung um MISMATCH und SEARCH.
-;;;
-;;; Revision 1.5  1992/11/26  17:02:13  hk
-;;; length von sequence.c nach hier.
-;;;
-;;; Revision 1.4  1992/08/11  14:31:42  kl
-;;; Substitute implementiert.
-;;;
-;;; Revision 1.3  1992/07/28  14:39:17  hk
-;;; Aufgeraeumt, umbenannt.
-;;;
-;;; Revision 1.2  1992/07/06  11:44:54  hk
-;;; Vorlaeufig string-char in character umbenannt.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.41 $
+;;; $Id: seq.lisp,v 1.41 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -133,8 +32,10 @@
  '(complement elt subseq copy-seq length reverse nreverse make-sequence
    concatenate map some every notany notevery reduce fill replace remove
    remove-if remove-if-not delete delete-if delete-if-not remove-duplicates
-   delete-duplicates find find-if find-if-not position position-if
-   position-if-not count count-if count-if-not mismatch search substitute sort))
+   delete-duplicates substitute substitute-if substitute-if-not nsubstitute
+   nsubstitute-if nsubstitute-if-not find find-if find-if-not position
+   position-if position-if-not count count-if count-if-not mismatch search
+   sort))
 
 ;;------------------------------------------------------------------------------
 ;; Fuer Fehlermeldungen
@@ -146,8 +47,7 @@
 (defun sequence-type (sequence)
   (cond
     ((listp   sequence) 'list)
-    ((vectorp sequence) `(vector ,(array-element-type sequence)))
-    (t (error "Unexpected error"))))
+    ((vectorp sequence) `(vector ,(array-element-type sequence)))))
 
 ;;------------------------------------------------------------------------------
 (defmacro check-seq-test (test test-not)
@@ -158,25 +58,25 @@
     (t #'eql)))
 
 ;;------------------------------------------------------------------------------
-(defun check-seq-start-end (start end length)
-  (when (not (check-integer start 0 length))
-    (error NOT_IN_RANGE start length))
-  (when (null end)
-    (setq end length))
-  (when (not (check-integer end 0 length))
-    (error NOT_IN_RANGE end length))
-  (when (> start end)
-    (error "The START value ~S is greater than the END value ~S" start end))
-  end)
+(defmacro check-seq-end (end length)
+  `(let ((l ,length))
+    (when (> ,end l) (setq ,end l))))
 
-;;------------------------------------------------------------------------------
-(defun check-seq-count (count length)
-  (cond
-    ((integerp count)
-     (if (plusp count) count 0))
-    ((null count) length)
-    (t (error "~S should be an INTEGER at least 0 and no more than 16777214"
-              count))))
+;;-----------------------------------------------------------------------------
+;; APPLY-KEY saves us a function call sometimes.
+;;-----------------------------------------------------------------------------
+(defmacro apply-key (key element)
+  `(if ,key
+       (funcall ,key ,element)
+       ,element))
+
+;;-----------------------------------------------------------------------------
+;; Seq-Dispatch does an efficient type-dispatch on the given Sequence.
+;;-----------------------------------------------------------------------------
+(defmacro seq-dispatch (sequence list-form array-form)
+  `(if (listp ,sequence)
+       ,list-form
+       ,array-form))
 
 ;;------------------------------------------------------------------------------
 ;; Abstrakter Datentyp Queue
@@ -233,55 +133,48 @@
 ;; ELT sequence index
 ;;-----------------------------------------------------------------------------
 (defun elt (sequence index)
-  (typecase sequence
-    (cons (nth index sequence))
-    (vector (row-major-aref sequence index))
-    (T (error WRONG_TYPE sequence 'SEQUENCE))))
+  (seq-dispatch
+   sequence
+   (nth index sequence)
+   (row-major-aref sequence index)))
 
 ;;-----------------------------------------------------------------------------
 ;; (setf ELT) newvalue sequence index
 ;;-----------------------------------------------------------------------------
 (defun (setf elt) (newvalue sequence index)
-  (typecase sequence
-    (cons (setf (nth index sequence) newvalue))
-    (vector (setf (row-major-aref sequence index) newvalue))
-    (T (error WRONG_TYPE sequence 'SEQUENCE))))
+  (seq-dispatch
+   sequence
+   (setf (nth index sequence) newvalue)
+   (setf (row-major-aref sequence index) newvalue)))
 
 ;;-----------------------------------------------------------------------------
 ;; SUBSEQ sequence start &OPTIONAL end
 ;;-----------------------------------------------------------------------------
-(defun subseq (sequence start &optional end)
-    (typecase sequence
-      (null nil)
-      (cons (list-subseq sequence start end))
-      (vector (vector-subseq sequence start end))
-      (T (error WRONG_TYPE sequence 'SEQUENCE))))
+(defun subseq (sequence start &optional (end most-positive-fixnum))
+  (seq-dispatch
+   sequence
+   (list-subseq sequence start end)
+   (vector-subseq sequence start end)))
 
-(defun vector-subseq (sequence start end)
-  (let ((length (length sequence)))
-    (setq end (check-seq-start-end start end length))
-    (let ((subseq (make-sequence `(vector ,(array-element-type sequence))
-                                 (- end start))))
+;;-----------------------------------------------------------------------------
+(defun vector-subseq (vector start end)
+  (let ((length (length vector)))
+    (check-seq-end end length)
+    (let ((subseq (make-array (- end start)
+                              :element-type (array-element-type vector))))
       (do ((i start (1+ i))
            (j 0     (1+ j)))
           ((= i end) subseq)
-        (setf (elt subseq j) (elt sequence i))))))
+        (setf (elt subseq j) (elt vector i))))))
 
-(defun list-subseq (sequence start end)
+;;-----------------------------------------------------------------------------
+(defun list-subseq (list start end)
   (let ((subseq (empty-queue)))
-    (setq sequence (nthcdr start sequence))
-    (cond
-      (end
-       (decf end start)
-       (dotimes (i end)
-         (when (atom sequence)
-           (error "end of sequence reached"))
-         (add-q (pop sequence) subseq)))
-      (t
-       (loop
-        (when (null sequence)
-          (return))
-        (add-q (pop sequence) subseq))))
+    (setq list (nthcdr start list))
+    (decf end start)
+    (dotimes (i end)
+      (when (endp list) (return))
+      (add-q (pop list) subseq))
     (queue2list subseq)))
 
 ;;------------------------------------------------------------------------------
@@ -302,36 +195,34 @@
 ;;------------------------------------------------------------------------------
 (defun length (sequence)
   (declare (:my-last-arg-may-be-rest-var :length))
-  (typecase sequence
-    (null 0)
-    (cons (let ((n 0)) 
-            (dolist (s sequence) (incf n))
-            n))
-    ;;Statt doppeltem vectorp-Test erzeugt vector-length ggf Laufzeitfehler
-    (T (vector-length sequence))))
+  (seq-dispatch
+   sequence
+   (let ((n 0)) (dolist (s sequence) (incf n)) n)
+   (vector-length sequence)))
 
 ;;-----------------------------------------------------------------------------
 ;; REVERSE sequence
 ;;-----------------------------------------------------------------------------
 (defun reverse (sequence)
-  (typecase sequence
-    (null nil)
-    (cons (list-reverse sequence))
-    (vector (vector-reverse sequence))
-    (T (error WRONG_TYPE sequence 'SEQUENCE))))
-  
-(defun vector-reverse (sequence)
-  (let* ((length (length sequence))
-         (reverse (make-sequence `(vector ,(array-element-type sequence))
-                                 length)))
+  (seq-dispatch
+   sequence
+   (list-reverse sequence)
+   (vector-reverse sequence)))
+
+;;-----------------------------------------------------------------------------
+(defun vector-reverse (vector)
+  (let* ((length (length vector))
+         (reverse (make-array length
+                              :element-type (array-element-type vector))))
     (do ((i 0 (1+ i))
          (j (1- length) (1- j)))
         ((= i length) reverse)
-      (setf (elt reverse j) (elt sequence i)))))
+      (setf (elt reverse j) (elt vector i)))))
 
-(defun list-reverse (sequence)
+;;-----------------------------------------------------------------------------
+(defun list-reverse (list)
   (let ((reverse nil))
-    (dolist (elem sequence)
+    (dolist (elem list)
       (setf reverse (cons elem reverse)))
     reverse))
 
@@ -342,39 +233,34 @@
   (typecase sequence
     (null nil)
     (cons (list-nreverse sequence))
-    (vector (vector-nreverse sequence))
-    (T (error WRONG_TYPE sequence 'SEQUENCE))))
+    (T (vector-nreverse sequence))))
 
-(defun vector-nreverse (sequence)
+;;-----------------------------------------------------------------------------
+(defun vector-nreverse (vector)
   (do ((i 0 (1+ i))
-       (j (1- (length sequence)) (1- j))
+       (j (1- (length vector)) (1- j))
        seq-elem-i)
-      ((>= i j) sequence)
-    (setq seq-elem-i (elt sequence i))
-    (setf (elt sequence i) (elt sequence j))
-    (setf (elt sequence j) seq-elem-i)))
+      ((>= i j) vector)
+    (setq seq-elem-i (elt vector i))
+    (setf (elt vector i) (elt vector j))
+    (setf (elt vector j) seq-elem-i)))
 
-(defun list-nreverse (sequence)
+;;-----------------------------------------------------------------------------
+(defun list-nreverse (list)
   (labels ((doit (head tail)
 	     (let ((rest (cdr tail)))
 	       (setf (cdr tail) head)
 	       (if (null rest)
 		   tail
 		   (doit tail rest)))))
-    (if (null sequence)
-	sequence
-	(doit nil sequence))))
+    (doit nil list)))
 
 ;;-----------------------------------------------------------------------------
 ;; MAKE-SEQUENCE type size &KEY :initial-element
 ;;-----------------------------------------------------------------------------
-
 ;; type ::= LIST |
 ;;          (SIMPLE-STRING size)              | (STRING size) |
 ;;          (SIMPLE-VECTOR element-type size) | (VECTOR element-type size)
-
-;; (declaim (lisp::fun-spec normalize-type :par-spec 1))
-
 ;;------------------------------------------------------------------------------
 (defun make-sequence (type size &key (initial-element nil init-elem-sp))
   (let ((result-type (normalize-type type))
@@ -430,6 +316,7 @@
     (apply #'concatenate-to-list sequences)
     (apply #'concatenate-to-non-list result-type sequences)))
 
+;;-----------------------------------------------------------------------------
 (defun concatenate-to-non-list (result-type &rest sequences)
   (let (new-sequence
         (size  0)
@@ -438,24 +325,24 @@
       (incf size (length sequence)))
     (setq new-sequence (make-sequence result-type size))
     (dolist (sequence sequences)
-      (if (listp sequence)
-          (dolist (elem sequence)
-            (setf (elt new-sequence index) elem)
-            (incf index))
-          (dotimes (i (length sequence))
-            (setf (elt new-sequence index)
-                  (elt sequence     i))
-            (incf index))))
+      (seq-dispatch sequence
+       (dolist (elem sequence)
+         (setf (elt new-sequence index) elem)
+         (incf index))
+       (dotimes (i (length sequence))
+         (setf (elt new-sequence index) (elt sequence i))
+         (incf index))))
     new-sequence))
 
+;;-----------------------------------------------------------------------------
 (defun concatenate-to-list (&rest sequences)
   (let ((new-sequence (empty-queue)))
     (dolist (sequence sequences)
-      (if (listp sequence)
-          (dolist (elem sequence)
-            (add-q elem new-sequence))
-          (dotimes (i (length sequence))
-            (add-q (elt sequence i) new-sequence))))
+      (seq-dispatch sequence
+       (dolist (elem sequence)
+         (add-q elem new-sequence))
+       (dotimes (i (length sequence))
+         (add-q (elt sequence i) new-sequence))))
     (queue2list new-sequence)))
 
 ;;------------------------------------------------------------------------------
@@ -465,11 +352,10 @@
   (setq more-sequences (cons sequence more-sequences))
   (let ((l (apply #'min (mapcar #'length more-sequences)))
         (i 0))
-    (declare (fixnum i l))
     (labels ((get-elem (rest-sequences)
-               (if (listp (car rest-sequences))
-                   (pop (car rest-sequences))
-                   (elt (car rest-sequences) i))))
+               (seq-dispatch (car rest-sequences)
+                             (pop (car rest-sequences))
+                             (elt (car rest-sequences) i))))
       (cond
         ((null result-type)
          (loop
@@ -499,11 +385,10 @@
   (setq more-sequences (cons sequence more-sequences))
   (let ((l (apply #'min (mapcar #'length more-sequences)))
         (i 0))
-    (declare (fixnum i l))
     (labels ((get-elem (rest-sequences)
-               (if (listp (car rest-sequences))
-                   (pop (car rest-sequences))
-                   (elt (car rest-sequences) i))))
+               (seq-dispatch (car rest-sequences)
+                             (pop (car rest-sequences))
+                             (elt (car rest-sequences) i))))
       (loop
        (when (>= i l) (return NIL))
        (let ((that-value
@@ -518,11 +403,10 @@
   (setq more-sequences (cons sequence more-sequences))
   (let ((l (apply #'min (mapcar #'length more-sequences)))
         (i 0))
-    (declare (fixnum i l))
     (labels ((get-elem (rest-sequences)
-               (if (listp (car rest-sequences))
-                   (pop (car rest-sequences))
-                   (elt (car rest-sequences) i))))
+               (seq-dispatch (car rest-sequences)
+                             (pop (car rest-sequences))
+                             (elt (car rest-sequences) i))))
       (loop
        (when (>= i l) (return T))
        (unless (apply predicate (maplist #'get-elem more-sequences))
@@ -544,11 +428,11 @@
 ;;-----------------------------------------------------------------------------
 ;; REDUCE function sequence &KEY :from-end :start :end :initial-value
 ;;-----------------------------------------------------------------------------
-(defun reduce (function sequence
-                        &key  from-end (start 0) end
+(defun reduce (function sequence &key
+                        from-end (start 0) (end most-positive-fixnum)
                         (initial-value nil init-val-sp))
   (let ((length (length sequence)))
-    (setq end (check-seq-start-end start end length))
+    (check-seq-end end length)
     (cond
       ((zerop length) (if init-val-sp
                           initial-value
@@ -574,18 +458,21 @@
 ;;-----------------------------------------------------------------------------
 ;; FILL sequence item &KEY :start :end
 ;;-----------------------------------------------------------------------------
-(defun fill (sequence item &key (start 0) end)
-  (setq end (check-seq-start-end start end (length sequence)))
-  (do ((i start (1+ i)))
-      ((>= i end) sequence)
-    (setf (elt sequence i) item)))
+(defun fill (sequence item &key (start 0) (end most-positive-fixnum))
+  (let ((length (length sequence)))
+    (check-seq-end end length)
+    (do ((i start (1+ i)))
+        ((>= i end) sequence)
+      (setf (elt sequence i) item))))
 
 ;;-----------------------------------------------------------------------------
 ;; REPLACE sequence1 sequence2 &KEY :start1 :end1 :start2 :end2
 ;;-----------------------------------------------------------------------------
-(defun replace (sequence1 sequence2 &key (start1 0) end1 (start2 0) end2)
-  (setq end1 (check-seq-start-end start1 end1 (length sequence1)))
-  (setq end2 (check-seq-start-end start2 end2 (length sequence2)))
+(defun replace (sequence1 sequence2 &key
+                          (start1 0) (end1 most-positive-fixnum)
+                          (start2 0) (end2 most-positive-fixnum))
+  (check-seq-end end1 (length sequence1))
+  (check-seq-end end2 (length sequence2))
   (let ((length (min (- end1 start1) (- end2 start2))))
     (if (and (eq sequence1 sequence2)
              (> start1 start2))
@@ -601,45 +488,36 @@
         (setf (elt sequence1 i1) (elt sequence2 i2)))))
   sequence1)
 
-;;------------------------------------------------------------------------------
-(defun matched-items (item sequence test start end key)
-  (do (matched-items
-       (i start (1+ i)))
-      ((>= i end) (reverse matched-items))
-    (when (funcall test item (funcall key (elt sequence i)))
-      (push i matched-items))))
-
 ;;-----------------------------------------------------------------------------
 ;; REMOVE item sequence &KEY :from-end :test :test-not :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun remove (item sequence &rest keys)
-  (typecase sequence
-    (null nil)
-    (cons (apply #'list-remove item sequence keys))
-    (vector (apply #'vector-remove item sequence keys))
-    (T (error WRONG_TYPE sequence 'SEQUENCE))))
+(defun remove (item sequence &key
+                    from-end test test-not (start 0)
+                    (end most-positive-fixnum) (count most-positive-fixnum)
+                    key)
+  (setq test (check-seq-test test test-not))
+  (seq-dispatch
+   sequence
+   (list-remove item sequence from-end test start end count key)
+   (vector-remove item sequence from-end test start end count key)))
 
-(defun list-remove (item sequence
-                         &key from-end test test-not (start 0) end count
-                         (key #'identity))
-  (let ((length (length sequence))
-        (matched-items (empty-queue))
+;;-----------------------------------------------------------------------------
+(defun list-remove (item sequence from-end test start end count key)
+  (let ((matched-items (empty-queue))
         (num-matched 0)
         (new-sequence (empty-queue)))
-    (setq test  (check-seq-test test test-not))
-    (setq end   (check-seq-start-end start end length))
-    (setq count (check-seq-count count length))
+    
     (let ((i 0))
       (dolist (elem sequence)
         (when (>= i end) (return))
-        (when (and (>= i start) (funcall test item (funcall key elem)))
+        (when (and (>= i start) (funcall test item (apply-key key elem)))
           (add-q i matched-items)
           (incf num-matched))
         (incf i)))
     (setq matched-items (queue2list matched-items))
     (if (not from-end)
         (do ((i 0 (1+ i)))
-            ((>= i length))
+            ((or (endp sequence) (>= i end)))
           (cond
             ((and (plusp count) (eql i (car matched-items)))
              (pop matched-items)
@@ -647,7 +525,7 @@
              (pop sequence))
             (t (add-q (pop sequence) new-sequence))))
         (do ((i 0 (1+ i)))
-            ((>= i length))
+            ((or (endp sequence) (>= i end)))
           (cond
             ((and (<= num-matched count) (eql i (car matched-items)))
              (pop matched-items)
@@ -658,19 +536,20 @@
                  (pop matched-items)
                  (decf num-matched))))))
     (queue2list new-sequence)))
-    
-(defun vector-remove (item sequence
-                           &key from-end test test-not (start 0) end count
-                           (key #'identity))
+
+;;-----------------------------------------------------------------------------
+(defun vector-remove (item sequence from-end test start end count key)
   (let ((length (length sequence))
-        matched-items
-        num-matched
+        (matched-items (empty-queue))
+        (num-matched 0)
         new-sequence)
-    (setq test  (check-seq-test test test-not))
-    (setq end   (check-seq-start-end start end length))
-    (setq count (check-seq-count count length))
-    (setq matched-items (matched-items item sequence test start end key))
-    (setq num-matched   (length matched-items))
+    (check-seq-end end length)
+    (do ((i start (1+ i)))
+        ((>= i end))
+      (when (funcall test item (apply-key key (elt sequence i)))
+        (add-q i matched-items)
+        (incf num-matched)))
+    (setq matched-items (queue2list matched-items))
     (setq new-sequence  (make-sequence (sequence-type sequence)
                                        (- length (min num-matched count))))
     (if (not from-end)
@@ -700,158 +579,407 @@
 ;;-----------------------------------------------------------------------------
 ;; REMOVE-IF predicate sequence &KEY :from-end :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun remove-if (predicate sequence &rest rest-args)
-  (apply #'remove nil sequence
-         :test #'(lambda (item seq-elem)
-                   (declare (ignore item))
-                   (funcall predicate seq-elem))
-         rest-args))
+(defun remove-if (predicate sequence &key
+                            from-end (start 0)
+                            (end most-positive-fixnum)
+                            (count most-positive-fixnum) key)
+  (remove nil sequence
+          :test #'(lambda (item seq-elem)
+                    (declare (ignore item))
+                    (funcall predicate seq-elem))
+          :from-end from-end :start start :end end :count count :key key))
 
 ;;-----------------------------------------------------------------------------
 ;; REMOVE-IF-NOT predicate sequence &KEY :from-end :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun remove-if-not (predicate sequence &rest rest-args)
-  (apply #'remove nil sequence
-         :test #'(lambda (item seq-elem)
-                   (declare (ignore item))
-                   (not (funcall predicate seq-elem)))
-         rest-args))
+(defun remove-if-not (predicate sequence &key
+                                from-end (start 0)
+                                (end most-positive-fixnum)
+                                (count most-positive-fixnum) key)
+  (remove nil sequence
+          :test #'(lambda (item seq-elem)
+                    (declare (ignore item))
+                    (not (funcall predicate seq-elem)))
+          :from-end from-end :start start :end end :count count :key key))
  
 ;;-----------------------------------------------------------------------------
 ;; DELETE item sequence &KEY :from-end :test :test-not :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun delete (item sequence &rest rest-args)
-  (apply #'remove item sequence rest-args))
+(defun delete (item sequence &key
+                    from-end test test-not (start 0) (end most-positive-fixnum)
+                    (count most-positive-fixnum) key)
+  (typecase sequence
+    (null nil)
+    (cons
+     (list-delete item sequence from-end test test-not start end count key))    
+    (T
+     (setq test (check-seq-test test test-not))
+     (vector-remove item sequence from-end test start end count key))))
 
+;;-----------------------------------------------------------------------------
+(defun list-delete (item list from-end test test-not start end count key)
+  (cond
+    ((or from-end test test-not start end key)
+     (setq test (check-seq-test test test-not))
+     (list-remove item list from-end test start end count key))
+    (t (loop
+        (when (or (null list) (zerop count))
+          (return-from list-delete list))
+        (cond
+          ((eql item (car list))
+           (setf list (cdr list))
+           (decf count))
+          (t (return))))
+       (let ((l1 list) (l2 (cdr list)))
+         (loop
+          (when (or (null l2) (zerop count))
+            (return-from list-delete list))
+          (cond
+            ((eql item (car l2))
+             (setq l2 (cdr l2))
+             (setf (cdr l1) l2)
+             (decf count))
+            (t (setq l1 l2 l2 (cdr l2)))))))))
+      
 ;;-----------------------------------------------------------------------------
 ;; DELETE-IF predicate sequence &KEY :from-end :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun delete-if (predicate sequence &rest rest-args)
-  (apply #'delete nil sequence
-         :test #'(lambda (item seq-elem)
-                   (declare (ignore item))
-                   (funcall predicate seq-elem))
-         rest-args))
+(defun delete-if (predicate sequence &key
+                            from-end (start 0)
+                            (end most-positive-fixnum)
+                            (count most-positive-fixnum) key)
+  (delete nil sequence
+          :test #'(lambda (item seq-elem)
+                    (declare (ignore item))
+                    (funcall predicate seq-elem))
+          :from-end from-end :start start :end end :count count :key key))
 
 ;;-----------------------------------------------------------------------------
 ;; DELETE-IF-NOT predicate sequence &KEY :from-end :start :end :count :key
 ;;-----------------------------------------------------------------------------
-(defun delete-if-not (predicate sequence &rest rest-args)
-  (apply #'delete nil sequence
-         :test #'(lambda (item seq-elem)
-                   (declare (ignore item))
-                   (not (funcall predicate seq-elem)))
-         rest-args))
+(defun delete-if-not (predicate sequence &key
+                                from-end (start 0)
+                                (end most-positive-fixnum)
+                                (count most-positive-fixnum) key)
+  (delete nil sequence
+          :test #'(lambda (item seq-elem)
+                    (declare (ignore item))
+                    (not (funcall predicate seq-elem)))
+          :from-end from-end :start start :end end :count count :key key))
 
 ;;-----------------------------------------------------------------------------
 ;; REMOVE-DUPLICATES sequence &KEY :from-end :test :test-not :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun remove-duplicates (sequence
-                          &key from-end test test-not (start 0) end
-                          (key #'identity))
-  (let ((length (length sequence))
-        new-sequence
-        new-length
-        without-duplicates)
-    
-    (setq test (check-seq-test test test-not))
-    (setq end (check-seq-start-end start end length))
+(defun remove-duplicates (sequence &key
+                                   from-end test test-not (start 0)
+                                   (end most-positive-fixnum)
+                                   key)
+  (setq test (check-seq-test test test-not))
+  (seq-dispatch
+   sequence
+   (list-remove-duplicates sequence from-end test start end key)
+   (vector-remove-duplicates sequence from-end test start end key)))
 
-    (if (not from-end)
-      (do ((i start (1+ i)))
-          ((>= i end)
-           (setq without-duplicates (reverse without-duplicates)))
-        (do ((j (1+ i) (1+ j)))
-            ((>= j end)
-             (push (elt sequence i) without-duplicates))
-          (when (funcall test (funcall key (elt sequence i))
-                         (funcall key (elt sequence j)))
-            (return))))
-      (do ((i (1- end) (1- i)))
-          ((< i start))
-        (do ((j (1- i) (1- j)))
-            ((< j start)
-             (push (elt sequence i) without-duplicates))
-          (when (funcall test (funcall key (elt sequence i))
-                         (funcall key (elt sequence j)))
-            (return)))))
+;;-----------------------------------------------------------------------------
+;; CMU-CL Code
+;; Remove duplicates from a list. If from-end, remove the later duplicates,
+;; not the earlier ones. Thus if we check from-end we don't copy an item
+;; if we look into the already copied structure (from after :start) and see
+;; the item. If we check from beginning we check into the rest of the 
+;; original list up to the :end marker (this we have to do by running a
+;; do loop down the list that far and using our test.
+;;-----------------------------------------------------------------------------
+(defun list-remove-duplicates (list from-end test start end key)
+  (let* ((result (list ())) ; Put a marker on the beginning to splice with.
+	 (splice result)
+	 (current list))
+    (do ((index 0 (1+ index)))
+	((= index start))
+      (setq splice (cdr (rplacd splice (list (car current)))))
+      (setq current (cdr current)))
+    (do ((index 0 (1+ index)))
+	((or (endp current) (>= index end)))
+      (when (or (and from-end 
+                     (not (member (apply-key key (car current))
+                                  (nthcdr (1+ start) result)
+                                  :test test
+                                  :key key)))
+                (and (not from-end)
+                     (not (do ((it (apply-key key (car current)))
+                               (l (cdr current) (cdr l))
+                               (i (1+ index) (1+ i)))
+                              ((or (endp l) (>= i end))
+                               ())
+                            (if (funcall test (apply-key key (car l)) it)
+                                (return t))))))
+	  (setq splice (cdr (rplacd splice (list (car current))))))
+      (setq current (cdr current)))
+    (do ()
+	((atom current))
+      (setq splice (cdr (rplacd splice (list (car current)))))
+      (setq current (cdr current)))
+    (cdr result)))
 
-    (setq new-length (+ start (length without-duplicates) (- length end)))
-    (setq new-sequence
-          (make-sequence (sequence-type sequence)
-                         new-length))
-    (let ((i 0) (j end))
-      (loop
-        (when (>= i start) (return))
-        (setf (elt new-sequence i) (elt sequence i))
-        (incf i))
-      (loop
-        (when (null without-duplicates) (return))
-        (setf (elt new-sequence i) (pop without-duplicates))
-        (incf i))
-      (loop
-        (when (>= i new-length) (return))
-        (setf (elt new-sequence i) (elt sequence j))
-        (incf i)
-        (incf j)))
-    new-sequence))
+;;-----------------------------------------------------------------------------
+;; CMU-CL Code
+;;-----------------------------------------------------------------------------
+(defun vector-remove-duplicates (vector from-end test start end key
+                                        &aux (length (length vector)))
+  (check-seq-end end length)
+  (let ((result (make-array length :element-type (array-element-type vector)))
+	(index 0)
+	(jndex start))
+    (do ()
+	((= index start))
+      (setf (aref result index) (aref vector index))
+      (setq index (1+ index)))
+    (do ((elt))
+	((= index end))
+      (setq elt (aref vector index))
+      (unless (or (and from-end
+		        (position (apply-key key elt) result :start start
+			   :end jndex :test test :key key))
+		  (and (not from-end)
+		        (position (apply-key key elt) vector :start (1+ index)
+			   :end end :test test :key key)))
+	(setf (aref result jndex) elt)
+	(setq jndex (1+ jndex)))
+      (setq index (1+ index)))
+    (do ()
+	((= index length))
+      (setf (aref result jndex) (aref vector index))
+      (setq index (1+ index))
+      (setq jndex (1+ jndex)))
+    (rt::shrink-pvector result jndex)))
 
 ;;-----------------------------------------------------------------------------
 ;; DELETE-DUPLICATES sequence &KEY :from-end :test :test-not :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun delete-duplicates (sequence &rest rest-args)
-  (apply #'remove-duplicates sequence rest-args))
+(defun delete-duplicates (sequence &key
+                                   from-end test test-not (start 0)
+                                   (end most-positive-fixnum)
+                                   key)
+  (remove-duplicates sequence
+                     :from-end from-end :test test :test-not test-not
+                     :start start :end end :key key))
+
+;;------------------------------------------------------------------------------
+;; SUBSTITUTE newitem olditem sequence &KEY :from-end :test :test-not :start
+;;   :end :count :key
+;;------------------------------------------------------------------------------
+(defun substitute (new old sequence &key
+                       from-end test test-not
+                       (start 0) (end most-positive-fixnum)
+                       (count most-positive-fixnum) key)
+  (setq test (check-seq-test test test-not))
+  (let ((length (length sequence)))
+    (check-seq-end end length)
+    
+    (seq-dispatch
+     sequence
+     (if from-end
+         (nreverse (list-substitute new old (reverse sequence) test
+                                    (- length end) (- length start)
+                                    count key))
+         (list-substitute new old sequence test start end count key))
+     (if from-end
+         (vector-substitute new old sequence  test -1 (1- length)
+                            -1 length (1- end) (1- start) count key)
+         (vector-substitute new old sequence test 1 0 length length
+                            start end count key)))))
+
+;;------------------------------------------------------------------------------
+(defun list-substitute (new old list test start end count key)
+  (let* ((result (list nil))
+	 elt
+	 (splice result)
+	 (list list))                   ; Get a local list for a stepper.
+    (do ((index 0 (1+ index)))
+	((= index start))
+      (setq splice (cdr (rplacd splice (list (car list)))))
+      (setq list (cdr list)))
+    (do ((index start (1+ index)))
+	((or (= index end) (null list) (= count 0)))
+      (setq elt (car list))
+      (setq splice
+	    (cdr (rplacd splice
+                         (list (cond
+                                 ((funcall test old (apply-key key elt))
+                                  (setq count (1- count))
+                                  new)
+                                 (t elt))))))
+      (setq list (cdr list)))
+    (do ()
+	((null list))
+      (setq splice (cdr (rplacd splice (list (car list)))))
+      (setq list (cdr list)))
+    (cdr result)))
+
+;;------------------------------------------------------------------------------
+(defun vector-substitute (new old sequence  test incrementer left right length
+                              start end count key)
+  (let ((result (make-array length :element-type (array-element-type sequence)))
+	(index left))
+    (do ()
+	((= index start))
+      (setf (aref result index) (aref sequence index))
+      (setq index (+ index incrementer)))
+    (do ((elt))
+	((or (= index end) (= count 0)))
+      (setq elt (aref sequence index))
+      (setf (aref result index) 
+	    (cond ((funcall test old (apply-key key elt))
+		   (setq count (1- count))
+		   new)
+		  (t elt)))
+      (setq index (+ index incrementer)))
+    (do ()
+	((= index right))
+      (setf (aref result index) (aref sequence index))
+      (setq index (+ index incrementer)))
+    result))
+
+;;-----------------------------------------------------------------------------
+;; SUBSTITUTE-IF newitem test sequence &KEY :from-end :start :end :count :key
+;;-----------------------------------------------------------------------------
+(defun substitute-if (new predicate sequence &key
+                          from-end (start 0) (end most-positive-fixnum)
+                          (count most-positive-fixnum) key)
+  (substitute new nil sequence
+              :test #'(lambda (item seq-elem)
+                        (declare (ignore item))
+                        (funcall predicate seq-elem))
+              :from-end from-end :start start :end end :count count :key key))
+
+;;-----------------------------------------------------------------------------
+;; SUBSTITUTE-IF-NOT newitem test sequence &KEY
+;;    :from-end :start :end :count :key
+;;-----------------------------------------------------------------------------
+(defun substitute-if-not (new predicate sequence &key
+                              from-end (start 0) (end most-positive-fixnum)
+                              (count most-positive-fixnum) key)
+  (substitute new nil sequence
+              :test #'(lambda (item seq-elem)
+                        (declare (ignore item))
+                        (not (funcall predicate seq-elem)))
+              :from-end from-end :start start :end end :count count :key key))
+
+;;------------------------------------------------------------------------------
+;; NSUBSTITUTE newitem olditem sequence &KEY :from-end :test :test-not :start
+;;   :end :count :key
+;;------------------------------------------------------------------------------
+(defun nsubstitute (new old sequence &key
+                        from-end test test-not (start 0)
+                        (end most-positive-fixnum) (count most-positive-fixnum)
+                        key)
+  (setq test (check-seq-test test test-not))
+  (seq-dispatch
+   sequence
+   (if from-end
+       (nreverse
+        (nlist-substitute
+         new old (nreverse sequence) test start end count key))
+       (nlist-substitute new old sequence test start end count key))
+   (progn
+     (check-seq-end end (length sequence))
+     (if from-end
+         (nvector-substitute new old sequence -1
+                             test (1- end) (1- start) count key)
+         (nvector-substitute new old sequence 1 test start end count key)))))
+
+;;------------------------------------------------------------------------------
+(defun nlist-substitute (new old sequence test start end count key)
+  (do ((list (nthcdr start sequence) (cdr list))
+       (index start (1+ index)))
+      ((or (endp list) (= index end) (= count 0)) sequence)
+    (when (funcall test old (apply-key key (car list)))
+      (rplaca list new)
+      (setq count (1- count)))))
+
+;;------------------------------------------------------------------------------
+(defun nvector-substitute (new old sequence incrementer
+                               test start end count key)
+  (do ((index start (+ index incrementer)))
+      ((or (= index end) (= count 0)) sequence)
+    (when (funcall test old (apply-key key (aref sequence index)))
+      (setf (aref sequence index) new)
+      (setq count (1- count)))))
+
+;;-----------------------------------------------------------------------------
+;; NSUBSTITUTE-IF newitem test sequence &KEY :from-end :start :end :count :key
+;;-----------------------------------------------------------------------------
+(defun nsubstitute-if (new predicate sequence &key
+                           from-end (start 0) (end most-positive-fixnum)
+                           (count most-positive-fixnum) key)
+  (nsubstitute new nil sequence
+               :test #'(lambda (item seq-elem)
+                         (declare (ignore item))
+                         (funcall predicate seq-elem))
+               :from-end from-end :start start :end end :count count :key key))
+
+;;-----------------------------------------------------------------------------
+;; NSUBSTITUTE-IF-NOT newitem test sequence &KEY
+;;    :from-end :start :end :count :key
+;;-----------------------------------------------------------------------------
+(defun nsubstitute-if-not (new predicate sequence &key
+                                   from-end (start 0) (end most-positive-fixnum)
+                                   (count most-positive-fixnum)
+                                   key)
+  (nsubstitute new nil sequence
+               :test #'(lambda (item seq-elem)
+                         (declare (ignore item))
+                         (not (funcall predicate seq-elem)))
+               :from-end from-end :start start :end end :count count :key key))
 
 ;;-----------------------------------------------------------------------------
 ;; FIND item sequence &KEY :from-end :test :test-not :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun find (item sequence &rest keys)
-  (typecase sequence
-    (null nil)
-    (cons (apply #'list-find item sequence keys))
-    (vector (apply #'vector-find item sequence keys))
-    (T (error WRONG_TYPE sequence 'SEQUENCE))))
+(defun find (item sequence &key
+                  from-end test test-not (start 0)
+                  (end most-positive-fixnum) key)
+  (seq-dispatch
+   sequence
+   (list-find item sequence from-end test test-not start end key)
+   (vector-find  item sequence from-end test test-not start end key)))
 
-(defun vector-find (item vector
-                         &key from-end test test-not (start 0) end
-                         (key #'identity))
+;;-----------------------------------------------------------------------------
+(defun vector-find (item vector from-end test test-not start end key)
   (setq test (check-seq-test test test-not))
-  (setq end  (check-seq-start-end start end (length vector)))
+  (check-seq-end end (length vector))
   (if (not from-end)
       (do ((i start (1+ i)))
           ((>= i end) nil)
         (let ((elem (elt vector i)))
-          (when (funcall test item (funcall key elem)) (return elem))))
+          (when (funcall test item (apply-key key elem)) (return elem))))
       (do ((i (1- end) (1- i)))
           ((< i start) nil)
         (let ((elem (elt vector i)))
-          (when (funcall test item (funcall key elem)) (return elem))))))
+          (when (funcall test item (apply-key key elem)) (return elem))))))
 
-(defun list-find (item
-                  list
-                  &key from-end test test-not (start 0) end (key #'identity))
+;;-----------------------------------------------------------------------------
+(defun list-find (item list from-end test test-not start end key)
+  (setq test (check-seq-test test test-not))
   (let ((i start)
-        (result nil)
-        (length (length list)))
-    (setq test (check-seq-test test test-not))
-    (setq end  (check-seq-start-end start end length))
-    (when from-end (decf end))
+        (result nil))
     (dolist (elem (nthcdr start list))
-      (when (funcall test item (funcall key elem)) (if from-end
-                                                       (setf result elem)
-                                                       (return elem)))
-      (when (= i end) (return result))      
-      (incf i))))
+      (when (>= i end) (return))
+      (when (funcall test item (apply-key key elem))
+        (setf result elem)
+        (unless from-end (return)))
+      (incf i))
+    result))
 
 ;;-----------------------------------------------------------------------------
 ;; FIND-IF predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun find-if (predicate sequence &rest rest-args)
-  (apply #'find nil sequence
-         :test #'(lambda (item seq-elem)
-                   (declare (ignore item))
-                   (funcall predicate seq-elem))
-         rest-args))
+(defun find-if (predicate sequence &key
+                          from-end (start 0)
+                          (end most-positive-fixnum) key)
+  (find nil sequence
+        :test #'(lambda (item seq-elem)
+                  (declare (ignore item))
+                  (funcall predicate seq-elem))
+        :from-end from-end :start start :end end :key key))
 
 ;;-----------------------------------------------------------------------------
 ;; FIND-IF-NOT predicate sequence &KEY :from-end :start :end :key
@@ -866,231 +994,299 @@
 ;;-----------------------------------------------------------------------------
 ;; POSITION item sequence &KEY :from-end :test :test-not :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun position (item sequence &rest keys)
-  (typecase sequence
-    (null nil)
-    (cons (apply #'list-position item sequence keys))
-    (vector (apply #'vector-position item sequence keys))
-    (T (error WRONG_TYPE sequence 'SEQUENCE))))
+(defun position (item sequence &key
+                      from-end test test-not (start 0)
+                      (end most-positive-fixnum) key)
+  (seq-dispatch
+   sequence
+   (list-position item sequence from-end test test-not start end key)
+   (vector-position item sequence from-end test test-not start end key)))
 
-(defun vector-position (item sequence
-                             &key from-end test test-not (start 0) end
-                             (key #'identity))
+;;-----------------------------------------------------------------------------
+(defun vector-position (item sequence from-end test test-not start end key)
   (setq test (check-seq-test test test-not))
-  (setq end  (check-seq-start-end start end (length sequence)))
+  (check-seq-end end (length sequence))
 
   (if (not from-end)
     (do ((i start (1+ i)))
         ((>= i end) nil)
-      (when (funcall test item (funcall key (elt sequence i)))
+      (when (funcall test item (apply-key key (elt sequence i)))
         (return i)))
     (do ((i (1- end) (1- i)))
         ((< i start) nil)
-      (when (funcall test item (funcall key (elt sequence i)))
+      (when (funcall test item (apply-key key (elt sequence i)))
         (return i)))))
 
-(defun list-position (item list
-                           &key from-end test test-not (start 0) end
-                           (key #'identity))
+;;-----------------------------------------------------------------------------
+(defun list-position (item list from-end test test-not start end key)
   (let ((i start)
-        (result nil)
-        (length (length list)))
+        (result nil))
     (setq test (check-seq-test test test-not))
-    (setq end  (check-seq-start-end start end length))
-    (when from-end (decf end))
     (dolist (elem (nthcdr start list))
-      (when (funcall test item (funcall key elem)) (if from-end
-                                                       (setf result i)
-                                                       (return i)))
-      (when (= i end) (return result))      
-      (incf i))))
+      (when (>= i end) (return))
+      (when (funcall test item (apply-key key elem))
+        (setf result i)
+        (unless from-end (return)))
+      (incf i))
+    result))
 
 ;;-----------------------------------------------------------------------------
 ;; POSITION-IF predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun position-if (predicate sequence &rest rest-args)
-  (apply #'position nil sequence
-         :test #'(lambda (item seq-elem)
-                   (declare (ignore item))
-                   (funcall predicate seq-elem))
-         rest-args))
+(defun position-if (predicate sequence &key
+                              from-end (start 0)
+                              (end most-positive-fixnum) key)
+  (position nil sequence
+            :test #'(lambda (item seq-elem)
+                      (declare (ignore item))
+                      (funcall predicate seq-elem))
+            :from-end from-end :start start :end end :key key))
 
 ;;-----------------------------------------------------------------------------
 ;; POSITION-IF-NOT predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun position-if-not (predicate sequence &rest rest-args)
-  (apply #'position nil sequence
-         :test #'(lambda (item seq-elem)
-                   (declare (ignore item))
-                   (not (funcall predicate seq-elem)))
-         rest-args))
+(defun position-if-not (predicate sequence &key
+                                  from-end (start 0)
+                                  (end most-positive-fixnum) key)
+  (position nil sequence
+            :test #'(lambda (item seq-elem)
+                      (declare (ignore item))
+                      (not (funcall predicate seq-elem)))
+            :from-end from-end :start start :end end :key key))
 
 ;;-----------------------------------------------------------------------------
 ;; COUNT item sequence &KEY :from-end :test :test-not :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun count (item sequence
-                   &key from-end test test-not (start 0) end (key #'identity))
+(defun count (item sequence &key
+                   from-end test test-not (start 0)
+                   (end most-positive-fixnum) key)
   (declare (ignore from-end))
   (setq test (check-seq-test test test-not))
-  (setq end  (check-seq-start-end start end (length sequence)))
+  (seq-dispatch
+   sequence
+   (list-count item sequence test start end key)
+   (vector-count item sequence test start end key)))
 
+;;-----------------------------------------------------------------------------
+(defun list-count (item list test start end key)
+  (decf end start)
+  (let ((count 0))
+    (dolist (elem (nthcdr start list))
+      (when (>= 0 end) (return))
+      (when (funcall test item (apply-key key elem))
+        (incf count))
+      (decf end))
+    count))
+
+;;-----------------------------------------------------------------------------
+(defun vector-count (item vector test start end key)
+  (check-seq-end end (length vector))
   (let ((count 0))
     (do ((i start (1+ i)))
-        ((>= i end) nil)
-      (when (funcall test item (funcall key (elt sequence i)))
+        ((>= i end))
+      (when (funcall test item (apply-key key (elt vector i)))
         (incf count)))
     count))
 
 ;;-----------------------------------------------------------------------------
 ;; COUNT-IF predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun count-if (predicate sequence &rest rest-args)
-  (apply #'count nil sequence
+(defun count-if (predicate sequence &key
+                           from-end (start 0)
+                           (end most-positive-fixnum) key)
+  (count nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
                    (funcall predicate seq-elem))
-         rest-args))
+         :from-end from-end :start start :end end :key key))
 
 ;;-----------------------------------------------------------------------------
 ;; COUNT-IF-NOT predicate sequence &KEY :from-end :start :end :key
 ;;-----------------------------------------------------------------------------
-(defun count-if-not (predicate sequence &rest rest-args)
-  (apply #'count nil sequence
+(defun count-if-not (predicate sequence &key
+                               from-end (start 0)
+                               (end most-positive-fixnum) key)
+  (count nil sequence
          :test #'(lambda (item seq-elem)
                    (declare (ignore item))
                    (not (funcall predicate seq-elem)))
-         rest-args))
+         :from-end from-end :start start :end end :key key))
+
+;;------------------------------------------------------------------------------
+;; MISMATCH utilities, CMU-CL code
+;;------------------------------------------------------------------------------
+(defmacro matchify-list (sequence start length end)
+  `(setq ,sequence
+    (if from-end
+        (nthcdr (- ,length ,start 1) (reverse ,sequence))
+        (nthcdr ,start ,sequence))))
+
+;;------------------------------------------------------------------------------
+(defmacro if-mismatch (elt1 elt2)
+  `(cond ((= index1 end1)
+	  (return (if (= index2 end2)
+		      nil
+		      (if from-end (1+ index1) index1))))
+	 ((= index2 end2)
+	  (return (if from-end (1+ index1) index1)))
+	 (t (if (not (funcall test (apply-key key ,elt1) (apply-key key ,elt2)))
+		(return (if from-end (1+ index1) index1))))))
+
+;;------------------------------------------------------------------------------
+(defmacro mumble-mumble-mismatch ()
+  `(do ((index1 start1 (+ index1 inc))
+	(index2 start2 (+ index2 inc)))
+       (())
+     (if-mismatch (aref sequence1 index1) (aref sequence2 index2))))
+
+;;------------------------------------------------------------------------------
+(defmacro mumble-list-mismatch ()
+  `(do ((index1 start1 (+ index1 inc))
+	(index2 start2 (+ index2 inc)))
+       (())
+     (if-mismatch (aref sequence1 index1) (pop sequence2))))
+
+;;------------------------------------------------------------------------------
+(defmacro list-mumble-mismatch ()
+  `(do ((index1 start1 (+ index1 inc))
+	(index2 start2 (+ index2 inc)))
+       (())
+     (if-mismatch (pop sequence1) (aref sequence2 index2))))
+
+;;------------------------------------------------------------------------------
+(defmacro list-list-mismatch ()
+  `(do ((index1 start1 (+ index1 inc))
+	(index2 start2 (+ index2 inc)))
+    (())
+    (if-mismatch (pop sequence1) (pop sequence2))))
 
 ;;------------------------------------------------------------------------------
 ;; MISMATCH sequence1 sequence2 &KEY :from-end :test :test-not
 ;;          :key :start1 :start2 :end1 :end2
 ;;------------------------------------------------------------------------------
-(defun mismatch (sequence1 sequence2 
-                 &key from-end test test-not (key #'identity)
-                      (start1 0) (start2 0) end1 end2)
-  (setq test (check-seq-test test test-not))
-  (setq end1  (check-seq-start-end start1 end1 (length sequence1)))
-  (setq end2  (check-seq-start-end start2 end2 (length sequence2)))
+(defun mismatch (sequence1 sequence2 &key from-end test test-not 
+			   (start1 0) end1 (start2 0) end2 key)
+  (let ((length1 (length sequence1))
+	(length2 (length sequence2)))
+    (when (null end1) (setf end1 length1))
+    (when (null end2) (setf end2 length2))
+    (setq test (check-seq-test test test-not))
+    (let ((inc (if from-end -1 1))
+          (start1 (if from-end (1- end1) start1))
+          (start2 (if from-end (1- end2) start2))
+          (end1 (if from-end (1- start1) end1))
+          (end2 (if from-end (1- start2) end2)))
+      (cond
+        ((listp sequence1)
+         (matchify-list sequence1 start1 length1 end1)
+         (cond
+           ((listp sequence2)
+            (matchify-list sequence2 start2 length2 end2)
+            (list-list-mismatch))
+           (T (list-mumble-mismatch))))
+        ((listp sequence2)
+         (matchify-list sequence2 start2 length2 end2)
+         (mumble-list-mismatch))
+        (T (mumble-mumble-mismatch))))))
 
-  (block testing-sequences
-    (if from-end
-          
-        ;; von rechts nach links
-        ;;----------------------
-        (do ((i1 (1- end1) (1- i1))
-             (i2 (1- end2) (1- i2)))
-            ((or (<= i1 start1) (<= i2 start2)) nil)
-          (unless (funcall test 
-                           (funcall key (elt sequence1 i1))
-                           (funcall key (elt sequence2 i2)))
-            (return-from testing-sequences (1+ i1))))
-        
-      ;; von links nach rechts
-      ;;----------------------
-      (do ((i1 start1 (1+ i1))
-           (i2 start2 (1+ i2)))
-          ((or (>= i1 end1) (>= i2 end2)) nil)
-        (unless (funcall test 
-                         (funcall key (elt sequence1 i1))
-                         (funcall key (elt sequence2 i2)))
-          (return-from testing-sequences i1))))
-    nil))
+;;------------------------------------------------------------------------------
+;; SEARCH utilities, CMU-CL code
+;;------------------------------------------------------------------------------
+(defmacro compare-elements (elt1 elt2)
+  `(if test-not
+       (if (funcall test-not (apply-key key ,elt1) (apply-key key ,elt2))
+	   (return nil)
+	   t)
+       (if (not (funcall test (apply-key key ,elt1) (apply-key key ,elt2)))
+	   (return nil)
+	   t)))
+
+;;------------------------------------------------------------------------------
+(defmacro search-compare-list-list (main sub)
+  `(do ((main ,main (cdr main))
+	(jndex start1 (1+ jndex))
+	(sub (nthcdr start1 ,sub) (cdr sub)))
+       ((or (null main) (null sub) (= end1 jndex)) t)
+     (compare-elements (car main) (car sub))))
+
+;;------------------------------------------------------------------------------
+(defmacro search-compare-list-vector (main sub)
+  `(do ((main ,main (cdr main))
+	(index start1 (1+ index)))
+       ((or (null main) (= index end1)) t)
+     (compare-elements (car main) (aref ,sub index))))
+
+;;------------------------------------------------------------------------------
+(defmacro search-compare-vector-list (main sub index)
+  `(do ((sub (nthcdr start1 ,sub) (cdr sub))
+	(jndex start1 (1+ jndex))
+	(index ,index (1+ index)))
+       ((or (= end1 jndex) (null sub)) t)
+     (compare-elements (aref ,main index) (car sub))))
+
+;;------------------------------------------------------------------------------
+(defmacro search-compare-vector-vector (main sub index)
+  `(do ((index ,index (1+ index))
+	(sub-index start1 (1+ sub-index)))
+       ((= sub-index end1) t)
+     (compare-elements (aref ,main index) (aref ,sub sub-index))))
+
+;;------------------------------------------------------------------------------
+(defmacro search-compare (main-type main sub index)
+  (if (eq main-type 'list)
+      `(seq-dispatch ,sub
+        (search-compare-list-list ,main ,sub)
+        (search-compare-list-vector ,main ,sub))
+      `(seq-dispatch ,sub
+        (search-compare-vector-list ,main ,sub ,index)
+        (search-compare-vector-vector ,main ,sub ,index))))
+ 
+;;------------------------------------------------------------------------------
+(defmacro list-search (main sub)
+  `(do ((main (nthcdr start2 ,main) (cdr main))
+	(index2 start2 (1+ index2))
+	(terminus (- (the fixnum end2)
+		     (the fixnum (- (the fixnum end1)
+				    (the fixnum start1)))))
+	(last-match ()))
+       ((> index2 terminus) last-match)
+     (declare (fixnum index2 terminus))
+     (if (search-compare list main ,sub index2)
+	 (if from-end
+	     (setq last-match index2)
+	     (return index2)))))
+
+;;------------------------------------------------------------------------------
+(defmacro vector-search (main sub)
+  `(do ((index2 start2 (1+ index2))
+	(terminus (- end2 (- end1 start1)))
+	(last-match ()))
+    ((> index2 terminus) last-match)
+    (if (search-compare vector ,main ,sub index2)
+        (if from-end
+            (setq last-match index2)
+            (return index2)))))
 
 ;;------------------------------------------------------------------------------
 ;; SEARCH sequence1 sequence2 &KEY :from-end :test :test-not
 ;;        :key :start1 :start2 :end1 :end2
 ;;------------------------------------------------------------------------------
-(defun search (sequence1 sequence2 
-               &key from-end test test-not (key #'identity)
-                    (start1 0) (start2 0) end1 end2)
-  
-  (setq test (check-seq-test test test-not))
-  (setq end1  (check-seq-start-end start1 end1 (length sequence1)))
-  (setq end2  (check-seq-start-end start2 end2 (length sequence2)))
-  
-  (let ((first1 (if from-end
-                    (funcall key (elt sequence1 (1- end1)))
-                  (funcall key (elt sequence1 start1)))))
-    (block testing-sequences
-      (if from-end
-          
-          ;; von rechts nach links
-          ;;----------------------
-          (do ((i (1- end2) (1- i)))
-              ((<= i start2) nil)
-            (block testing-subsequences
-              (when (funcall test first1 (funcall key (elt sequence2 i)))
-                (do ((i1 (- 2 end1) (1- i1))
-                     (i2 (1- i) (1- i2)))
-                    ((or (<= i1 start1) (<= i2 start2)) nil)
-                  (unless (funcall test 
-                                   (funcall key (elt sequence1 i1))
-                                   (funcall key (elt sequence2 i2)))
-                    (setf i (1+ i2))
-                    (return-from testing-subsequences nil)))
-                (return-from testing-sequences (- (1+ i) (- end1 start1))))))
-        
-        ;; von links nach rechts
-        ;;----------------------
-        (do ((i start2 (1+ i)))
-              ((>= i end2) nil)
-            (block testing-subsequences
-              (when (funcall test first1 (funcall key (elt sequence2 i)))
-                (do ((i1 (1+ start1) (1+ i1))
-                     (i2 (1+ i) (1+ i2)))
-                    ((or (>= i1 end1) (>= i2 end2)) nil)
-                  (unless (funcall test 
-                                   (funcall key (elt sequence1 i1))
-                                   (funcall key (elt sequence2 i2)))
-                    (setf i (1- i2))
-                    (return-from testing-subsequences nil)))
-                (return-from testing-sequences i)))))
-      nil)))
-
-;;------------------------------------------------------------------------------
-;; SUBSTITUTE newitem olditem sequence &KEY :from-end :test :test-not :start
-;;   :end :cout :key
-;;------------------------------------------------------------------------------
-(defun substitute (newitem olditem sequence &key from-end test test-not
-                           (start 0) end count (key #'identity))
-  (let ((length (length sequence)))
-    (setq test (check-seq-test test test-not))
-    (setq end  (check-seq-start-end start end length))
-    (setq count (check-seq-count count length))
-  
-    (if (not from-end)
-        (do ((newseq (make-sequence (sequence-type sequence) length))
-             (i 0 (1+ i))
-             (k 0))
-            ((>= i length) newseq)
-          (cond ((and (<= start i) (< i end) (< k count) 
-                      (funcall test olditem 
-                               (funcall key (elt sequence i))))
-                 (setf (elt newseq i) newitem)
-                 (incf k))
-                (t (setf (elt newseq i) (elt sequence i)))))
-
-        (do ((newseq (make-sequence (sequence-type sequence) length))
-             (i (1- length) (1- i))
-             (k 0))
-            ((< i 0) newseq)
-          (cond ((and (<= start i) (< i end) (< k count) 
-                      (funcall test olditem 
-                               (funcall key (elt sequence i))))
-                 (setf (elt newseq i) newitem)
-                 (incf k))
-                (t (setf (elt newseq i) (elt sequence i))))))))
-          
-
-
+(defun search (sequence1 sequence2 &key from-end (test #'eql) test-not 
+		(start1 0) end1 (start2 0) end2 key)
+  (when (null end1) (setf end1 (length sequence1)))
+  (when (null end2) (setf end2 (length sequence2)))
+  (seq-dispatch sequence2
+    (list-search sequence2 sequence1)
+    (vector-search sequence2 sequence1)))
 
 ;;-----------------------------------------------------------------------------
 ;; SORT sequence predicate &KEY :key
 ;;-----------------------------------------------------------------------------
-(defun sort (sequence predicate &key (key #'identity))
-  (if (listp sequence)
-    (list-merge-sort sequence predicate key)
-    (quick-sort sequence 0 (length sequence) predicate key)))
+(defun sort (sequence predicate &key key)
+  (seq-dispatch
+   sequence
+   (list-merge-sort sequence predicate key)
+   (quick-sort sequence 0 (length sequence) predicate key)))
 
 ;;------------------------------------------------------------------------------
 (defun list-merge-sort (l predicate key)
@@ -1100,8 +1296,8 @@
                left right l0 l1 key-left key-right)
            (cond ((< i 2) l)
                  ((= i 2)
-                  (setq key-left (funcall key (car l)))
-                  (setq key-right (funcall key (cadr l)))
+                  (setq key-left (apply-key key (car l)))
+                  (setq key-right (apply-key key (cadr l)))
                   (if (or (funcall predicate key-left key-right)
                           (not (funcall predicate key-right key-left)))
                       l
@@ -1118,8 +1314,8 @@
                           ((endp right) left)
                           (t (setq l0 (cons nil nil))
                              (setq l1 l0)
-                             (setq key-left (funcall key (car left)))
-                             (setq key-right (funcall key (car right)))
+                             (setq key-left (apply-key key (car left)))
+                             (setq key-right (apply-key key (car right)))
 
                              (loop
                                (cond
@@ -1133,7 +1329,7 @@
                                   (when (endp left)
                                     (rplacd l1 right)
                                     (return (cdr l0)))
-                                  (setq key-left (funcall key (car left))))
+                                  (setq key-left (apply-key key (car left))))
                                  (t (rplacd l1 right)
                                     (setq l1 (cdr l1))
                                     (setq right (cdr right))
@@ -1141,7 +1337,7 @@
                                       (rplacd l1 left)
                                       (return (cdr l0)))
                                     (setq key-right
-                                          (funcall key (car right)))))))))))))
+                                          (apply-key key (car right)))))))))))))
     (sort l)))
 
 ;;------------------------------------------------------------------------------
@@ -1156,8 +1352,8 @@
       (do ()
           ((or (> j k)
                (funcall predicate
-                        (funcall key (elt sequence k))
-                        (funcall key d))))
+                        (apply-key key (elt sequence k))
+                        (apply-key key d))))
         (decf k))
       (when (< k start)
         (quick-sort sequence (1+ start) end predicate key)
@@ -1165,8 +1361,8 @@
       (do ()
           ((or (> j k)
                (not (funcall predicate
-                             (funcall key (elt sequence j))
-                             (funcall key d)))))
+                             (apply-key key (elt sequence j))
+                             (apply-key key d)))))
         (incf j))
       (when (> j k) (return))
       (rotatef (elt sequence j) (elt sequence k))

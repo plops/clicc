@@ -1,61 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem
-;;;            OPEN, FILE-POSITION, FILE-LENGTH,
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : OPEN, FILE-POSITION, FILE-LENGTH,
 ;;;            READ-CHAR, UNREAD-CHAR WRITE-CHAR
 ;;;
-;;; $Revision: 1.14 $
-;;; $Log: file.lisp,v $
-;;; Revision 1.14  1993/11/10  17:34:45  hk
-;;; Schreibfehler in der letzten revision behoben
-;;;
-;;; Revision 1.13  1993/11/10  16:44:23  hk
-;;; Fehler in write-char behoben: stream t -> *standard-ouput*
-;;;
-;;; Revision 1.12  1993/11/10  16:06:59  hk
-;;; In read-char den Defaultwert von eof-error-p zu T korrigiert.
-;;;
-;;; Revision 1.11  1993/11/01  16:05:01  hk
-;;; Falschen Kommentar gelöscht.
-;;;
-;;; Revision 1.10  1993/08/17  10:25:22  hk
-;;; Open benutzt nun namestring, um das Argument in einen String zu
-;;; wandeln
-;;;
-;;; Revision 1.9  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.8  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.7  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.14 $ eingefuegt
-;;;
-;;; Revision 1.6  1993/01/14  16:17:13  hk
-;;; probe-file geloescht, da in pathname definiert.
-;;;
-;;; Revision 1.5  1993/01/07  12:23:11  hk
-;;; C-fclose deklariert.
-;;;
-;;; Revision 1.4  1993/01/06  16:30:46  hk
-;;; Aufruf von C-fopen vereinfacht.
-;;;
-;;; Revision 1.3  1993/01/05  15:37:48  hk
-;;; Zusaetzliches Argument fuer make-file-...-stream.
-;;;
-;;; Revision 1.2  1992/07/06  15:24:43  hk
-;;; 'runtime --> "RUNTIME"
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.15 $
+;;; $Id: file.lisp,v 1.15 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")

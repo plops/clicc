@@ -1,383 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Top-Level-Forms
-;;;
-;;; $Revision: 1.105 $
-;;; $Log: p1tlf.lisp,v $
-;;; Revision 1.105  1994/04/18  12:18:03  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - UNEXPANDED-FOREIGN-FUN als Operator im Global-Environment
-;;;
-;;; Revision 1.104  1994/02/18  13:55:25  hk
-;;; (funcall f . args) wird direkt in zu einem app-Knoten mit form f und
-;;; arg-list args.
-;;;
-;;; Revision 1.103  1993/12/16  12:49:07  hk
-;;; In p1-export eine Queue verwendet, um das Umrehen des 1. Arguments zu
-;;; verhindern.
-;;;
-;;; Revision 1.102  1993/12/09  14:34:36  hk
-;;; Meldung "Importing definitions from module ~A" erfolgt in p1-load vor
-;;; dem Lesen des .def Files und nicht erst beim Lesen des .syntax Files
-;;;
-;;; Revision 1.101  1993/12/07  10:20:31  uho
-;;; Der Quellcode von Funktionsdefinitionen wird nur dann gemerkt, wenn
-;;; der Modulkompiler aktiv ist.
-;;;
-;;; Revision 1.100  1993/11/23  16:05:13  hk
-;;; In p1-defun: Test auf (setf f) durch consp statt durch listp.
-;;;
-;;; Revision 1.99  1993/11/15  13:35:45  pm
-;;; selbst fabrizierten Fehler behoben in p1-call.
-;;;
-;;; Revision 1.98  1993/11/03  11:47:02  pm
-;;; Inkonsistenzen in den Symbolnamen behoben.
-;;;
-;;; Revision 1.97  1993/10/06  11:15:23  hk
-;;; Bei Applikationen lokaler Funktionen wird nun geprüft, ob die
-;;; aktuellen zu den formalen Parametern passen.
-;;;
-;;; Revision 1.96  1993/08/26  12:18:24  hk
-;;; Initialisierungsfunktion eines importierten Moduls bekommt unbekannten
-;;; write-effect, damit ihr Aufruf nicht wegoptimiert wird.
-;;;
-;;; Revision 1.95  1993/08/20  11:50:18  ft
-;;; p1-defvar beachtet jetzt das gesetzte *SDF*-flag, d.h. die Meldung
-;;; in so einem Fall unterdrueckt.
-;;;
-;;; Revision 1.94  1993/08/19  16:50:20  hk
-;;; Verwendung von lex-var-name-p, in p1-make-new-symbol schon in sym-list
-;;; des Moduls schreiben.
-;;;
-;;; Revision 1.93  1993/07/30  08:54:52  hk
-;;; Schreibfehler in p1-export behoben.
-;;;
-;;; Revision 1.92  1993/07/28  11:29:41  hk
-;;; Auch nil wird zur Laufzeit exportiert, wenn es in einer
-;;; Exportanweisung vorkam.
-;;;
-;;; Revision 1.91  1993/07/26  09:45:07  hk
-;;; p1-export: wirklich nur importierte Symbole zur Laufzeit exportieren
-;;;
-;;; Revision 1.90  1993/07/22  15:45:12  wg
-;;; export exportiert alle importierten Symbole einer Symbolliste auf
-;;; einmal.
-;;;
-;;; Revision 1.89  1993/07/22  14:57:46  hk
-;;; p1-export exportiert imported syms zur Laufzeit
-;;;
-;;; Revision 1.88  1993/07/20  13:24:56  uho
-;;; Generierung des Aufrufs der Initialisierungsfunktion auf
-;;; 'imported-module'-Zwischensprachkonstrukt umgestellt.
-;;;
-;;; Revision 1.87  1993/07/19  14:46:05  uho
-;;; In 'p1-load' bei Import die Generierung a) des Aufrufs der
-;;; Initialisierungsfunktion des importierten Moduls und b) des
-;;; Zuruecksetzen von *PACKAGE* eingefuegt. Das .def-File muss vor dem .syntax-File
-;;; geladen werden, damit die Symbole des importierten Moduls beim Laden
-;;; des .syntax-Files schon im globalen Environment definiert sind.
-;;;
-;;; Revision 1.86  1993/07/13  11:25:26  uho
-;;; Behandlung des Slots 'package' in 'p1-in-package' geaendert, um niemals
-;;; auf den uninitialisierten Slot zuzugreifen.
-;;;
-;;; Revision 1.85  1993/07/02  13:44:38  ft
-;;; Name des impliziten Blocks als optionaler Parameter von p1-defun
-;;; eingefuegt.
-;;;
-;;; Revision 1.84  1993/07/02  11:41:31  ft
-;;; Tippfehler beseitigt.
-;;;
-;;; Revision 1.83  1993/07/02  11:31:30  ft
-;;; Anpassung an die geaenderte Definition von p1-named-lambda.
-;;;
-;;; Revision 1.82  1993/07/02  11:24:25  uho
-;;; Wirkung von *MODULE-COMPILER* auf p1-load geandert.
-;;;
-;;; Revision 1.81  1993/06/28  17:32:40  hk
-;;; Wenn APP Zwischensprachkonstrukte generiert werden, und der Slot form
-;;; eine fun enthaelt, dann wird gewaehrleistet, dass aktuelle und formale
-;;; Parameterliste zusammenpassen, (das geschah bisher in Pass3).
-;;;
-;;; Revision 1.80  1993/06/22  11:14:13  hk
-;;; p1-import definiert.
-;;;
-;;; Revision 1.79  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.78  1993/05/17  08:10:48  pm
-;;; Fehler beseitigt im Aufruf von p1-foreign-fun-call
-;;;
-;;; Revision 1.77  1993/05/08  17:50:34  hk
-;;; (quote <symbol>) in p1-proclaim gestrichen, clicc-lisp: -> L:,
-;;; p1-top-level-form umsortiert bzgl. extend-syntax-export.
-;;;
-;;; Revision 1.76  1993/05/06  16:42:40  hk
-;;; Im *lisp-module* darf aus beliebigen Packages, auch ffi, exportiert
-;;; werden.
-;;;
-;;; Revision 1.75  1993/05/04  11:56:10  uho
-;;; DEFCONSTANTs werden nicht mehr automatisch exportiert (p1-make-constant)
-;;;
-;;; Revision 1.74  1993/04/30  10:16:20  hk
-;;; Keywords werden automatisch aus Modulen exportiert.
-;;;
-;;; Revision 1.73  1993/04/22  12:56:31  pm
-;;; aufruf von p1-foreign-fun-call verbessert
-;;;
-;;; Revision 1.72  1993/04/22  11:26:33  hk
-;;; Sonderbehandlung bei *HEADER-FILE*, *CLICC-LISP-PROGRAM*, *FORCE-COMPILE*
-;;; gestrichen. Voraeufige Sonderbehandlung des Symbols T.
-;;; Funktionen in Modulen werden nicht mehr automatisch exportiert.
-;;; Sonderbehandlung bei *CLICC-MODULE* gestrichen. Sonderbehandlung fuer
-;;; *inline-module* um die eigenartigen Definitionen in inline.lisp
-;;; verarbeien zu koennen. p1-write-to-header gestrichen.
-;;;
-;;; Revision 1.71  1993/04/21  11:57:42  kl
-;;; Unnoetige Variable fct in p1-call entfernt.
-;;;
-;;; Revision 1.70  1993/04/21  08:59:52  ft
-;;; Aufruf von p1-def-built-in erfolgt jetzt nicht mehr mit apply.
-;;;
-;;; Revision 1.69  1993/04/20  14:38:37  ft
-;;; Eintragen der neuen Top-Level-Form 'def-built-in'.
-;;;
-;;; Revision 1.68  1993/04/16  08:21:30  hk
-;;; Aufrufe von Lisp Funktionen in Makroexpansionsfunktionen werden
-;;; immer durch Lisp-Funktionen dargestellt, sonst Warning.
-;;; In p1-export Sonderfall fuer *lisp-module*: auch aus RT darf exportiert werden.
-;;;
-;;; Revision 1.67  1993/04/14  10:23:45  hk
-;;; p1-in-package: Test auf (slot-boundp *module* 'package).
-;;;
-;;; Revision 1.66  1993/04/14  07:57:21  kl
-;;; Weitere Klammerungsfehler behoben.
-;;;
-;;; Revision 1.65  1993/04/13  10:16:52  uho
-;;; Klammerfehler beseitigt, vielen Dank an kl
-;;;
-;;; Revision 1.64  1993/04/08  14:59:55  uho
-;;; Aenderungen fuer syntaktischen Export ge-merged
-;;;
-;;; Revision 1.63  1993/04/08  09:12:33  pm
-;;; p1-call-foreign-fun in p1-foreign-fun-call umbenannt
-;;;
-;;; Revision 1.62  1993/04/08  08:12:47  hk
-;;; Aufrufe von Lisp Systemfunktionen in Makroexpansionsfunktionen
-;;; werden gesondert behandelt.
-;;;
-;;; Revision 1.61  1993/04/06  14:06:58  ft
-;;; p1-constant braucht sich jetzt nicht mehr um Klassen zu kuemmern.
-;;;
-;;; Revision 1.60  1993/04/03  10:00:40  hk
-;;; p1-in-package an Modulkompilation angepasst und aufgeraeumt,
-;;; Bearbeitung von Compiler-Macros eingebaut, dazu p1-call und p1-defun
-;;; angepasst.
-;;;
-;;; Revision 1.59  1993/03/23  07:37:13  ft
-;;; Multiple Werte fuer die pass1-fn's eingefuehrt um die Probleme mit
-;;; make-instance zu beseitigen.
-;;;
-;;; Revision 1.58  1993/03/22  17:33:39  hk
-;;; Keywords in LZS Slots.
-;;;
-;;; Revision 1.57  1993/03/12  09:50:28  ft
-;;; p1-constant an Klassen angepasst.
-;;;
-;;; Revision 1.56  1993/02/25  13:15:41  jh
-;;; Beim Uebersetzen von CLICC-Modulen wird der exported-slot der definierten Funktionen gesetzt.
-;;;
-;;; Revision 1.55  1993/02/23  08:27:32  ft
-;;; p1-defun liefert jetzt erzeugte Funktion als Resultat, um
-;;;  bei der Finalisierung generischer Funktionen anwendbar zu sein.
-;;;
-;;; Revision 1.54  1993/02/19  13:59:18  hk
-;;; Fehler beim Test auf Lisp Package beseitigt.
-;;;
-;;; Revision 1.53  1993/02/17  11:34:07  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.52  1993/02/16  16:06:48  hk
-;;; Revision Keyword eingefuegt, Test auf Lisp-Package in p1-make-new-symbol
-;;; erweitert, Symbole des zu uebersetzenden Programms mit clicc-lisp::
-;;; gekennzeichnet, *CLICC-PACKAGE* durch *PACKAGE* ersetzt.
-;;;
-;;; Revision 1.51  1993/01/29  06:54:40  ft
-;;; *SETF-FUN* in SETF-FUN geaendert.
-;;;
-;;; Revision 1.50  1993/01/22  15:04:10  ft
-;;; Aenderungen fuer die Verarbeitung von erweiterten Funktionsnamen.
-;;;
-;;; Revision 1.49  1993/01/07  13:42:51  hk
-;;; In p1-top-level-form Aufruf von clc-error, wenn ein Ausdruck ignoriert wird.
-;;;
-;;; Revision 1.48  1992/12/17  07:21:50  kl
-;;; Einrueckung geaendert.
-;;;
-;;; Revision 1.47  1992/12/17  07:19:31  kl
-;;; (when (not A) B) durch (unless A B) ersetzt.
-;;;
-;;; Revision 1.46  1992/12/02  10:56:07  hk
-;;; Aufrufe von clicc-message neu formatiert.
-;;;
-;;; Revision 1.45  1992/12/01  16:23:48  ft
-;;; (nil) statt otherwise im case von p1-call eingesetzt.
-;;;
-;;; Revision 1.44  1992/11/27  09:22:04  ft
-;;; Erweiterung von p1-call um die Bahandlung gen. Funktionen.
-;;;
-;;; Revision 1.43  1992/11/26  12:22:29  hk
-;;; ?write von dynamischen Variablen wird erhoeht, wenn diese beschrieben oder
-;;; gebunden werden, damit bestimmt werden kann, ob spaeter ein illegales
-;;; defconstant erfolgt.
-;;;
-;;; Revision 1.42  1992/11/23  15:01:24  hk
-;;; let um find-secret-package-name in defvar umbenannt.
-;;;
-;;; Revision 1.41  1992/11/20  13:52:10  ft
-;;; Aufruf von p1-eval in p1-make-constant enabled.
-;;;
-;;; Revision 1.40  1992/11/13  11:46:56  ft
-;;; Aufruf von p1-eval in p1-make-constant disabled.
-;;;
-;;; Revision 1.39  1992/11/05  10:50:20  pm
-;;; Tippfehler korrigiert
-;;;
-;;; Revision 1.38  1992/11/04  12:44:14  pm
-;;; special-form load-foreign eingebaut.
-;;;
-;;; Revision 1.37  1992/11/02  14:50:06  pm
-;;; p1-call um Aufrufe von Foreign-Functions erweitert
-;;;
-;;; Revision 1.36  1992/10/19  14:31:53  ft
-;;; p1-defun verschoenert und Aufruf von redef-op-error eingefuegt.
-;;;
-;;; Revision 1.35  1992/09/25  16:59:32  kl
-;;; Einfache Literale (die leere Liste, Zeichen und Zahlen) werden jetzt
-;;; durch die entsprechenden Zwischensprachkonstrukte repraesentiert.
-;;; Innerhalb von strukturierten Literalen werden die leere Liste, Zeichen
-;;; und Zahlen weiterhin durch sich selbst dargestellt.
-;;; p1-make-symbol warnt nun, wenn NIL als Symbol verwendet wird.
-;;;
-;;; Revision 1.34  1992/09/25  16:48:31  kl
-;;; In p1-in-package und p1-use-package werden die Mengendifferenzen
-;;; jetzt richtig berechnet.
-;;;
-;;; Revision 1.33  1992/09/02  12:08:06  hk
-;;; Fehlermeldung eingefuegt, wenn Funktionsobjekt als Konstante verwendet wird.
-;;;
-;;; Revision 1.32  1992/08/31  08:39:15  ft
-;;; p1-defclass in p1-top-level-form eingebunden
-;;;
-;;; Revision 1.31  1992/08/31  08:24:27  hk
-;;; Indentation hinter p1-use-package korrigiert.
-;;;
-;;; Revision 1.30  1992/08/28  10:44:38  uho
-;;; p1-use-package definiert, um top-level USE-PACKAGES zu behandeln.
-;;;
-;;; Revision 1.29  1992/08/16  14:45:30  kl
-;;; Eingefuegte clicc-message wieder entfernt.
-;;;
-;;; Revision 1.28  1992/08/15  13:08:16  kl
-;;; In p1-top-level-form (first form) durch name ersetzt.
-;;;
-;;; Revision 1.27  1992/08/11  16:22:41  hk
-;;; Ignore Declaration in p1-make-new-symbol.
-;;;
-;;; Revision 1.26  1992/08/07  11:35:54  hk
-;;; Dateikopf verschoenert.
-;;;
-;;; Revision 1.25  1992/08/07  09:57:58  hk
-;;; Aufrufe von lokal definierten Makros werden erkannt.
-;;;
-;;; Revision 1.24  1992/08/05  13:43:13  hk
-;;; Syntaktische Aenderungen.
-;;;
-;;; Revision 1.23  1992/08/04  18:22:28  hk
-;;; Symbole des Lisp-Package werden ggf. automatisch exportiert,
-;;; Symbole des Keyword-Package bekommen sich selbst als Wert.
-;;;
-;;; Revision 1.22  1992/07/29  16:53:30  hk
-;;; p1-mv-lambda und p1-lambda-app nach p1lambda.lisp .
-;;;
-;;; Revision 1.21  1992/07/29  14:12:14  hk
-;;; Exported Symbole des LISP-Package werden automatisch exportiert.
-;;;
-;;; Revision 1.20  1992/07/29  09:58:40  hk
-;;; check-use-of-params in p1-mv-lambda gestrichen, Schreibfehler beseitigt.
-;;;
-;;; Revision 1.19  1992/07/27  16:47:22  hk
-;;; In p1-in-package: get-symbol-bind --> p1-make-symbol, Umbenennungen,
-;;; wenn Zwischensprachrepraesentationen von Symbolen erzeugt werden,
-;;; die nur zum
-;;; evaluieren waehrend der Ubersetzungszeit benoetigt werden, dann werden diese
-;;; nicht in *global-environment* eingetragen.
-;;;
-;;; Revision 1.18  1992/07/22  13:08:14  hk
-;;; In p1-constant array mit update-array bearbeitet.
-;;;
-;;; Revision 1.17  1992/07/22  11:52:21  hk
-;;; In p1-export: :exported --> :external, Package bei find-symbol angegeben.
-;;;
-;;; Revision 1.16  1992/07/09  09:07:35  hk
-;;; Fuer Symbole aus Header-Dateien werden imported-syms generiert, falls
-;;; nicht gerade das Hauptprogramm uebersetzt wird.
-;;;
-;;; Revision 1.15  1992/07/08  12:59:19  hk
-;;; p1-export: Nur im aktuellen Package exportieren.
-;;;
-;;; Revision 1.14  1992/07/08  12:48:51  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.13  1992/07/08  12:44:23  hk
-;;; Das Symbol nil wird immer exportiert.
-;;;
-;;; Revision 1.12  1992/07/08  12:33:08  hk
-;;; p1-make-new-symbol generiert fuer importierte Symbole imported-sym
-;;; ausser bei der Uebersetzung des Hauptprogramms,
-;;; in dem alle Symbole (scheinbar) definiert werden.
-;;;
-;;; Revision 1.11  1992/07/08  12:23:09  hk
-;;; Toplevel Form export wird gesondert uebersetzt.
-;;;
-;;; Revision 1.10  1992/07/07  12:26:31  ft
-;;; Erweiterung von p1-top-level-form um defgeneric & defmethod
-;;;
-;;; Revision 1.9  1992/07/07  09:52:27  hk
-;;; Erst in CodeGen wird geprueft, ob in einem Modul neue Symbole definiert
-;;; wurden. Neue im Modul definierte Symbole werden in sym-list eingetragen.
-;;;
-;;; Revision 1.8  1992/07/02  14:02:44  hk
-;;; Named-const haben Wert :forward, solange sie nicht definiert sind.
-;;;
-;;; Revision 1.7  1992/06/11  09:47:05  hk
-;;; definiert, aber angwandte Vorkommen weiterhin durch imported-fun.
-;;;
-;;; Revision 1.6  1992/06/11  09:43:21  hk
-;;; Bei der Uebersetzung von Modulen werden definierte Fkt. durch global-fun
-;;;
-;;; Revision 1.5  1992/06/04  13:26:01  hk
-;;; Schreiben von DECLAIM sollte nicht in Pass1 erfolgen.
-;;;
-;;; Revision 1.4  1992/06/04  12:43:13  hk
-;;; ?const in ?value bzw. ?constant-value umbenannt.
-;;;
-;;; Revision 1.3  1992/06/04  09:47:54  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
-;;;
-;;;               1991/07/18            hk
-;;; P1-IN-PACKAGE neu geschrieben, benutzt nicht mehr die Funktion IN-PACKAGE,
-;;; um Kompatibilitaet mit X3J13 zu erreichen.
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Top-Level-Forms
+;;;
+;;; $Revision: 1.110 $
+;;; $Id: p1tlf.lisp,v 1.110 1994/12/13 16:01:27 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -483,8 +129,6 @@
             (p1-form (p1-expand-system-macro operator form)))
            ((:USER-MACRO :LOCAL-MACRO)
             (p1-form (p1-expand-user-macro operator form)))
-           (:UNEXPANDED-FOREIGN-FUN
-            (p1-form (p1-foreign-fun-call operator form)))
            ((:LOCAL-FUN :FOREIGN-FUN)
             (clc-check-nparams
              (?par-spec operator) (length args) (?symbol operator))
@@ -906,23 +550,28 @@
 ;; IN-PACKAGE package-name &KEY :nicknames :use
 ;;------------------------------------------------------------------------------
 (defun p1-in-package (name_rest)
-  (apply #'(lambda (name &key nicknames use)
-             (when (and nicknames (atom nicknames))
-               (setq nicknames (list nicknames)))
-             (when (and use (atom use))
-               (setq use (list use)))
-               
+  (apply #'(lambda (name &key (nicknames ()) (use '() supplied))               
              (let* ((package (or (find-package name)
                                 (make-package name :use '())))
-                   (new-nicknames
-                    (set-difference nicknames
-                                    (package-nicknames package)
-                                    :test #'string=))
-                   (new-use
-                    (set-difference use 
-                                    (mapcar #'package-name
-                                            (package-use-list package))
-                                    :test #'string=)))
+                   new-nicknames
+                   new-use)
+
+               ;; 1. IN-PACKAGE: wenn kein :use, dann Default = :use '("LISP")
+               ;;-------------------------------------------------------------
+               (unless (member package (queue2list (?package-list *module*)))
+                 (add-q *PACKAGE* (?package-list *module*))
+                 (unless supplied
+                   (setq use '("LISP"))))
+               
+               (setq new-nicknames
+                     (set-difference nicknames
+                                     (package-nicknames package)
+                                     :test #'string=))
+               (setq new-use
+                     (set-difference use 
+                                     (mapcar #'package-name
+                                             (package-use-list package))
+                                     :test #'string=))
                (when new-nicknames (add-nicknames package new-nicknames))
                (when new-use (use-package use package))
     
@@ -955,11 +604,7 @@
                ;; Die folgenden READ Operationen des Compilers erfolgen in dem
                ;; angegebenen Package.
                ;;---------------------
-               (setq *PACKAGE* package)
-               
-               ;; Eintragen des evtl. neuen Packages in die globale Umgebung
-               ;;-----------------------------------------------------------
-               (addnew-q *PACKAGE* (?package-list *module*))))
+               (setq *PACKAGE* package)))
                
          (mapcar #'p1-eval name_rest)))
 
@@ -1073,18 +718,17 @@
         (clicc-error ILLEGAL_CALL
                      "LOAD"
                      "(FILENAME &KEY :VERBOSE :PRINT :IF-DOES-NOT-EXIST)"))
-      (let* ((filename (pop evaluated-args))) ; Schluesselworte ignorieren
+      (let* ((pathname (merge-pathnames (pop evaluated-args))))
+                                        ; Schluesselworte ignorieren
         (cond
-          ((is-module-import filename)  ; import
-           (clicc-message "Importing definitions from module ~A"
-                          (strip-path filename))
-           (let ((imported-module (import-read filename)))
-             (syntax-import filename) 
-             (unless (string= filename *LISP-DEF*)
-               (gen-init-call imported-module))
+          ((is-module-import pathname)  ; import
+           (clicc-message "Importing definitions from module ~A" pathname)
+           (let ((imported-module (import-read pathname)))
+             (syntax-import pathname) 
+             (gen-init-call imported-module)
            (gen-reset-package)))
           (T                            ; include
-           (pass_1-of-file filename))))))) 
+           (pass_1-of-file pathname))))))) 
 
 ;;------------------------------------------------------------------------------
 ;; PROVIDE module-name

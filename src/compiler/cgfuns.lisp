@@ -1,241 +1,32 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Codegenerierung
 ;;;            - lokale, globale Funktionsdefinitionen
 ;;;            - Closures, Downfuns
 ;;;            - Aufrufe von importierten und definierten Funktionen
 ;;;
-;;; $Revision: 1.58 $
-;;; $Log: cgfuns.lisp,v $
-;;; Revision 1.58  1994/06/08  09:54:33  hk
-;;; opt-args: Bei Rest-Listen-Optimierung kann das Problem auftreten, da"s
-;;; eine Variable LOCAL(x) den gleichen Offset hat als die
-;;; Argument-Position eines Arguments an ARG(x).  Eine COPY-Anweisung
-;;; zwischen diesen Positionen w"urde f"alschlich wegoptimiert werden.
-;;;
-;;; Revision 1.57  1994/06/07  16:15:24  hk
-;;; Bug in CMU17 umgangen. Wieder vern"unftig einger"uckt.
-;;;
-;;; Revision 1.56  1994/05/25  14:05:17  sma
-;;; Aufruf der Restlistenoptimierung aus cg-params herausgezogen.
-;;;
-;;; Revision 1.55  1994/05/02  14:20:55  sma
-;;; opt-args korrigiert: Keine Optimierung, wenn ein Parameter eine
-;;; Restvariable ist.
-;;;
-;;; Revision 1.54  1994/04/28  09:59:52  sma
-;;; Erzeugung eines DOWN_FUNARGS durch Makroaufruf abstrahiert.
-;;;
-;;; Revision 1.53  1994/04/14  17:05:36  sma
-;;; REST_NOT_EMPTY Makro wird statt (rest_X != local) benutzt.
-;;;
-;;; Revision 1.52  1994/02/16  16:45:29  hk
-;;; *if-counter* *cont-counter* *tagbody-counter* werden f"ur jede
-;;; Funktion neu mit 0 initialisiert.
-;;;
-;;; Revision 1.51  1994/02/10  16:01:00  sma
-;;; cdr-rest-funcall-p -> rlo-rest-form.
-;;;
-;;; Revision 1.50  1994/02/08  13:56:53  sma
-;;; Diverse Änderungen für rest-Parameter-Optimierungen.
-;;;
-;;; Revision 1.49  1994/02/03  17:31:23  sma
-;;; Änderungen für Optimierung von &rest-Paramtern.
-;;;
-;;; Revision 1.48  1994/01/07  15:17:42  hk
-;;; Nach der letzten Änderung wird opt-args in mehr Fällen aufgerufen, so
-;;; daß ein Fehler bei der Ausnutzung von ?need-no-stack auftreten kann:
-;;; man darf eine Funktion nur direkt auf die Variablenposition anwenden,
-;;; wenn diese stackalloziert ist und im aktuellen Activation Record
-;;; liegt.
-;;;
-;;; Revision 1.47  1994/01/07  13:40:06  hk
-;;; In opt-args die Abschätzung für den Fall verbessert, daß die aktuelle
-;;; Funktion lokale Funktionen hat.
-;;;
-;;; Revision 1.46  1994/01/07  10:18:52  hk
-;;; closure-result-p entfernt, weil Daten vom Typ closure-result
-;;; nicht mehr vorkommen.
-;;;
-;;; Revision 1.45  1994/01/06  17:28:34  sma
-;;; opt-args verbessert, um mehr COPY-Befehle einzusparen. Die
-;;; imported-funs aus sys.def haben eine neue Annotation need-no-stack
-;;; bekommen, die den Wert T enthält, wenn die Funktion einstellig ist und
-;;; keinen weiteren LISP-Stack benötigt. So kann die optimierung, daß das
-;;; Funktionsergebnis eines Funktionsaufrufs an der Stelle erzeugt wird,
-;;; wo es benötigt wird, öfter greifen.
-;;; Wurde bei
-;;; 	(let (a b)
-;;; 	  (setq a (1+ a)))
-;;; vorher
-;;; 	COPY(ARG(0),ARG(2));
-;;; 	F1plus(ARG(2));
-;;; 	COPY(ARG(2),ARG(0));
-;;; erzeugt, ist es jetzt nur
-;;; 	F1plus(ARG(0));
-;;;
-;;; Revision 1.44  1994/01/05  12:28:24  sma
-;;; cg-set-C-name so geändert, daß bei Funktionen aus dem rt-package ein
-;;; Präfix "rt_" generiert wird, wenn die Funktionsnamen weder mit "c_"
-;;; noch mit "unix_" beginnen.
-;;;
-;;; Revision 1.43  1993/12/23  12:02:25  hk
-;;; Fehler in opt-args behoben.
-;;;
-;;; Revision 1.42  1993/12/18  09:11:12  hk
-;;; In cg-downfuns #+CMU17(declare (notinline CC-NameConc)) eingefügt, um
-;;; einen Fehler in CMU-CL 17.c zu umgehen
-;;;
-;;; Revision 1.41  1993/11/22  09:24:02  hk
-;;; Neuer C-Code ONLY_ONCE in Initialisierungsfunktionen, der bewirkt,
-;;; da_ diese Funktionen hvchstens 1x ausgef|hrt werden.
-;;;
-;;; Revision 1.40  1993/10/14  16:09:32  sma
-;;; Code für die Erstellung einer Closure in das Makro GEN_CLOSURE
-;;; verschoben.
-;;;
-;;; Revision 1.39  1993/07/13  11:14:14  uho
-;;; Funktion 'C-ify' und 'cg-unique-prefix' (als 'unique-prefix') nach clcmisc verschoben.
-;;;
-;;; Revision 1.38  1993/07/07  15:49:00  uho
-;;; Umwandlung von Lisp-Namen in C-Namen aus der Funktion cg-set-C-name
-;;; herausgeloest und verfeinert. Wird jetzt auch CALC-SYMBOL-BASE verwendet.
-;;;
-;;; Revision 1.37  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.36  1993/06/04  13:45:08  pm
-;;; Aufruf von cg-call-in-interface
-;;;
-;;; Revision 1.35  1993/05/19  08:54:16  hk
-;;; Funktionen im *ffi-package* bekommen Praefix FFI_.
-;;;
-;;; Revision 1.34  1993/05/06  10:56:47  hk
-;;; cg-set-C-name erweitert + korrigiert.
-;;;
-;;; Revision 1.33  1993/04/07  16:39:41  hk
-;;; cg-fun-def bindet dynamische Variable *fun-name* fuer Fehlermeldungen.
-;;;
-;;; Revision 1.32  1993/04/07  16:11:09  hk
-;;; In cg-set-C-name: cg-error -> clc-error.
-;;;
-;;; Revision 1.31  1993/04/06  17:28:21  hk
-;;; ?codegen -> ?c-inline.
-;;;
-;;; Revision 1.30  1993/03/24  13:41:53  hk
-;;; Symbole 'jump, 'closure, 'downfun in Slots heissen jetzt :jump,
-;;; :closure und :downfun.
-;;;
-;;; Revision 1.29  1993/03/22  15:30:05  hk
-;;; lower-case in Lisp Funktionsnamen -> upcase in C Funktionsnamen.
-;;;
-;;; Revision 1.28  1993/02/19  13:59:11  hk
-;;; Fehler beim Test auf Lisp Package beseitigt.
-;;;
-;;; Revision 1.27  1993/02/17  11:33:58  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.26  1993/02/16  16:03:06  hk
-;;; Revision Keyword eingefuegt, Test auf Lisp-Package in cg-set-C-name
-;;; erweitert.
-;;;
-;;; Revision 1.25  1993/01/22  14:52:46  ft
-;;; cg-set-C-name an erweiterte Funktionsnamen angepasst.
-;;;
-;;; Revision 1.24  1993/01/14  14:31:27  hk
-;;; cg-set-C-name neu
-;;;
-;;; Revision 1.23  1992/09/28  17:22:30  hk
-;;; (CC-bool fun) -> C-TRUE.
-;;;
-;;; Revision 1.22  1992/09/23  09:47:29  hk
-;;; Fehler in C-global-closure beseitigt.
-;;;
-;;; Revision 1.21  1992/09/21  11:18:52  hk
-;;; Die eigentliche C-Codegenerierung uebersichtlicher gestaltet
-;;;
-;;; Revision 1.20  1992/08/11  12:42:45  hk
-;;; C-Ln --> C-Decl, fuer Deklarationen.
-;;;
-;;; Revision 1.19  1992/08/10  16:54:53  hk
-;;; Variablen *mv-spec* und *mv-produced* werden nicht mehr benutzt.
-;;;
-;;; Revision 1.18  1992/08/05  09:13:21  hk
-;;; opt-args wusste noch nichts von var-ref.
-;;;
-;;; Revision 1.17  1992/08/04  17:59:06  hk
-;;; ?num-free-lex-vars wurde erst nach der ersten Benutzung initialisiert.
-;;;
-;;; Revision 1.16  1992/08/04  17:32:22  hk
-;;; Fehler in opt-args behoben.
-;;;
-;;; Revision 1.15  1992/07/30  12:28:05  hk
-;;; *downfun-count* wurde nicht beruecksichtigt.
-;;;
-;;; Revision 1.14  1992/07/30  10:18:49  hk
-;;; Code fuer Downfuns umgestellt.
-;;;
-;;; Revision 1.13  1992/07/29  15:08:57  hk
-;;; Berechnung von num-fee-lex-vars nicht mehr in Pass3, neue Konstante
-;;; CLOSURE-EXTRA-SPACE.
-;;;
-;;; Revision 1.12  1992/07/28  10:52:44  hk
-;;; cg-set-C-name aufgeraeumt.
-;;;
-;;; Revision 1.11  1992/07/27  13:08:36  hk
-;;; * in Lisp-Namen wird zu X in C-Namen.
-;;;
-;;; Revision 1.10  1992/07/21  13:54:40  hk
-;;; Fuer Standardfunktionen des LISP-Package werden C-Namen generiert,
-;;; indem = nach E, < nach L , > nach G und / nach N abgebildet werden.
-;;; string/= wird somit zu FstringNE.
-;;;
-;;; Revision 1.9  1992/07/21  13:16:57  hk
-;;; C-Namen fuer Funktionen des Laufzeitsystems deren Symbol im LISP-Package
-;;; liegt, beginnen mit dem Zeichen "F".
-;;;
-;;; Revision 1.8  1992/07/21  10:54:54  hk
-;;; Slot closure-offset ist unbound und nicht nil, wenn noch nicht initialisiert
-;;;
-;;; Revision 1.7  1992/06/11  11:18:05  hk
-;;; cg-error
-;;;
-;;; Revision 1.6  1992/06/11  11:11:31  hk
-;;; C-Namen von lokalen Funktionen werden zu Beginn der Uebersetzung der
-;;; umfassenden Funktion generiert. Schreibfehler: var -> local static.
-;;; Rumpf von labels-form heisst ?body. Fuer die Uebesetzung lokaler Funktionen
-;;; in gen-fun wird nur noch eine einfache dolist Schleife benoetigt.
-;;;
-;;; Revision 1.5  1992/06/04  16:07:13  hk
-;;; Leerstring in CC-nargs eingefuegt.
-;;;
-;;; Revision 1.4  1992/06/04  12:39:53  hk
-;;; ?const -> ?const-list
-;;;
-;;; Revision 1.3  1992/06/04  12:24:54  hk
-;;; Zu Beginn der Bearbeitung von labels-form werden die C-Namen fuer lokale
-;;; Funktionen generiert.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
-;;;
-;;;               1992/02/03            hk
-;;; Neue Funktion cg-defun; Generierung von Konstanten erfolgt jeweils vor der
-;;; Uebersetzung einer Funktion.
-;;;
-;;;               1992/01/17            hk
-;;; Neue Funktion C-gen-decl. Uebersetzte Funktionen haben nun den Typ void.
-;;; Neue Komponente in der Struktur fun, die die lokalen Funktionen enthaelt,
-;;; damit auch lokale Funktionen deklariert werden koennen. Globale Funktionen
-;;; werden am Anfang der Datei deklariert (siehe cgmain). Lokale Funktionen
-;;; werden vor der Funktion deklariert, in deren Rumpf sie definiert sind.
+;;; $Revision: 1.59 $
+;;; $Id: cgfuns.lisp,v 1.59 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

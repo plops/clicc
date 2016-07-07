@@ -1,10 +1,26 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem
-;;;            - Backquote-Reader + Simplifier
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : - Backquote-Reader + Simplifier
 ;;;            - Readtables, Readtable-Funktionen
 ;;;            - READ
 ;;;            - READ-PRESERVING-WHITESPACE
@@ -15,56 +31,8 @@
 ;;;            - READ-FROM-STRING
 ;;;            - PARSE-INTEGER
 ;;;
-;;; $Revision: 1.14 $
-;;; $Log: read.lisp,v $
-;;; Revision 1.14  1994/06/03  09:51:05  hk
-;;; Schreibfehler behoben
-;;;
-;;; Revision 1.13  1994/06/02  14:10:19  hk
-;;; Print-Funktion f"ur readtable-Struktur von write2 nach hier.
-;;;
-;;; Revision 1.12  1994/05/31  12:05:06  hk
-;;; Bessere warning beim Lesen von Ratios als Floats
-;;;
-;;; Revision 1.11  1994/02/17  16:16:35  hk
-;;; "Uberfl"ussigen Test in struct-reader gestrichen, aufger"aumt,
-;;; Fehlermeldung verbessert.
-;;;
-;;; Revision 1.10  1994/01/11  16:11:47  hk
-;;; Fehler in bq-attach-append bei `( ..... . const) behoben.
-;;;
-;;; Revision 1.9  1993/11/29  12:26:40  uho
-;;; In 'read-token' wird beim Lesen des look-ahead-Zeichens das Ende
-;;; explizit als NIL gemeldet.
-;;;
-;;; Revision 1.8  1993/11/10  16:09:27  hk
-;;; In read-from-string den Defaultwert von eof-error-p zu T korrigiert.
-;;;
-;;; Revision 1.7  1993/07/14  13:50:42  hk
-;;; Neue Reader fuer #b, #o, #x und #nR, vector-reader verbessert
-;;;
-;;; Revision 1.6  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.5  1993/05/07  08:55:22  hk
-;;; readtable exportiert.
-;;;
-;;; Revision 1.4  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.3  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.14 $ eingefuegt
-;;;
-;;; Revision 1.2  1993/01/11  15:04:27  hk
-;;; structure -> struct
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.18 $
+;;; $Id: read.lisp,v 1.18 1995/03/03 17:35:19 wg Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -93,19 +61,87 @@
 
 (defparameter *read-base* 10)
 (defparameter *read-suppress* nil)
-(defparameter *features* nil)
+(defparameter *features* '(:CLICC))
 
-(defparameter *token* (make-array 80
-                                  :element-type 'character
-                                  :fill-pointer 0
-                                  :adjustable t))
+;;; (defparameter *token* (make-array 80
+;;;                                   :element-type 'character
+;;;                                   :fill-pointer 0
+;;;                                   :adjustable t))
+
+(defparameter *token* (make-string 80))
+(defvar *fill-pointer* 0)
+(defvar *token-length* 80)
+(defconstant *token-extension* 80)
+
 (defparameter *uninterned* nil)
 (defparameter *preserve-whitespace* nil)
 (defparameter *dot-flag* nil)
 (defparameter *parenthesis-open* nil)
 
+(defvar *readtable-unchanged*)
+
 (defparameter *standard-readtable* (make-standard-readtable))
 (defparameter *readtable* (copy-readtable nil)) ; erst nach obiger Zeile
+(defparameter *readtable-syntax* (readtable-syntax *readtable*))
+(defparameter *the-readtable* *readtable*)
+
+(setq *readtable-unchanged* T)
+
+
+;;------------------------------------------------------------------------------
+;; Die 80%-Regel: Die Readtable ist nicht angefasst worden.
+;;------------------------------------------------------------------------------
+;;; Ist *readtable* noch original, d.h. eq zu *the-readtable* und ist
+;;; *readtable-unchanged* noch T (80%-Fall), kann optimiert werden.
+;;; Kommentar: Den Test (eq *readtable* *the-readtable*) koennen wir
+;;;            uns sparen, da copy-readtable aufgerufen werden muss, um
+;;;            *readtable* mit etwas Sinnvollem zu belegen. Da copy-readtable
+;;;            sowieso destruktiv auf *readtable* sein kann, gilt dann schon
+;;;            *readtable-unchanged* = nil.
+;;------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+(defmacro unchanged-rtab () `*readtable-unchanged*)
+
+
+;;------------------------------------------------------------------------------
+;; *token*-Behandlung ...
+;;------------------------------------------------------------------------------
+;;; Selbstgeschriebenes VECTOR-PUSH-EXTEND auf dem STRING *token*
+;;; beachtet *fill-pointer* und aktualisiert *token-length*
+;;------------------------------------------------------------------------------
+
+;;------------------------------------------------------------------------------
+(defun token-push-extend (char)
+  (setf (schar *token* *fill-pointer*) char)
+  (incf *fill-pointer*)
+  (when (>= *fill-pointer* *token-length*)
+        (setq *token*
+              (concatenate 'string *token* (make-string *token-extension*)))
+        (incf *token-length* *token-extension*)))
+
+;;------------------------------------------------------------------------------
+(defun get-token-string ()
+  (let ((substring (make-string *fill-pointer*)))
+      (do ((i 0 (1+ i)))
+          ((= i *fill-pointer*) substring)
+        (setf (schar substring i) (schar *token* i)))))  
+
+;;------------------------------------------------------------------------------
+(defun token-subseq (start end)
+  (when (not (check-integer start 0 *fill-pointer*))
+    (error "The value ~S is not an integer in the interval [0,~S]"
+           start *fill-pointer*))
+  (when (not (check-integer end 0 *fill-pointer*))
+    (error "The value ~S is not an integer in the interval [0,~S]"
+           end *fill-pointer*))
+  (when (> start end)
+    (error "The START value ~S is greater than the END value ~S" start end))
+  (let ((substring (make-string (- end start))))
+      (do ((i start (1+ i))
+           (j 0     (1+ j)))
+          ((= i end) substring)
+        (setf (schar substring j) (schar *token* i)))))  
 
 ;;------------------------------------------------------------------------------
 ;; Backquote ...
@@ -335,10 +371,21 @@
 (defmacro terminating-p (syntax) `(null (cdr ,syntax)))
 
 (defmacro get-syntax (c)
-  `(aref (readtable-syntax *readtable*) (char-code ,c)) )
+  `(if (unchanged-rtab)
+       (rt::svref-internal *readtable-syntax* (char-code ,c))
+     (aref (readtable-syntax *readtable*) (char-code ,c)) ))
+
+(defmacro constituent-p (c)
+  `(eql (rt::svref-internal *readtable-syntax* (char-code ,c))
+        'CONSTITUENT))
 
 ;;------------------------------------------------------------------------------
 (defun copy-readtable (&optional (from *readtable*) (to nil))
+  
+  ;; originale Readtable potentiell zerstoert
+  ;;-----------------------------------------
+  (setq *readtable-unchanged* nil)
+  
   (when (null from) (setq from *standard-readtable*))
   (when (null to) (setq to (make-readtable)))
   (let ((syntax-from (readtable-syntax from))
@@ -357,6 +404,11 @@
                                      (to-readtable *readtable*)
                                      (from-readtable *standard-readtable*)
                                      &aux pair)
+  
+  ;; originale Readtable potentiell zerstoert
+  ;;-----------------------------------------
+  (setq *readtable-unchanged* nil)
+  
   (setf (aref (readtable-syntax to-readtable) (char-code to-char))
         (aref (readtable-syntax from-readtable) (char-code from-char)))
   
@@ -375,6 +427,11 @@
 
 ;;------------------------------------------------------------------------------
 (defun copy-dispatch-macro-character (pair from to)
+  
+  ;; originale Readtable potentiell zerstoert
+  ;;-----------------------------------------
+  (setq *readtable-unchanged* nil)
+
   (let ((c (car pair))
         (dispatch-from (cdr pair))
         dispatch-to)
@@ -391,6 +448,11 @@
                                  &optional
                                  non-terminating-p
                                  (readtable  *readtable*))
+  
+  ;; originale Readtable potentiell zerstoert
+  ;;-----------------------------------------
+  (setq *readtable-unchanged* nil)
+  
   (setf (aref (readtable-syntax readtable) (char-code char))
         (cons function non-terminating-p))
   
@@ -412,6 +474,11 @@
 (defun make-dispatch-macro-character (char &optional
                                            non-terminating-p
                                            (readtable *readtable*))
+  
+  ;; originale Readtable potentiell zerstoert
+  ;;-----------------------------------------
+  (setq *readtable-unchanged* nil)
+  
   (let ((dispatch-array (make-array char-code-limit :initial-element nil)))
     (setf (aref (readtable-syntax readtable) (char-code char))
           (cons
@@ -454,6 +521,11 @@
 (defun set-dispatch-macro-character (disp-char sub-char function
                                                &optional
                                                (readtable *readtable*))
+  
+  ;; originale Readtable potentiell zerstoert
+  ;;-----------------------------------------
+  (setq *readtable-unchanged* nil)
+  
   (let ((dispatch-array
          (cdr (assoc disp-char (readtable-dispatch readtable)))))
     (unless dispatch-array
@@ -472,15 +544,14 @@
     (aref dispatch-array (char-code (char-upcase sub-char)))))
 
 ;;------------------------------------------------------------------------------
-(defun read-token (stream c)
+(defun read-token (stream c syntax)
   (let ((multiple-escape nil)
-        syntax 
         (escape nil)
         (colon nil)
         colon-pos)
 
     (loop
-      (setq syntax (get-syntax c))
+;;;      (setq syntax (get-syntax c))
       (cond
         ((not multiple-escape)
          (case syntax
@@ -493,15 +564,44 @@
 
             (return))
 
+           (CONSTITUENT
+            (when (eql #\: c)
+		  (case colon
+			((nil) (setq colon 1)
+			 (setq colon-pos *fill-pointer*))
+			(1 (setq colon 2)
+			   (unless (eql colon-pos
+					(1- *fill-pointer*))
+				   (setq colon 3)))
+			(t (setq colon 3))))
+            (token-push-extend (char-upcase c))
+	    (setq c (read-char stream nil nil))
+	    (when (unchanged-rtab)
+	     (loop
+	      (unless (and c (constituent-p c)) (return))
+	      (when (eql #\: c)
+		    (case colon
+			  ((nil) (setq colon 1)
+			   (setq colon-pos *fill-pointer*))
+			  (1 (setq colon 2)
+			     (unless (eql colon-pos
+					  (1- *fill-pointer*))
+				     (setq colon 3)))
+			  (t (setq colon 3))))
+	      (token-push-extend (char-upcase c))
+	      (setq c (read-char stream nil nil)))))
+
            (SINGLE-ESCAPE
             (setq c (read-char stream nil nil))
             (unless c
               (error
                "unexpected End of File after single escape"))
             (setq escape t)
-            (vector-push-extend c *token*))
+            (token-push-extend c)
+	    (setq c (read-char stream nil nil)))
 
-           (MULTIPLE-ESCAPE (setq escape t multiple-escape t))
+           (MULTIPLE-ESCAPE (setq escape t multiple-escape t)
+			    (setq c (read-char stream nil nil)))
 
            ((nil) (error "illegal Character"))
                            
@@ -512,29 +612,41 @@
             (when (eql #\: c)
               (case colon
                 ((nil) (setq colon 1)
-                 (setq colon-pos (fill-pointer *token*)))
+                 (setq colon-pos *fill-pointer*))
                 (1 (setq colon 2)
                    (unless (eql colon-pos
-                                (1- (fill-pointer *token*)))
+                                (1- *fill-pointer*))
                      (setq colon 3)))
                 (t (setq colon 3))))
-            (vector-push-extend (char-upcase c) *token*))))
+            (token-push-extend (char-upcase c))
+	    (setq c (read-char stream nil nil))))  ;; end of case
+
+            (unless c (return))
+            (setq syntax (get-syntax c)))
 
         (T (case syntax
-             (SINGLE-ESCAPE
-              (setq c (read-char stream nil nil))
-              (unless c
-                (error "unexpected End of File after single escape"))
-              (vector-push-extend c *token*))
-             (MULTIPLE-ESCAPE (setq multiple-escape nil))
-             ((NIL) (error "illegal character"))
-             (t (vector-push-extend c *token*)))))
-                
-      (setq c (read-char stream nil nil))
-      (unless c
-        (when multiple-escape
-          (error "unexpected End of File after multiple escape"))
-        (return)))                     ;end of loop
+		 (CONSTITUENT 
+                  (token-push-extend c)
+		  (setq c (read-char stream nil nil))
+                  (when (unchanged-rtab)
+		   (loop
+		    (unless (and c (constituent-p c)) (return))
+		    (token-push-extend c)
+		    (setq c (read-char stream nil nil)))))
+		 (SINGLE-ESCAPE
+		  (setq c (read-char stream nil nil))
+		  (unless c
+			  (error "unexpected End of File after single escape"))
+		  (token-push-extend c)
+		  (setq c (read-char stream nil nil)))
+		 (MULTIPLE-ESCAPE (setq multiple-escape nil)
+				  (setq c (read-char stream nil nil)))
+		 ((NIL) (error "illegal character"))
+		 (t (token-push-extend c)
+		    (setq c (read-char stream nil nil))))
+	   (unless c (error "unexpected End of File after multiple escape"))
+           (setq syntax (get-syntax c)))))                        ;end of loop
+
 
     ;; nicht analysieren, wenn *READ-SUPPRESS*
     (when *read-suppress* (return-from read-token nil))
@@ -542,7 +654,7 @@
     ;; *token* als  Zahl oder Symbol interpretieren
     ;;---------------------------------------------
     (let ((i 0)
-          (len (fill-pointer *token*))
+          (len *fill-pointer*)
           (sign 1)
           (num1 0) (num2 0.0)
           (base *read-base*)
@@ -559,14 +671,14 @@
            (read-digits (&aux x d)
              (cond
                ((eql i len) nil)
-               (T (setq x (digit-char-p (aref *token* i) base))
+               (T (setq x (digit-char-p (pvref *token* i) base))
                   (cond
                     ((null x) nil)
                     (T (incf i)
                        (loop
                          (when (eql i len)
                            (return x))
-                         (setq d (digit-char-p (aref *token* i)
+                         (setq d (digit-char-p (pvref *token* i)
                                                base))
                          (when (null d)
                            (return x))
@@ -576,7 +688,7 @@
            (read-sign ()
              (if (eql i len)
                1
-               (case (aref *token* i)
+               (case (pvref *token* i)
                  (#\- (incf i) -1)
                  (#\+ (incf i) 1)
                  (t 1))))
@@ -585,7 +697,7 @@
              (loop
                (when (eql i len)
                  (return))
-               (setq c (aref *token* i))
+               (setq c (pvref *token* i))
                (setq x (digit-char-p c))
                (when (null x) (return))
                (incf i)
@@ -601,7 +713,7 @@
 
            ;; Wenn letztes Zeichen = #\., dann Dezimal-Integer
            ;;-------------------------------------------------
-           (when (eql #\. (aref *token* (1- len)))
+           (when (eql #\. (pvref *token* (1- len)))
              (setq base 10))
 
            (setq sign (read-sign))
@@ -611,7 +723,7 @@
              ;; Integer
              ;;--------
              (return-from read-token (* sign num1)))
-           (setq c (aref *token* i)) (incf i)
+           (setq c (pvref *token* i)) (incf i)
            (cond
              ((eql #\. c)
               ;; Dezimal Integer
@@ -636,14 +748,14 @@
 
            (setq num1 0)
            (when (eql i len) (go SYMBOL))
-           (setq c (aref *token* i)) (incf i)
+           (setq c (pvref *token* i)) (incf i)
            (unless (eql #\. c) (go SYMBOL))
                   
            ;; nur ein Punkt
            ;;--------------
            (when (eql i len) (go SYMBOL))
 
-           (setq c (aref *token* i)) (incf i)
+           (setq c (pvref *token* i)) (incf i)
            (setq num2 (digit-char-p c))
            (when (null num2) (go SYMBOL))
            (setq num2 (/ num2 10.0))
@@ -653,7 +765,7 @@
 
            (when (eql i len)
              (return-from read-token (* sign (+ num1 num2))))
-           (setq c (aref *token* i)) (incf i)
+           (setq c (pvref *token* i)) (incf i)
 
          FLOAT-EXPT
 
@@ -687,7 +799,7 @@
                 ;; Pruefen ob der 'Dot' einer Dotted-List vorliegt
                 ;;------------------------------------------------
                 (when (and (eql len 1)
-                           (eql (aref *token* 0) #\.) 
+                           (eql (pvref *token* 0) #\.) 
                            *dot-flag*)
                   (setq *dot-flag* nil)
                   (return-from read-token nil))
@@ -695,13 +807,13 @@
                 ;; Pruefen ob das Symbol vollstaendig aus Dots besteht
                 ;;----------------------------------------------------
                 (do ((i 0 (1+ i)))
-                    ((>= i len) (error "illegal token ~S" *token*))
-                  (unless (eql #\. (aref *token* i)) (return))))
+                    ((>= i len) (error "illegal token ~S" (get-token-string)))
+                  (unless (eql #\. (pvref *token* i)) (return))))
 
               (return-from read-token
                 (if *uninterned*
-                  (make-symbol *token*)
-                  (values (intern *token*)))))
+                  (make-symbol (get-token-string))
+                  (values (intern (get-token-string))))))
             
              (*uninterned* (error "token may not contain colons"))
 
@@ -709,17 +821,17 @@
              ;;--------
              ((eql colon-pos 0)
               (unless (eql colon 1)
-                (error "illegal token ~S" *token*))
+                (error "illegal token ~S" (get-token-string)))
               (return-from read-token
-                (values (intern (subseq *token* 1)
+                (values (intern (token-subseq 1 *fill-pointer*)
                                 *keyword-package*))))
 
              ;; Package ist angegeben
              ;;----------------------
-             (T (let* ((package-name (subseq *token* 0 colon-pos))
+             (T (let* ((package-name (token-subseq 0 colon-pos))
                        (package (find-package package-name))
                        (symbol-name
-                        (subseq *token* (+ colon-pos colon))))
+                        (token-subseq (+ colon-pos colon) *fill-pointer*)))
                   (unless package
                     (error "illegal package-name ~S" package-name))
                   (case colon
@@ -731,7 +843,7 @@
                            (error "can't find the external symbol ~S in ~S"
                                   symbol-name package))
                          (return-from read-token symbol)))
-                    (T (error "illegal Token ~S" *token*)))))))))))
+                    (T (error "illegal Token ~S" (get-token-string))))))))))))
 
 ;;------------------------------------------------------------------------------
 ;; ignore-token stream
@@ -739,7 +851,7 @@
 ;;------------------------------------------------------------------------------
 (defun ignore-token (stream)
   (let ((c (read-char stream t nil t)))
-    (read-token stream c)
+    (read-token stream c (get-syntax c))
     nil))
 
 ;;------------------------------------------------------------------------------
@@ -800,16 +912,16 @@
 
 ;;------------------------------------------------------------------------------
 (defun string-reader (stream char &aux c)
-  (setf (fill-pointer *token*) 0)
+  (setq *fill-pointer* 0)
   (loop
     (setq c (read-char stream t nil t))
     (cond
       ((eql (get-syntax c) 'SINGLE-ESCAPE)
        (setq c (read-char stream t nil t))
-       (vector-push-extend c *token*))
+       (token-push-extend c))
       ((eql char c)
-       (return (copy-seq *token*)))
-      (T (vector-push-extend c *token*)))))
+       (return (get-token-string)))
+      (T (token-push-extend c)))))
 
 ;;------------------------------------------------------------------------------
 (defun char-reader (stream char font)
@@ -823,12 +935,12 @@
     (when (and c2 (eql 'CONSTITUENT (get-syntax c2)))
       ;; multiple-character case
       ;;------------------------
-      (setf (fill-pointer *token*) 0)
+      (setq *fill-pointer* 0)
       (let ((*read-suppress* t))
-        (read-token stream c))
+        (read-token stream c (get-syntax c)))
       (unless *read-suppress* 
-        (setq c (name-char *token*))
-        (when (null c) (error "illegal character name ~s" *token*))))
+        (setq c (name-char (get-token-string)))
+        (when (null c) (error "illegal character name ~s" (get-token-string)))))
 
     (cond
       (*read-suppress* nil)
@@ -962,15 +1074,15 @@
   (if (atom feature)
     (member feature *features*)
     (case (first feature)
-      (not (not (eval-feature (second feature))))
-      (and (dolist (feature (cdr feature))
-             (unless (eval-feature feature)
-               (return-from eval-feature nil)))
-           T)
-      (or (dolist (feature (cdr feature))
-            (when (eval-feature feature)
-              (return-from eval-feature t)))
-          nil)
+      (:not (not (eval-feature (second feature))))
+      (:and (dolist (feature (cdr feature))
+              (unless (eval-feature feature)
+                (return-from eval-feature nil)))
+            T)
+      (:or (dolist (feature (cdr feature))
+             (when (eval-feature feature)
+               (return-from eval-feature t)))
+           nil)
       (T (error "illegal feature expression ~s" feature)))))
                     
   
@@ -1023,8 +1135,8 @@
             (WHITESPACE)                ;ignorieren
    
             ((CONSTITUENT SINGLE-ESCAPE MULTIPLE-ESCAPE)
-             (return (progn (setf (fill-pointer *token*) 0)
-                            (read-token stream c))))
+             (return (progn (setq *fill-pointer* 0)
+                            (read-token stream c syntax))))
    
             ((nil) (error "illegal Character"))
            
@@ -1107,12 +1219,12 @@
       ((null c)
        (when eof-error-p (error "unexpected end of file"))
        (values eof-value t))
-      (T (setf (fill-pointer *token*) 0)
+      (T (setq *fill-pointer* 0)
          (loop
-           (when (eql #\Newline c) (return (values (copy-seq *token*) nil)))
-           (vector-push-extend c *token*)
+           (when (eql #\Newline c) (return (values (get-token-string) nil)))
+           (token-push-extend c)
            (setq c (read-char stream nil nil))
-           (when (null c) (return (values (copy-seq *token*) t))))))))
+           (when (null c) (return (values (get-token-string) t))))))))
 
 ;;------------------------------------------------------------------------------
 (defun peek-char (&optional peek-type stream (eof-error-p t)
@@ -1172,7 +1284,7 @@
      ;; mindestens 1 Ziffer lesen
      ;;--------------------------
      (when (>= start end) (go NO-INTEGER))
-     (setq x (digit-char-p (char start start) radix))
+     (setq x (digit-char-p (char string start) radix))
      (cond
        ((null x) (go NO-INTEGER))
        (T (incf start)
@@ -1242,7 +1354,7 @@
     (set-macro-character #\; #'semicolon-reader NIL rtab)
     (set-macro-character #\" #'string-reader NIL rtab)
     (set-macro-character #\` #'backquote-reader NIL rtab)
-    
+
     rtab))
 
     

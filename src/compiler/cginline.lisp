@@ -1,153 +1,30 @@
-;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Codegenerierung
 ;;;            Erzeugen von Inline-Code fuer ausgewaehlte Systempraedikate
 ;;;
-;;; $Revision: 1.40 $
-;;; $Log: cginline.lisp,v $
-;;; Revision 1.40  1994/05/20  08:41:15  hk
-;;; Noch ein Fehler in  get-arg-loc behoben.
-;;;
-;;; Revision 1.39  1994/05/18  15:08:51  sma
-;;; EQL-Makro für eql-Funktion eingeführt.
-;;;
-;;; Revision 1.38  1994/05/18  08:52:56  hk
-;;; Fehler in get-arg-loc behoben.
-;;;
-;;; Revision 1.37  1994/05/06  12:40:39  sma
-;;; Fehler in cg-struct-size korrigiert.
-;;;
-;;; Revision 1.36  1994/04/28  09:59:02  sma
-;;; Auskommentiere Funktion entfernt; C-MacroCall "LOAD_FIXNUM" -->
-;;; C-integer; cg-cons erzeugt Makroaufruf von ALLOC_CONS statt direkten
-;;; Code zur Erzeugung einer CONS-Zelle.
-;;;
-;;; Revision 1.35  1994/01/27  16:21:17  kl
-;;; rt::fixnump eingetragen.
-;;;
-;;; Revision 1.34  1994/01/27  14:47:51  sma
-;;; 1-fix und <fix werden jetzt inline-compiliert.
-;;;
-;;; Revision 1.33  1994/01/24  16:32:18  sma
-;;; rt::struct-type entfernt (jetzt in LISP in struct.lisp implementiert).
-;;; Optimierungen für not auskommentiert. Genau Erklärung siehe pred.lisp.
-;;;
-;;; Revision 1.32  1994/01/22  17:51:22  sma
-;;; Fehlende Klammer ergänzt.
-;;;
-;;; Revision 1.31  1994/01/21  16:50:08  sma
-;;; Optimierung! CC-get-int eingeführt. Insbesondere bei instance-ref,
-;;; structure-ref und die logischen funktionen bekommen jetzt eine
-;;; integer-konstante direkt uebergeben statt sie auf den stack zu
-;;; schieben und sofort wieder davon auszulesen.
-;;;
-;;; Revision 1.30  1994/01/21  13:20:42  sma
-;;; Alle für Symbole notwendigen Funktionen des rt::-Packages werden jetzt
-;;; inline compiliert. LOAD_BOOL in pred-result eingeführt. Fehler in
-;;; instance-set und set-svref-internal korriert. slot-set-unbound
-;;; gelöscht.
-;;;
-;;; Revision 1.29  1993/12/16  16:30:50  pm
-;;; FFI-Funktionen vom rt:: Package ins FFI: Package geschoben.
-;;;
-;;; Revision 1.28  1993/12/14  12:50:25  sma
-;;; Namensänderungen durch Einführung von plain-vector-Typ.
-;;; rt::%vector-length heißt jetzt rt::plain-vector-length, neue Funktion
-;;; rt::plain-vector-p, rt::svref-internal und rt::set-svref-internal.
-;;;
-;;; Revision 1.27  1993/12/09  14:13:16  sma
-;;; Änderungen für neue array-Repräsentation. stringp, vectorp, arrayp
-;;; sind in direkt Lisp kodiert, neu/verändert sind simple-bit-vector-p
-;;; und simple-vector-p.
-;;;
-;;; Revision 1.26  1993/11/01  15:25:46  hk
-;;; Fehler in get-arg-loc (var-ref) behoben. Im Zusammenspiel mit opt-args
-;;; wurden in gewissen Fällen lokale Variablen überschrieben, obwohl sie
-;;; später noch benutzt wurden.
-;;;
-;;; Revision 1.25  1993/10/26  14:58:14  sma
-;;; EQ Makro wird benutzt; CAR,CDR Makros eingeführt; mehr Typtest-Makros.
-;;;
-;;; Revision 1.24  1993/09/28  14:45:55  pm
-;;; Die C-Konvertierungsfunktionen werden jetzt inline compileiert
-;;;
-;;; Revision 1.23  1993/09/10  15:08:28  hk
-;;; get-arg-loc spezialisiert über form statt t.
-;;;
-;;; Revision 1.22  1993/09/10  11:49:54  hk
-;;; Fehler in cg-eq behoben, wenn beide Argumente einfache Konstanten
-;;; waren.
-;;;
-;;; Revision 1.21  1993/08/18  15:25:32  ft
-;;; Die Funktionen instancep, instance-set, instance-ref und
-;;; set-slot-unbound werden jetzt inline compiliert.
-;;;
-;;; Revision 1.20  1993/07/22  13:00:54  hk
-;;; In cg-%car und cg-%cdr GET_FORM durch GET_CAR ersetzt.
-;;;
-;;; Revision 1.19  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.18  1993/04/06  17:28:30  hk
-;;; ?codegen -> ?c-inline.
-;;;
-;;; Revision 1.17  1993/04/06  17:09:29  hk
-;;; shift-right, shift-left -> %shift-right, %shift-left.
-;;;
-;;; Revision 1.16  1993/02/16  15:50:26  hk
-;;; Revision Keyword eingefuegt, Symbole im zu uebersetzenden Programm
-;;; werden im clicc-lisp Package angesprochen.
-;;;
-;;; Revision 1.15  1993/01/13  15:06:31  ft
-;;; Erweiterung um Funktionen fuer ash.
-;;;
-;;; Revision 1.14  1993/01/07  10:00:20  hk
-;;; Fehler mit special-sys-fun behoben.
-;;;
-;;; Revision 1.13  1993/01/07  08:31:04  hk
-;;; Fehler in macrolet von cg-special-funs behoben.
-;;;
-;;; Revision 1.12  1993/01/06  13:03:40  hk
-;;; Funktionen {p1,p2,p3,cg}-special-funs vereinheitlicht.
-;;;
-;;; Revision 1.11  1993/01/06  11:18:53  ft
-;;; Erweiterung um logische Operationen auf Zahlen.
-;;;
-;;; Revision 1.10  1992/12/03  14:53:26  hk
-;;; typecase -> etypecase
-;;;
-;;; Revision 1.9  1992/11/26  16:46:17  hk
-;;; Neu cg-%vector-length.
-;;;
-;;; Revision 1.8  1992/11/26  16:00:13  hk
-;;; cg-init von cgmain.lisp -> hier, get-arg geaendert, etc.
-;;;
-;;; Revision 1.7  1992/11/25  17:51:27  hk
-;;; Inline Compilation von %car, %cdr, %rplaca, %rplacd, %cons und
-;;; einige Umbenennungen: check-integer-low -> fixnum-low-p ...
-;;;
-;;; Revision 1.6  1992/10/08  14:04:23  hk
-;;; cg-eq: Optimierung nach p2, null-form beachtet, cg-get-arg korrigiert.
-;;;
-;;; Revision 1.5  1992/09/25  17:24:44  kl
-;;; C-eq und C-eql auf die neue Repraesentation der einfachen Literale
-;;; umgestellt.
-;;;
-;;; Revision 1.4  1992/09/21  11:18:52  hk
-;;; Die eigentliche C-Codegenerierung uebersichtlicher gestaltet
-;;;
-;;; Revision 1.3  1992/07/30  10:27:07  hk
-;;; .
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.44 $
+;;; $Id: cginline.lisp,v 1.44 1994/12/17 11:54:49 pm Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")     
@@ -212,15 +89,7 @@
  rt::<fix
  rt::1-fix
 
- ffi::c-struct-p
- ffi::c-char-p
- ffi::c-short-p
- ffi::c-int-p
- ffi::c-long-p
- ffi::c-unsigned-char-p
- ffi::c-unsigned-short-p
- ffi::c-unsigned-int-p
- ffi::c-unsigned-long-p
+ ffi:c-string-p
 )
 
 ;;------------------------------------------------------------------------------
@@ -484,41 +353,9 @@
 ;;------------------------------------------------------------------------------
 ;; FFI
 ;;------------------------------------------------------------------------------
-(defun cg-c-struct-p (x-loc)
+(defun cg-c-string-p (x-loc)
   (pred-result
-   (getCode "CL_C_STRUCT_P(~A)" (CC-get-arg x-loc))))
-
-(defun cg-c-char-p (x-loc)
-  (pred-result
-   (getCode "CL_C_CHAR_P(~A)" (CC-get-arg x-loc))))
-
-(defun cg-c-short-p (x-loc)
-  (pred-result
-   (getCode "CL_C_SHORT_P(~A)" (CC-get-arg x-loc))))
-
-(defun cg-c-int-p (x-loc)
-  (pred-result
-   (getCode "CL_C_INT_P(~A)" (CC-get-arg x-loc))))
-
-(defun cg-c-long-p (x-loc)
-  (pred-result
-   (getCode "CL_C_LONG_P(~A)" (CC-get-arg x-loc))))
-
-(defun cg-c-unsigned-char-p (x-loc)
-  (pred-result
-   (getCode "CL_C_UNSIGNED_CHAR_P(~A)" (CC-get-arg x-loc))))
-
-(defun cg-c-unsigned-short-p (x-loc)
-  (pred-result
-   (getCode "CL_C_UNSIGNED_SHORT_P(~A)" (CC-get-arg x-loc))))
-
-(defun cg-c-unsigned-int-p (x-loc)
-  (pred-result
-   (getCode "CL_C_UNSIGNED_INT_P(~A)" (CC-get-arg x-loc))))
-
-(defun cg-c-unsigned-long-p (x-loc)
-  (pred-result
-   (getCode "CL_C_UNSIGNED_LONG_P(~A)" (CC-get-arg x-loc))))
+   (getCode "CL_C_STRING_P(~A)" (CC-get-arg x-loc))))
 
 ;;------------------------------------------------------------------------------
 ;; CAR, CDR, etc.
@@ -665,8 +502,12 @@
   (to-result-loc value))
 
 (defun cg-symbol-name (sym)
-  (C-MacroCall "LOAD_SMSTR" (CC-MacroCall "SYM_NAME" (CC-get-arg sym))
-               (CC-dest *result-spec*)))
+  (setq sym (CC-get-arg sym))
+  (case *result-spec*
+    ((NIL))
+    (C-BOOL (setq *C-bool* C-TRUE))
+    (T (C-MacroCall "GET_SYM_NAME" (CC-stack *stack-top*) sym
+                    (CC-dest *result-spec*)))))
 
 (defun cg-constant-flag-p (sym)
   (pred-result

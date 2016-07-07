@@ -1,123 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Codegenerierung: Funktionen, die C-Code erzeugen
 ;;;
-;;; $Revision: 1.34 $
-;;; $Log: cgcode.lisp,v $
-;;; Revision 1.34  1994/04/28  10:00:34  sma
-;;; Erzeugung eines GLOB_FUNARGs durch Makroaufruf abstrahiert.
-;;;
-;;; Revision 1.33  1994/02/08  13:54:21  sma
-;;; Änderungen für Optimierung von &rest-Paramtern.
-;;;
-;;; Revision 1.32  1994/02/03  17:30:27  sma
-;;; Änderungen für Optimierung von &rest-Paramtern.
-;;;
-;;; Revision 1.31  1993/12/09  14:04:42  sma
-;;; CC-Stack erzeugt jetzt ARG(xxx) statt STACK(base, xxx).
-;;;
-;;; Revision 1.30  1993/11/22  09:24:02  hk
-;;; Neuer C-Code ONLY_ONCE in Initialisierungsfunktionen, der bewirkt,
-;;; da_ diese Funktionen hvchstens 1x ausgef|hrt werden.
-;;;
-;;; Revision 1.29  1993/09/09  10:03:18  uho
-;;; Die Funktion 'CC-caller-stack' wird nun hier und nicht mehr in
-;;; cgblock.lisp definiert.
-;;; Die Funktionen 'C-MemUpMove' und 'C-MVToStack' generieren jetzt
-;;; Aufrufe von entsprechenden C-Makros 'MEM_UP_MOVE' bzw. 'MV_TO_STACK',
-;;; statt den Code selbst zu expandieren.
-;;;
-;;; Revision 1.28  1993/08/20  08:56:36  hk
-;;; In C-Comment format ~t durch write-char #\Tab ersetzt.
-;;;
-;;; Revision 1.27  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.26  1993/06/04  14:14:10  hk
-;;; (incf *C-line-count*) eingefuegt, um die Zeilenzahl in der generierten
-;;; C Datei beschraenken zu koennen.
-;;;
-;;; Revision 1.25  1993/04/19  16:05:09  hk
-;;; CC-Call kann nun auch Code generieren, falls 0 C Argumente.
-;;;
-;;; Revision 1.24  1993/03/17  15:51:15  hk
-;;; add-comment so geaendert, dass das Leerzeichen automatisch an den
-;;; String angehaengt wird.
-;;;
-;;; Revision 1.23  1993/02/16  16:08:12  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.22  1993/01/28  15:19:04  uho
-;;; Ausgabe von Zeilenkommentaren am Ende generierter Zeilen ermoeglicht
-;;;
-;;; Revision 1.21  1993/01/26  13:51:15  uho
-;;; C-Cmd gibt nun ggf. einen Kommentar aus
-;;;
-;;; Revision 1.20  1993/01/26  08:49:00  sma
-;;; integer overflow extra behandelt - jetzt richtig
-;;;
-;;; Revision 1.19  1993/01/25  15:22:13  sma
-;;; integer overflow extra behandelt
-;;;
-;;; Revision 1.18  1993/01/21  13:51:46  uho
-;;; C-if-flat eingefuehrt fuer die Generierung von  if ... goto
-;;;
-;;; Revision 1.17  1993/01/13  15:08:22  ft
-;;; Erweiterung um die C-Shift-Operatoren.
-;;;
-;;; Revision 1.16  1993/01/06  11:19:44  ft
-;;; Erweiterung um logische Funktionen.
-;;;
-;;; Revision 1.15  1992/11/23  14:25:46  ft
-;;; Konstantendefinitionen verschoben.
-;;;
-;;; Revision 1.14  1992/10/05  16:06:47  uho
-;;; C-VarDeclInit eingefuehrt -  Definieren initialisierter Variablen
-;;; C-DefSymDefault eingefuehrt - Definieren von Preprocessor Symbolen
-;;; C-DefMemSizes einegfuehrt - Definieren der Konstanten fuer Stack/Heapgroesse
-;;;
-;;; Revision 1.13  1992/10/05  14:32:39  uho
-;;; Anfuerungszeichen um #define eingefuegt.
-;;;
-;;; Revision 1.12  1992/10/02  14:07:22  hk
-;;; Fehlerbehandlung jetzt lokal
-;;;
-;;; Revision 1.11  1992/09/30  16:50:57  hk
-;;; Bei der Ausgabe von Code mittels format *print-circle* auf nil.
-;;;
-;;; Revision 1.10  1992/09/28  17:21:46  hk
-;;; Lerror -> Labort, C-TRUE und C-FALSE neu.
-;;;
-;;; Revision 1.9  1992/09/23  09:47:13  hk
-;;; Definition von C-GLOBAL_FUNARG-Init.
-;;;
-;;; Revision 1.8  1992/09/23  08:31:20  hk
-;;; CC-op< definiert.
-;;;
-;;; Revision 1.7  1992/09/21  11:18:52  hk
-;;; Die eigentliche C-Codegenerierung uebersichtlicher gestaltet
-;;;
-;;; Revision 1.6  1992/09/02  09:37:48  hk
-;;; CC-make-bool in to-result-loc und C-copy in cg-copy verwendet.
-;;;
-;;; Revision 1.5  1992/08/11  12:32:05  hk
-;;; Neue Funktion C-Decl fuer Deklarationen von Variablen.
-;;;
-;;; Revision 1.4  1992/08/07  12:00:25  hk
-;;; Dateikopf verschoenert.
-;;;
-;;; Revision 1.3  1992/06/11  11:15:48  hk
-;;; cg-error -> error.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.36 $
+;;; $Id: cgcode.lisp,v 1.36 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -184,7 +90,9 @@
                                "*\\/"
                                (subseq comment (+ 2 pos)))))
   (write-char #\Tab *C-file*)
-  (format *C-file* "/* ~A*/" comment))
+  (write-string "/* " *C-file*)
+  (write-string comment *C-file*)
+  (write-string "*/" *C-file*))
 
 
 ;;------------------------------------------------------------------------------
@@ -230,7 +138,10 @@
   (let ((*print-circle* nil))
     (dotimes (i *C-indent*)
       (write-char #\Tab *C-file*))
-    (format *C-file* "~{~A~}" args)))
+    (dolist (arg args)
+      (if (stringp arg)
+        (write-string arg *C-file*)
+        (princ arg *C-file*)))))
 
 ;;------------------------------------------------------------------------------
 ;; Ausgabe einer Zeile C-Code
@@ -520,16 +431,22 @@
 ;; Initialisierung einer Komponente eines Arrays des Typs CL_FORM
 ;;------------------------------------------------------------------------------
 (defun C-init-CL_FORM (type init-form)
-  (format *C-file*
-          (cond ((eql init-form C-most-negative-fixnum)
-                              ; Umgeht die Warnung "integer-overflow" des acc
-                 (incf init-form)
-                 "{ ~A, (~A) - 1 },")
-                ((integerp init-form)
-                 "{ ~A, ~A },")
-                (T
-                 "{ ~A, (long)~A },"))
-	  type init-form)
+  (write-string "{ " *C-file*)
+  (princ type *C-file*)
+  (write-string ", " *C-file*)
+  (cond ((eql init-form C-most-negative-fixnum)
+                      ; Umgeht die Warnung "integer-overflow" des acc
+         (incf init-form)
+         (write-char #\( *C-file*)
+         (princ init-form *C-file*)
+         (write-string ") -1 }," *C-file*))
+        ((integerp init-form)
+         (princ init-form *C-file*)
+         (write-string " }," *C-file*))
+        (T
+         (write-string "(long)" *C-file*)
+         (princ init-form *C-file*)
+         (write-string " }," *C-file*)))
   (C-Newline))
 
 ;;------------------------------------------------------------------------------

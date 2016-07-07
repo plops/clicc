@@ -1,10 +1,26 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem
-;;;            - WRITE
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : - WRITE
 ;;;            - PRIN1
 ;;;            - PRINT
 ;;;            - PPRINT (= PRINT)
@@ -18,98 +34,8 @@
 ;;;            - TERPRI
 ;;;            - FRESH-LINE
 ;;;
-;;; $Revision: 1.26 $
-;;; $Log: print.lisp,v $
-;;; Revision 1.26  1994/06/07  09:30:50  hk
-;;; In pprint einen Aufruf von terpri eingef"ugt.
-;;;
-;;; Revision 1.25  1994/06/02  14:14:16  hk
-;;; Defaultwerte f"ur *print-length* und *print-level* abweichend vom
-;;; Steele auf 50 gesetzt, da *print-circle* nicht beachtet wird.
-;;; Beim Drucken von Strukturen wird :print-function beachtet.
-;;; Print-Funktionen f"ur readtable, stream, package und pathname werden nun
-;;; in den entsprechenden defstructs angegeben.
-;;;
-;;; Revision 1.24  1994/04/22  14:15:57  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Ausgabe verschoenert.
-;;;
-;;; Revision 1.23  1994/04/18  12:22:01  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Ausgaberoutine fuer Foreign-Types erweitert.
-;;;
-;;; Revision 1.22  1993/12/16  16:43:10  pm
-;;; inkonsistenzen in den Symbolnamen behoben.
-;;;
-;;; Revision 1.21  1993/12/09  10:23:09  hk
-;;; Fehler in write2 für Vectoren behoben.
-;;;
-;;; Revision 1.20  1993/12/06  16:13:06  hk
-;;; Fehler in write2 behoben, Test auf structp nach pathnamep etc.
-;;;
-;;; Revision 1.19  1993/11/30  16:06:59  hk
-;;; Fehler behoben.
-;;;
-;;; Revision 1.18  1993/11/30  15:48:04  hk
-;;; Fehler behoben: *print-level* und *print-length* werden bei Strukturen
-;;; beachtet.
-;;;
-;;; Revision 1.17  1993/08/17  15:27:56  hk
-;;; Klammerfehler behoben.
-;;;
-;;; Revision 1.16  1993/08/17  14:07:05  hk
-;;; Pathnames als #P, Fehler beim Drucken von Packages behoben.
-;;;
-;;; Revision 1.15  1993/07/22  08:30:49  pm
-;;; Fehler bereinigt
-;;;
-;;; Revision 1.14  1993/07/21  13:34:40  pm
-;;; Erweiterung um die Ausgabe fuer C-Strukturen
-;;;
-;;; Revision 1.13  1993/07/14  08:52:33  ft
-;;; Anpassung an die geänderten Parameter von instance-ref/set.
-;;;
-;;; Revision 1.12  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.11  1993/05/23  17:56:48  pm
-;;; write2 um die Ausgabe von C-Werten erweitert
-;;;
-;;; Revision 1.10  1993/05/21  13:58:50  pm
-;;; c-int in int umbenannt
-;;;
-;;; Revision 1.9  1993/05/03  16:23:39  hk
-;;; In write2: Drucken von foreign numbers komplett auskommentiert,
-;;; da die Funktionen rt::foreign-number-p und make-integer nicht definiert sind.
-;;;
-;;; Revision 1.8  1993/05/03  15:30:14  hk
-;;; (make-integer object) auskommentiert, da make-integer undefiniert ist.
-;;;
-;;; Revision 1.7  1993/05/03  12:43:08  pm
-;;; Erweiterung um die Ausgabe fuer das FFI
-;;;
-;;; Revision 1.6  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.5  1993/02/25  15:21:15  ft
-;;; Funktion write2 kann jetzt auch Instanzen drucken.
-;;;
-;;; Revision 1.4  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.26 $ eingefuegt
-;;;
-;;; Revision 1.3  1993/01/11  15:22:58  hk
-;;; structure -> struct
-;;;
-;;; Revision 1.2  1992/09/30  17:24:52  hk
-;;; #<Unbound> fuer unbound.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.28 $
+;;; $Id: print.lisp,v 1.28 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -451,36 +377,6 @@
                  (write-string " #<slot> " stream)
                  (write2 (rt::struct-ref object i type) stream))
                (write-char #\) stream)))))))
-
-    ((or (ffi::c-char-p object)
-         (ffi::c-unsigned-char-p object))
-     (write-string "#<C-CHARACTER @ " stream)
-     (write-char (ffi::lisp-character object) stream)
-     (write-string ">" stream))
-    ((or (ffi::c-long-p object)
-         (ffi::c-unsigned-long-p object))
-     (write-string "#<C-INTEGER @ " stream)
-     (print-integer (ffi::lisp-integer object) stream)
-     (write-string ">" stream))
-    ((ffi::c-long-double-p object)
-     (write-string "#<C-FLOAT @ " stream)
-     (print-float (ffi::lisp-float object) stream)
-     (write-string ">" stream))
-
-    ((or (rt::c-struct-p object)
-         (rt::c-union-p object)
-         (rt::c-handle-p object)
-         (rt::c-array-p object))
-     (let* ((*print-level* 0))
-       (write-string "#<" stream)
-       (write2 (rt::internal-get-symbol object) stream)
-       (write-string " @ " stream)
-       (write2 (rt::internal-get-address object) stream)
-       (write-string ">" stream)))
-    ((ffi::c-string-p object)
-     (write-string "#<C-STRING @ " stream)
-     (write-string (ffi::make-lisp-string object) stream)
-     (write-string ">" stream))
 
     ((rt::unbound-value-p object)
      (write-string "#<Unbound>" stream))

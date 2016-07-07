@@ -1,217 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Pass 1 der Klassenverarbeitung, sowie der Instantierung
 ;;;
-;;; $Revision: 1.63 $
-;;; $Log: p1class.lisp,v $
-;;; Revision 1.63  1994/02/21  10:04:42  ft
-;;; Parameterprüfung in p1-defclass erweitert; Neue Funktion
-;;; export-classes zur Vorbereitung von Klassen auf das Exportieren hin
-;;; zugefügt.
-;;;
-;;; Revision 1.62  1994/01/26  13:36:53  ft
-;;; Änderung der Darstellung von ungebundenen Slots.
-;;;
-;;; Revision 1.61  1994/01/21  16:51:15  ft
-;;; Zweite Behelfskorrektur an *SECRET-UNBOUND-SLOT-VALUE*.
-;;;
-;;; Revision 1.60  1994/01/21  16:48:51  ft
-;;; Behelfskorrektur an *SECRET-UNBOUND-SLOT-VALUE*.
-;;;
-;;; Revision 1.59  1994/01/21  08:25:00  ft
-;;; Änderung der Zwischensprachrepr. des Werts unbound für Slots von einem
-;;; String zu einem Symbol (unintern).
-;;;
-;;; Revision 1.58  1993/12/14  12:27:25  hk
-;;; In parse-slot-specifier: 'setf -> 'L::setf
-;;;
-;;; Revision 1.57  1993/11/22  13:13:14  ft
-;;; compute-class-precedence-list in compute-c-p-l wegen Konflikten mit
-;;; gleichnamiger Funktion in Allegro CL umbenannt.
-;;;
-;;; Revision 1.56  1993/11/10  09:47:52  ft
-;;; Parameteranalyse in p1-defclass erweitert. Vorkommen von T in
-;;; Superklassenlisten werden gestrichen, Bei mehrfacher Nennung einer
-;;; Klasse wird ein Fehler ausgegeben.
-;;;
-;;; Revision 1.55  1993/10/13  14:15:28  ft
-;;; Fehler beim Umwandeln der Klassensymbole behoben.
-;;;
-;;; Revision 1.54  1993/10/13  12:26:22  ft
-;;; Falls der Fehler bei einer referenzierten aber nicht definierten
-;;; Klasse fortgesetzt wird, werden jetzt Default-Belegungen f"ur die
-;;; Klasse ermittelt und diese in die class-def-list des aktuellen Moduls
-;;; eingetragen.
-;;;
-;;; Revision 1.53  1993/09/30  09:35:31  ft
-;;; Einbau eines forsetzbaren Fehlers, falls mehr als ein initarg
-;;; fuer einen Slot angegeben wird.
-;;;
-;;; Revision 1.52  1993/09/17  13:53:14  ft
-;;; Explizite Angabe des Tests bei allen Aufrufen von assoc die nur eq
-;;; benoetigen.
-;;;
-;;; Revision 1.51  1993/09/09  09:27:10  ft
-;;; Bei einfacher Vererbung werden die Positionen von Slots erhalten.
-;;;
-;;; Revision 1.50  1993/09/09  09:05:47  ft
-;;; Aenderung der durch den order Slot festgelegten Reihenfolge.
-;;;
-;;; Revision 1.49  1993/09/07  09:48:27  ft
-;;; Verwaltung der Annotation order an definierten Klassen implementiert.
-;;;
-;;; Revision 1.48  1993/09/06  08:43:29  ft
-;;; Das Compiler-Flag *OPTIMIZE* wird jetzt beachtet.
-;;;
-;;; Revision 1.47  1993/07/14  08:52:50  ft
-;;; Anpassung an die geänderten Parameter von instance-ref/set.
-;;;
-;;; Revision 1.46  1993/06/29  11:40:48  ft
-;;; Ungenutzte Variable in compute-class-precedence-list entfernt.
-;;;
-;;; Revision 1.45  1993/06/26  14:22:55  ft
-;;; Kommentare und Fehlermeldungen verschönt.
-;;;
-;;; Revision 1.44  1993/06/26  14:18:00  ft
-;;; Meldung beim Finalisieren von built-in's,
-;;; Optimierung der Position von Slots,
-;;; Fehler beim Linearisieren der class-precedence-list behoben.
-;;;
-;;; Revision 1.43  1993/06/23  09:18:41  uho
-;;; Explizite Bloecke fuer CLISP um die Funktionen topological-sort
-;;; und select-other-choice gelegt.
-;;;
-;;; Revision 1.42  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.41  1993/06/16  15:04:53  ft
-;;; an diversen Stellen L:: eingefügt.
-;;;
-;;; Revision 1.40  1993/06/16  11:31:45  ft
-;;; parser-function für defclass-parameter überarbeitet.
-;;;
-;;; Revision 1.39  1993/05/22  11:59:55  ft
-;;; Neue bessere und viel richtigere Verarbeitung von Slot-Initforms.
-;;;
-;;; Revision 1.38  1993/05/19  13:45:22  ft
-;;; Zugriffe auf den metaclass-slot gestrichen.
-;;;
-;;; Revision 1.37  1993/05/13  13:19:34  ft
-;;; lokale Funktion extract-slot-info in finalize-classes gestrichen, da
-;;; sie nicht mehr benutzt wird
-;;;
-;;; Revision 1.36  1993/04/20  14:28:33  ft
-;;; Erweiterung um das Finalisieren der Built-In-Klassen.
-;;;
-;;; Revision 1.35  1993/04/15  13:04:38  ft
-;;; symbolize-class-names wandelt jezt auch die Slot-Bezeichner um.
-;;;
-;;; Revision 1.34  1993/04/13  09:19:30  ft
-;;; Neue initform fuer ungebundene Slots.
-;;;
-;;; Revision 1.33  1993/04/08  10:13:16  ft
-;;; Ausgabe der Finalisierungsmeldung korrigiert, und neu Pruefung auf
-;;; doppelte Slot-Definitionen.
-;;;
-;;; Revision 1.32  1993/04/06  15:38:51  ft
-;;; Fehler bei falscher Lambda-liste fuer Defclass.
-;;;
-;;; Revision 1.31  1993/04/06  14:02:47  ft
-;;; Ueberfuehren der c-p-l in Zwischensprache jetzt 'von Hand'.
-;;;
-;;; Revision 1.30  1993/04/03  10:06:22  hk
-;;; p1-make-instance als Quelltext transform. compiler-macro implementiert.
-;;;
-;;; Revision 1.29  1993/03/30  12:27:59  ft
-;;; Verarbeitung der special-form find-class.
-;;;
-;;; Revision 1.28  1993/03/25  10:14:46  ft
-;;; Klassename wird waehrend des Finalisierens in ein 'defined-sym' umgewandelt.
-;;;
-;;; Revision 1.27  1993/03/23  07:34:00  ft
-;;; Verarbeitung der Slot-Initforms korrigiert,
-;;; p1-make-instance an die Veraenderung im Laufzeitsystem angepasst,
-;;;
-;;; Revision 1.26  1993/03/19  08:54:26  ft
-;;; Slot-Initforms enthalten jetzt Zwischensprachkonstrukte.
-;;;
-;;; Revision 1.25  1993/03/12  09:43:29  ft
-;;; Erweiterung um p1-make-instance; Anpassung der Werte von 'class-def'-Slots
-;;; an Codeerzeugung fuer Klassen; geaenerte Repraesentation des Unbound-Werts
-;;; fuer Slots.
-;;;
-;;; Revision 1.24  1993/02/22  16:07:12  ft
-;;; Ausgabe einer 'clicc-message' waehrend des Finalisierens.
-;;;
-;;; Revision 1.23  1993/02/16  17:02:19  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.22  1993/02/10  09:40:43  ft
-;;; Erweiterung der Spezialisierungsmoeglichkeit auf einen Parameter
-;;; an beliebiger Position.
-;;;
-;;; Revision 1.21  1993/01/22  14:54:35  ft
-;;; Es werden jetzt die erweiterten Funktionsnamen genutzt.
-;;;
-;;; Revision 1.20  1993/01/15  17:08:02  kl
-;;; Fehler in p1-defclass behoben. In einem if-Ausdruck im Fall :CLASS standen
-;;;
-;;; Revision 1.19  1993/01/15  11:52:28  ft
-;;; Fast alle clicc-error in clc-error umgewandelt und
-;;; ein catch fuer clicc-error in finalize-class installiert.
-;;;
-;;; Revision 1.18  1993/01/14  15:51:35  ft
-;;; Unterdruecken der lokalen Funktionen bei Slot-Zugriffs-Methoden
-;;; und Auswerten der definierten Slot-Typen.
-;;;
-;;; Revision 1.17  1993/01/13  12:19:43  ft
-;;; Setzen von *CURRENT-FORM* fuer Aufrufe von clicc-error
-;;;
-;;; Revision 1.16  1992/12/21  07:39:37  ft
-;;; Message-String verschoenert.
-;;;
-;;; Revision 1.15  1992/12/18  09:17:44  ft
-;;; UNBOUND als Slot-Wert implementiert.
-;;;
-;;; Revision 1.14  1992/12/10  11:02:53  ft
-;;; Erzeugen einer Laufzeit-Initialisierungsfkt.
-;;;
-;;; Revision 1.13  1992/12/03  15:36:49  ft
-;;; Zwischenstand der Fehlerbeseitigung.
-;;;
-;;; Revision 1.12  1992/11/17  14:47:25  ft
-;;; Fehler im Rueckgabewert von generate-slot-desc korrigiert.
-;;;
-;;; Revision 1.11  1992/11/17  13:22:32  ft
-;;; Verarbeitung der Writer-Methoden modifiziert.
-;;;
-;;; Revision 1.10  1992/11/12  10:55:14  ft
-;;; parse-class-options liefert jetzt auch documentation zurueck.
-;;;
-;;; Revision 1.9  1992/11/11  10:36:34  ft
-;;; Fehler in parse-slot-options beseitigt.
-;;;
-;;; Revision 1.8  1992/10/28  09:55:03  ft
-;;; Umbenennungen
-;;;
-;;; Revision 1.7  1992/10/28  09:50:28  ft
-;;; Aufruf von clicc-error korrigiert.
-;;;
-;;; Revision 1.6  1992/10/16  11:58:07  ft
-;;; Korrekturen in p1-defclass und Erweiterungen in finalize-classes.
-;;;
-;;; Revision 1.5  1992/10/13  09:27:29  ft
-;;; multiple-value-bind's so geaendert, dass Warnings entfallen.
-;;;
-;;; Revision 1.4  1992/10/13  09:11:02  ft
-;;; Umstellung auf die Aenderungen im *GLOBAL-ENVIRONMENT*.
-;;; finalize-classes hinzugefuegt.
-;;;
-;;; Revision 1.3  1992/09/01  14:32:57  ft
-;;; Datei-Header hinzugefuegt und Kommentare verschoenert
+;;; $Revision: 1.66 $
+;;; $Id: p1class.lisp,v 1.66 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -260,16 +72,15 @@
   
     ;; erste Parameterpruefung
     ;;------------------------
-    (unless (and (listp all-args) (> (length all-args) 2)
-                 (listp (second all-args)) (listp (third all-args)))
+    (unless (and (listp all-args) (>= (length all-args) 3)
+                 (listp (second all-args)) (listp (third all-args))
+                 (every #'listp (cdddr all-args)))
       (clicc-error
        ILLEGAL_CALL "DEFCLASS"
        "CLASS-NAME ({SUPERCLASS-NAME}*) ({SLOT-SPECIFIER}*) [CLASS-OPTION]"))
 
     (multiple-value-bind
-        (class-name 
-         superclass-names
-         slot-specifier)
+        (class-name superclass-names slot-specifier default-initargs)
         (parse-defclass-args all-args)
     
       (let ((class-entry                ; Klasseninfo aus dem global-env
@@ -282,6 +93,9 @@
         ;; gebe Meldung aus
         ;;-----------------
         (clicc-message "Analyse DEFCLASS     ~A" class-name)
+
+        (when default-initargs
+          (clc-error "class-option :DEFAULT-INITARGS will be ignored"))
 
         ;; Pruefen ob die Klasse schon definiert/referenziert  wurde
         ;; sonst neue Instanz von defined-class erzeugen
@@ -371,37 +185,29 @@
 ;;------------------------------------------------------------------------------
 ;; parse-defclass-args: Parser Funktion fuer die Parameter des macros defclass
 ;;------------------------------------------------------------------------------
-
 (defun parse-defclass-args (all-args)
   (let ((class-name                     ; Name der Klasse als Symbol
-         (first all-args))
+         (pop all-args))
         (defined-superclasses           ; Liste definierter Superklassen
-            (second all-args))
+            (pop all-args))
         ;; Die folgenden drei koennen auch nil enthalten
         (superclasses nil)              ; Liste aller Superklassen
         (slot-specifier                 ; definierte Slot Spezifizierer
-         (third all-args))                              
+         (pop all-args))                              
         (default-initargs nil))
     (setf superclasses defined-superclasses) ; vorlaeufig !!!
-    (do ((options (cadddr all-args) (cddr options)))
-        ((null options))
-      (case (first options)
-        (:default-initargs
-            (setf default-initargs (cadr options)))
-        (:documentation
-         nil)                           ; kann ignoriert werden
+    (dolist (option all-args)
+      (case (first option)
+        (:default-initargs (setf default-initargs (cdr option)))
+        (:documentation nil)            ; will be ignored
         (:metaclass
          (clc-error "The class-option ~A is not a part of the ~
                          implemented language ~%and  will be ignored."
-                    (first options)))                          
+                    (first option)))                          
         (otherwise
          (clc-error "The ~A is not a valid class-option and will be ignored."
-                    (first options)))))
-    (values
-     class-name
-     superclasses
-     slot-specifier
-     default-initargs)))
+                    (first option)))))
+    (values class-name superclasses slot-specifier default-initargs)))
 
 ;;------------------------------------------------------------------------------
 ;; Funktionen zum Erzeugen von Instanzen von slot-desc aus einer
@@ -763,10 +569,7 @@
                        (when reader-name
                          (p1-defmethod 
                           `(,reader-name ((instance ,class-name))
-                            ,(if (eq type T)
-                                 `(rt::instance-ref instance ,offset)
-                                 `(L::the ,type 
-                                   (rt::instance-ref instance ,offset))))
+                            (L::the ,type (rt::instance-ref instance ,offset)))
                           :dont-generate-local-funs T)))
                      (dolist (writer-name 
                                (cdr (assoc (?symbol slot-desc)
@@ -775,10 +578,8 @@
                        (when writer-name
                          (p1-defmethod 
                           `(,writer-name (new-value (instance ,class-name))
-                            ,(if (eq type T)
-                                 `(rt::instance-set new-value instance ,offset)
-                                 `(rt::instance-set 
-                                   (L::the ,type new-value) instance ,offset)))
+                            (rt::instance-set 
+                             (L::the ,type new-value) instance ,offset))
                           :dont-generate-local-funs T)))))))))
            
          ;;---------------------------------------------------------------------

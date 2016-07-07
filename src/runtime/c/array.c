@@ -1,74 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- * Funktion : System-Funktionen (Arrays)                                
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * $Revision: 1.18 $
- * $Log: array.c,v $
- * Revision 1.18  1994/04/28  09:42:57  sma
- * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
  *
- * Revision 1.17  1994/01/05  12:45:38  sma
- * Alle Laufzeitfunktionen mit dem Präfix rt_ versehen. make-plain-vector
- * in fünf Funktionen make-vector-t, make-vector-fixnum,
- * make-vector-float und make-vector-bit zerteilt.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ * Funktion : Arrays
  *
- * Revision 1.16  1993/12/14  12:30:37  sma
- * Namensänderungen durch Einführung von plain-vector-Typ.
- * simple-vector-element-code und make-simple-vector heißen jetzt
- * plain-vector-element-code und make-plain-vector. (set-)svref wurde in
- * (set-)pvref-internal umbenannt.
- *
- * Revision 1.15  1993/12/10  11:31:19  sma
- * Neue array-Repräsentation. Weniger C, mehr Lisp. Neue Version, die
- * meisten C-Funktionen wurden ersetzt/gelöscht. Neue Funktion shrink_smstr.
- *
- * Revision 1.13  1993/10/29  15:16:57  sma
- * Methode, den Array-Typ (inkorrekterweise) nochmals im TAG-Feld der
- * Arraygröße zu speichern entfernt. Aus diesem Grund
- * (set_)row_major_aref_internal geändert.
- *
- * Revision 1.12  1993/09/13  11:52:05  sma
- * Fehler in Längenangaben von Arrays, Vectoren und Instanzen beseitigt
- * durch Einführen des SET_AR_SIZE-Makros.
- *
- * Revision 1.11  1993/08/26  15:20:57  hk
- * Typ von set_array_header von (CL_FORM *) nach void.
- * Unbenutzte Variable entfernt.
- *
- * Revision 1.10  1993/08/20  10:13:41  hk
- * array_element_type_internal prüft nicht mehr auf array Typ.
- *
- * Revision 1.9  1993/07/08  13:12:05  sma
- * OFFSET-Marko eingeführt.
- *
- * Revision 1.8  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.7  1993/05/08  18:19:20  hk
- * Argumentreihenfolge von set-row-major-aref-internal, set-svref-internal
- * und set-fill-pointer-internal geaendert.
- *
- * Revision 1.6  1993/04/22  10:29:34  hk
- * fun_decl.h -> sys.h.
- *
- * Revision 1.5  1993/02/17  15:25:58  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.4  1993/01/05  10:25:12  hk
- * Neue Funktion shrink-vector
- *
- * Revision 1.3  1992/11/16  11:41:10  hk
- * Typ von set_row_major_aref_internal von (void *) nach void, scheint ein
- * Schreibfehler gewesen zu sein.
- *
- * Revision 1.2  1992/09/28  17:20:28  hk
- * Lerror -> Labort, neues Lerror mit Lisp-Parameter
- *
- * Revision 1.1  1992/03/24  17:03:37  hk
- * Initial revision
+ * $Revision: 1.21 $
+ * $Id: array.c,v 1.21 1994/11/22 14:54:01 hk Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>
@@ -85,8 +40,7 @@
 /*------------------------------------------------------------------------------
  * RT::PLAIN-VECTOR-ELEMENT-CODE vector
  *----------------------------------------------------------------------------*/
-void rt_plain_vector_element_code(base)
-CL_FORM *base;
+LISP_FUN(rt_plain_vector_element_code)
 {
    /* 2 Zeilen notwendig wegen Seiteneffekte in den LOAD-Makros */
    int code = GET_VECTOR_CODE(ARG(0)); 
@@ -94,72 +48,63 @@ CL_FORM *base;
 }
 
 /*------------------------------------------------------------------------------
- * RT::MAKE-VECTOR-T size initvalue
+ * RT::MAKE-VECTOR-T size
  *----------------------------------------------------------------------------*/
-void rt_make_vector_t(base)
-CL_FORM *base;
+LISP_FUN(rt_make_vector_t)
 {
    long i, size = GET_FIXNUM(ARG(0));
    CL_FORM *vector;
    
-   vector = form_alloc(ARG(2), size + HEADER_SIZE);
+   vector = form_alloc(ARG(1), size + HEADER_SIZE);
    for (i = 1; i <= size; i++)
-      COPY(ARG(1), OFFSET(vector, i));
+      LOAD_NIL(OFFSET(vector, i));
    
    INIT_VEC_T(vector, size);
    LOAD_VEC_T(vector, ARG(0));
 }
 
 /*------------------------------------------------------------------------------
- * RT::MAKE_VECTOR_FIXNUM size
+ * RT::MAKE-VECTOR-FIXNUM size
  *----------------------------------------------------------------------------*/
-void rt_make_vector_fixnum(base)
-CL_FORM *base;
+LISP_FUN(rt_make_vector_fixnum)
 {
-   long i, size = GET_FIXNUM(ARG(0));
+   long size = GET_FIXNUM(ARG(0));
    long *data = fixnum_alloc(ARG(0), size);
    CL_FORM *vector;
 
    vector = form_alloc(ARG(0), 1 + HEADER_SIZE);
-   for (i = 0; i < size; i++)
-      data[i] = 0;
    LOAD_FIXNUM_PTR(data, AR_BASE(vector));
    INIT_VEC_FIXNUM(vector, size);
    LOAD_VEC_FIXNUM(vector, ARG(0));
 }
 
 /*------------------------------------------------------------------------------
- * RT::MAKE_VECTOR_FLOAT size
+ * RT::MAKE-VECTOR-FLOAT size
  *----------------------------------------------------------------------------*/
-void rt_make_vector_float(base)
-CL_FORM *base;
+LISP_FUN(rt_make_vector_float)
 {
-   long i, size = GET_FIXNUM(ARG(0));
+   long size = GET_FIXNUM(ARG(0));
    double *data = float_alloc(ARG(0), size);
    CL_FORM *vector;
 
    vector = form_alloc(ARG(0), 1 + HEADER_SIZE);
-   for (i = 0; i < size; i++)
-      data[i] = 0.0;
    LOAD_FLOAT_PTR(data, AR_BASE(vector));
    INIT_VEC_FLOAT(vector, size);
    LOAD_VEC_FLOAT(vector, ARG(0));
 }
 
 /*------------------------------------------------------------------------------
- * RT::MAKE_VECTOR_CHAR size initvalue
+ * RT::MAKE-VECTOR-CHAR size initvalue
  *----------------------------------------------------------------------------*/
-void rt_make_vector_char(base)
-CL_FORM *base;
+LISP_FUN(rt_make_vector_char)
 {
-   long i, size = GET_FIXNUM(ARG(0));
+   long size = GET_FIXNUM(ARG(0));
    char initvalue = GET_CHAR(ARG(1));
    char *data = char_alloc(ARG(0), size);
    CL_FORM *vector;
 
    vector = form_alloc(ARG(0), 1 + HEADER_SIZE);
-   for (i = 0; i < size; i++)
-      data[i] = initvalue;
+   memset(data, initvalue, size);
    LOAD_CHAR_PTR(data, AR_BASE(vector));
    INIT_VEC_CHAR(vector, size);
    LOAD_VEC_CHAR(vector, ARG(0));
@@ -168,14 +113,12 @@ CL_FORM *base;
 /*------------------------------------------------------------------------------
  * RT::MAKE_VECTOR_BIT size
  *----------------------------------------------------------------------------*/
-void rt_make_vector_bit(base)
-CL_FORM *base;
+LISP_FUN(rt_make_vector_bit)
 {
    long size = GET_FIXNUM(ARG(0));
    CL_FORM *vector;
 
    vector = form_alloc(ARG(0), 1 + HEADER_SIZE);
-   /* bits müssen nicht initialisiert werden,0/1 sind alle möglichen Werte */
    LOAD_BITS_PTR(bits_alloc(ARG(0), size), AR_BASE(vector));
    INIT_VEC_BIT(vector, size);
    LOAD_VEC_BIT(vector, ARG(0));
@@ -185,8 +128,7 @@ CL_FORM *base;
 /*------------------------------------------------------------------------------
  * RT::PVREF vector index
  *----------------------------------------------------------------------------*/
-void rt_pvref(base)
-CL_FORM *base;
+LISP_FUN(rt_pvref)
 {
    CL_FORM *vector = GET_FORM(ARG(0));
    long index = GET_FIXNUM(ARG(1));
@@ -216,8 +158,7 @@ CL_FORM *base;
 /*------------------------------------------------------------------------------
  * RT::SET-PVREF value vector index
  *----------------------------------------------------------------------------*/
-void rt_set_pvref(base)
-CL_FORM *base;
+LISP_FUN(rt_set_pvref)
 {
    CL_FORM *vector = GET_FORM(ARG(1));
    long index = GET_FIXNUM(ARG(2));
@@ -247,8 +188,7 @@ CL_FORM *base;
 /*------------------------------------------------------------------------------
  * RT::SBVREF bit-vector index
  *----------------------------------------------------------------------------*/
-void rt_sbvref(base)
-CL_FORM *base;
+LISP_FUN(rt_sbvref)
 {
    long *bit_vector = BIT_AR(GET_FORM(ARG(0)));
    long index = GET_FIXNUM(ARG(1));
@@ -262,8 +202,7 @@ CL_FORM *base;
 /*------------------------------------------------------------------------------
  * RT::SET-SBVREF value bit-vector index
  *----------------------------------------------------------------------------*/
-void rt_set_sbvref(base)
-CL_FORM *base;
+LISP_FUN(rt_set_sbvref)
 {
    long *bit_vector = BIT_AR(GET_FORM(ARG(1)));
    long index = GET_FIXNUM(ARG(2));
@@ -277,8 +216,7 @@ CL_FORM *base;
 /*------------------------------------------------------------------------------
  * RT::BITOP opcode bit-array1 bit-array2 result-bit-array
  *----------------------------------------------------------------------------*/
-void rt_bitop(base)
-CL_FORM *base;
+LISP_FUN(rt_bitop)
 {
    long *a1 = BIT_AR(GET_FORM(ARG(1)));
    long *a2 = BIT_AR(GET_FORM(ARG(2)));
@@ -340,13 +278,22 @@ CL_FORM *base;
 }
 
 /*------------------------------------------------------------------------------
- * RT::SHRINK-SMSTR simple-strign new-size
+ * RT::SHRINK-SMSTR simple-string new-size
  *----------------------------------------------------------------------------*/
-void rt_shrink_smstr(base)
-CL_FORM *base;
+LISP_FUN(rt_shrink_smstr)
 {
    long new_size = GET_FIXNUM(ARG(1));
    /* Neue Endnull, falls String später in C-String verwandelt werden soll */
    CHAR_AR(AR_BASE(GET_FORM(ARG(0))))[new_size] = '\0';
    SET_AR_SIZE(new_size, GET_FORM(ARG(0)));
 }
+
+/*------------------------------------------------------------------------------
+ * RT::SHRINK-PVECTOR vector new-size
+ *----------------------------------------------------------------------------*/
+LISP_FUN(rt_shrink_pvector)
+{
+   long new_size = GET_FIXNUM(ARG(1));
+   SET_AR_SIZE(new_size, GET_FORM(ARG(0)));
+}
+

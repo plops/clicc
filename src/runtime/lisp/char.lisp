@@ -1,57 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : System-Funktionen (15. Characters)                             
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.13 $
-;;; $Log: char.lisp,v $
-;;; Revision 1.13  1994/06/09  13:54:43  hk
-;;; not null in alphanumericp gestrichen
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.12  1994/05/04  13:22:45  sma
-;;; Fehler in digit-char-p behoben.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Characters
 ;;;
-;;; Revision 1.11  1994/04/06  09:25:16  hk
-;;; Typtest auc character in rt::char= und rt::char/= eingef"ugt.
-;;;
-;;; Revision 1.10  1994/02/02  09:40:25  hk
-;;; Deklaration :simp-when-n-args bei char-... Funktionen eingefügt.
-;;;
-;;; Revision 1.9  1994/01/14  09:19:32  sma
-;;; Character-Funktionen neu geschrieben. Mehr Lisp, weniger C. Im C-Teil
-;;; befinden sich nur noch die zeichensatzabhängigen Funktionen.
-;;;
-;;; Revision 1.8  1994/01/05  12:44:12  sma
-;;; Namensänderung: rt::*-internal -> rt::*
-;;; name-char ist jetzt Lisp-Funktion.
-;;;
-;;; Revision 1.7  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.6  1993/05/14  13:32:47  hk
-;;; Funktion character definiert.
-;;;
-;;; Revision 1.5  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.4  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.13 $ eingefuegt
-;;;
-;;; Revision 1.3  1992/07/06  09:12:17  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.2  1992/07/06  08:28:10  hk
-;;; Neue Syntax fuer declaim fun-spec.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.15 $
+;;; $Id: char.lisp,v 1.15 1994/11/22 14:55:56 hk Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -291,9 +263,7 @@
 ;; CHAR-CODE char
 ;;------------------------------------------------------------------------------
 (defun char-code (char)
-  (unless (characterp char)
-    (error WRONG_TYPE char 'character))
-  (rt::char-code char))
+  (rt::char-code (must-be-character char)))
 
 ;;------------------------------------------------------------------------------
 ;; CODE-CHAR code
@@ -333,7 +303,7 @@
 (defun digit-char (weight &optional (radix 10))
   (if (and (check-integer radix 2 36)
            (check-integer weight 0 (1- radix)))
-      (elt "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" weight)
+      (char "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" weight)
       nil))
 
 ;;------------------------------------------------------------------------------
@@ -346,8 +316,7 @@
 ;; CHAR-NAME char
 ;;------------------------------------------------------------------------------
 (defun char-name (char)
-  (unless (characterp char)
-    (error WRONG_TYPE char 'character))
+  (must-be-character char)
   (cond
     ((char= char #\Space) "Space")
     ((char= char #\Newline) "Newline")

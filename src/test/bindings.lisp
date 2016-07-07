@@ -1,21 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Tests zu Wertbindungen, z. B. in let/let*-Ausdruecken
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.4 $
-;;; $Log: bindings.lisp,v $
-;;; Revision 1.4  1993/02/16  17:14:34  hk
-;;; Revision Keyword eingefuegt.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.3  1992/09/30  18:49:51  hk
-;;; bindings6a eingefuegt.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Tests zu Wertbindungen, z. B. in let/let*-Ausdruecken
 ;;;
-;;; Revision 1.2  1992/09/09  13:11:34  kl
-;;; Die let*-Tests eingefuegt.
-;;;
-;;; Revision 1.1  1992/09/08  15:16:16  kl
-;;; Initial revision
+;;; $Revision: 1.5 $
+;;; $Id: bindings.lisp,v 1.5 1994/11/22 14:45:44 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "USER")

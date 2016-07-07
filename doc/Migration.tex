@@ -1,0 +1,1583 @@
+% Projekt  : APPLY - A Practicable And Portable Lisp Implementation
+%            ------------------------------------------------------
+%            Migrations-Papier 
+% 
+% $Revision: 1.2 $
+% $Id: Migration.tex,v 1.2 1993/11/08 20:22:24 wg Exp $
+
+\documentstyle[apply,eapply]{article}
+
+%% RCS Time is GMT = (MET - 1) !
+%% $Id: Migration.tex,v 1.2 1993/11/08 20:22:24 wg Exp $
+
+
+\def\RCSdate $#1 19#2/#3/#4 #5 ${#4.#3.#2}
+\def\RCSrevision $#1 #2 ${#2}
+
+%------------------------------------------------------------------------
+\author{\wg, \fs}
+%%% \title{Migration und Kompilation in Lisp: Ein Weg von Prototypen
+%%% zu Anwendungen}
+\title{Migration and Compilation in Lisp:\\ Developing Applications 
+from Prototypes}
+\issuer{Christian - Albrechts - University Kiel}
+\task{Complete Compilation to C}
+%%% \task{Komplettkompilation nach C}
+%%% \documentid{APPLY/CAU/IV/3}
+\documentid{}
+%%% \status{Entwurf}
+%%% \created{30.03.93}
+%%% \revised{24.05.93}
+\status{Draft}
+\created{01.09.93}
+\revised{\RCSdate $Date: 1993/11/08 20:22:24 $}
+\institution{CAU}
+
+%------------------------------------------------------------------------
+\synopsis{
+%%% Dieser Bericht stellt die Zusammenfassung
+%%% des Kieler Beitrages zum Statusseminar des BMFT in Berlin, 27.~-28.~April~1993
+Lisp-basierte Anwendungen behalten oft den Charakter von Prototypen
+und weisen deshalb Defizite auf in den Bereichen: Wartbarkeit, klares
+Design und sparsamer Umgang mit Ressourcen. Der auf die Kompilation
+von Anwendungsprogrammen ausgerichtete Ansatz von \APPLY\ bietet einen
+Weg zur Qualit"atsverbesserung.  Es entstehen von einem Lisp-System
+unabh"angige Applikationen, d.h.\ "ubliche Objektfiles oder
+C-Programme, die mit Betriebssystemmitteln zu fertigen Programmen
+verbunden werden k"onnen.  Dies ist eine wesentliche Voraussetzung
+f"ur eine wirkliche Integration in ein DV-Umfeld. Zur Erzeugung von
+kompakten Anwendungen ist zudem ein Migrationsschritt erforderlich,
+der die dynamischen und hochflexiblen Sprachkonstrukte eliminiert.
+Praktisch bedeutet das eine gr"undliche "Uberarbeitung des Programms
+nach gewissen Migrationsregeln und allgemeinen Prinzipien des
+Software-Engineering.  Nach vorliegenden Erfahrungen sind
+Migrationsschritte nur an wenigen Stellen erforderlich, wo man sich
+beim Prototypen mit einer ad-hoc-L"osung durch ein dynamisches,
+universell einsetzbares Sprachmittel beholfen hat. Durch statische
+Programmanalyse werden zudem Programmierfehler aufgedeckt.
+}
+
+%------------------------------------------------------------------------
+\begin{document}
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+\pagestyle{empty}
+
+%%% \coverpages
+%%% \pagenumbering{roman}
+%\vspace*{1.0cm}
+%%% \vfill
+\thispagestyle{empty}
+
+\begin{center}
+%%% \LARGE 
+
+%%% {\bf Migration und Kompilation in Lisp: Ein Weg von Prototypen
+%%% zu Anwendungen\footnote{Diese Arbeit ist im Rahmen des 
+%%% Verbundvorhabens APPLY entstanden, das vom Bundesminister f"ur
+%%% Forschung und Technologie unter dem Kennzeichen "`01IW205B/O"'
+%%% gef"ordert wird.}}
+
+{\LARGE\bf Migration and Compilation in Lisp:\\ Developing Applications 
+from Prototypes\footnote{This work has been supported by the German
+Ministry of Research and Technology within the joint project APPLY
+(\,01IW205B/O\,).}}
+
+\vspace{1ex}
+\centerline{\Large (DRAFT)}
+%%% \centerline{\Large (Erweiterte Zusammenfassung)}
+
+\vspace{3ex}
+
+%%% \large
+%%%   Wolfgang Goerigk \hspace*{1.0cm} Friedemann Simon\\[3ex]
+%%%   Institut f"ur Informatik und Praktische Mathematik\\
+%%%   der Christian-Albrechts-Universit"at zu Kiel\\
+%%%   Preu"serstra"se 1--9, D--24105 Kiel\\
+%%%   wg@informatik.uni-kiel.de\\
+%%%   fs@informatik.uni-kiel.de\\
+\large
+  Wolfgang Goerigk \hspace*{1.0cm} Friedemann Simon\\[3ex]
+  Institute for Computer Science and Pract. Math.\\
+  Christian-Albrechts-University Kiel\\
+  Preu\ss erstra\ss e 1--9, D--24105 Kiel, Germany\\
+  wg@informatik.uni-kiel.dbp.de\\
+  fs@informatik.uni-kiel.dbp.de\\
+\end{center}
+
+\renewcommand{\thefootnote}{\arabic{footnote}}
+\setcounter{footnote}{0}
+\vskip9ex
+%%% \vfill
+%%% %------------------------------------------------------------------------
+%%% \begin{small}
+%%% \tableofcontents
+%%% \end{small}
+%%% 
+%%% \vfill
+%%% \pagebreak
+%%% \pagenumbering{arabic}
+%------------------------------------------------------------------------
+\section*{Abstract}
+%%% \section*{Zusammenfassung}
+
+Lisp-basierte Anwendungen behalten oft den Charakter von Prototypen
+und weisen deshalb Defizite auf in den Bereichen: Wartbarkeit, klares
+Design und sparsamer Umgang mit Ressourcen. Der auf die Kompilation
+von Anwendungsprogrammen ausgerichtete Ansatz von \APPLY\ bietet einen
+Weg zur Qualit"atsverbesserung.  Es entstehen von einem Lisp-System
+unabh"angige Applikationen, d.h.\ "ubliche Objektfiles oder
+C-Programme, die mit Betriebssystemmitteln zu fertigen Programmen
+verbunden werden k"onnen.  Dies ist eine wesentliche Voraussetzung
+f"ur eine wirkliche Integration in ein DV-Umfeld. Zur Erzeugung von
+kompakten Anwendungen ist zudem ein Migrationsschritt erforderlich,
+der die dynamischen und hochflexiblen Sprachkonstrukte eliminiert.
+Praktisch bedeutet das eine gr"undliche manuelle "Uberarbeitung des
+Programms entsprechend einem hier ausgearbeiteten methodischen
+Vorgehen und allgemeiner Prinzipien des Software-Engineering.  Nach
+vorliegenden Erfahrungen sind Migrationsschritte nur an wenigen
+Stellen erforderlich, wo man sich beim Prototypen mit einer
+ad-hoc-L"osung durch ein dynamisches, universell einsetzbares
+Sprachmittel beholfen hat. Durch statische Programmanalyse werden
+zudem Programmierfehler aufgedeckt.
+
+%------------------------------------------------------------------------
+%%% \begin{small}
+%%% \tableofcontents
+%%% \end{small}
+
+%------------------------------------------------------------------------
+\section{Introduction}
+%%% \section{Einleitung}
+
+Der breiten industriellen Anwendung Lisp-basierter
+Expertensystemtechnik stehen verschiedene Hindernisse im Wege
+\cite{Knemeyer93} \cite{Weule93} \cite{Mertens93}.  Ein Problemkreis
+ist die mangelnde technische und organisatorische
+Integrationsf"ahigkeit in das industrielle DV-Umfeld.  Ein weiteres
+Problem entsteht, weil die klassischen Vorgehensweisen bei einer
+Systementwicklung h"aufig unber"ucksichtigt bleiben. Die Anwendungen
+behalten den Charakter von Prototypen und weisen deshalb Defizite auf
+in den Bereichen: Wartbarkeit, klares Design und sparsamer Umgang mit
+Ressourcen.
+
+Der auf die Kompilation von Anwendungsprogrammen ausgerichtete Ansatz
+von \APPLY\ \cite{APPLY/IfKI/I.1/1} \cite{gosi91}
+bietet einen Weg zur Qualit"atsverbesserung unter besonderer
+Ber"ucksichtigung der genannten Kriterien.
+
+Grundannahme ist eine klare Trennungsm"oglichkeit von Entwicklung und
+Anwendung eines Programms. Fertige Programme ben"otigen die
+Flexibilit"at und den Leistungsumfang von Lisp nicht mehr in dem
+Ma"se, wie es w"ahrend der Programmentwicklung notwendig ist.
+Anwendungsprogramme k"onnen durch die Elimination des nicht
+ben"otigten Leistungsumfangs nicht nur bedeutend kleiner, sondern auch
+effizienter werden. Es entstehen von einem Lisp-System unabh"angige
+Applikationen, da die Kompilationsergebnisse "ubliche Objektfiles oder
+C-Programme sind, die mit Betriebssystemmitteln zu fertigen Programmen
+verbunden werden k"onnen. Das ist eine wesentliche Voraussetzung f"ur
+die wirkliche, sowohl technische als auch organisatorische Integration
+in ein DV-Umfeld.
+
+Da der volle Sprachumfang von Lisp unter dem Kriterium der sparsamen
+Nutzung von Ressourcen, insbesondere Speicher, nicht kompilierbar ist,
+m"ussen fertige Programme in der Regel in eine Teilsprache migriert
+werden, in der einige der hochflexiblen, dynamischen Sprachkonstrukte,
+die den {\em Entwicklungsproze"s} von Programmen beschleunigen, nicht
+mehr auftreten. Im Rahmen von APPLY wurde zu diesem Zweck die
+Teilsprache CommonLisp$_0$ \cite{APPLY/CAU/II.2/1}
+definiert. Praktisch bedeutet das eine gr"undliche manuelle
+"Uberarbeitung des Programms entsprechend einem methodischen Vorgehen,
+das wir in Abschnitt \ref{vorgehen} ausarbeiten, und entsprechend
+allgemeiner Prinzipien des Software-Engineering. Sie geschieht im
+Dialog mit dem Compiler, der gleichzeitig eine Analyse der statischen
+Semantik des Programms vornimmt und dabei Programmierfehler aufdecken
+kann. Dieser Migrationsschritt entspricht seinem Wesen nach einer
+manuellen Transformation, die durch das Entwicklungssystem und auch
+den "Ubersetzer unterst"utzt wird. Der Grund ist, da"s CommonLisp$_0$
+eine strikte Teilsprache von Common Lisp ist und somit die im Sinne
+einer "Ubersetzung m"oglichen automatischen
+Sourcecode-Transformationen per se entfallen. Der Programmieraufwand
+f"ur die Migration ist im Vergleich zu einer Reimplementation z. B. in
+C gering, und das Vorgehen ist wesentlich weniger fehleranf"allig.
+
+Nach vorliegenden Erfahrungen sind Migrationsschritte nur an wenigen
+Stellen eines Programms erforderlich, wo man sich beim Prototypen mit
+einer ad hoc L"osung durch ein dynamisches, universell einsetzbares
+Sprachmittel beholfen hat. Die Erfahrungen stammen aus der Migration
+und erfolgreichen Kompilation von Anwendungen, die in Common Lisp
+\cite{steele} \cite{steele90} entwickelt wurden, in die im Rahmen des
+APPLY-Projektes entstandene strikte Teilsprache CommonLisp$_{0}$
+von Common Lisp. 
+
+Die vorliegende Arbeit stellt das methodische Vorgehen, M"oglichkeiten
+und Grenzen des Ansatzes sowie Resultate "uber Migrationen und
+Kompilationen von Common-Lisp-Anwendungen externer Partner des
+APPLY-Projektes vor. Wir setzen die Kenntnis von Common Lisp
+\cite{steele} \cite{steele90} voraus, die f"ur das Verst"andnis des
+durchg"angig benutzten Beispiels n"otig ist.
+
+Ziel der Migration ist ein Programm der Sprache CommonLisp$_{0}$,
+das "uber ein Hauptprogramm verf"ugt und sich somit als eigenst"andige
+Applikation mit dem im Rahmen des Projektes APPLY entwickelten
+Komplettcompiler entweder als Ganzes oder modulweise in ein C-Programm
+und dann weiter in ein vom Lisp-System unabh"angiges Maschinenprogramm
+"ubersetzen l"a"st. Dabei ist die Transformation von Lisp nach C und
+die dann anschlie"sende Wartung und Weiterentwicklung des entstandenen
+C-Programmes ausdr"ucklich nicht ein Hauptziel dieser Arbeit. Vielmehr
+entsteht durch die "Ubersetzung C-Code, der eher dem einer abstrakten
+C-Maschine gleicht und nicht im Hinblick auf Lesbarkeit und
+"Anderbarkeit, sondern im Hinblick auf Effizienz und Portabilit"at
+generiert wurde.
+
+%%% Au"serdem verweisen wir
+%%% auf \cite{Knutzen92}, wo die Einschr"ankungen von \CL0\ gegen"uber
+%%% Common Lisp vollst"andig beschrieben und motiviert sind. Wir werden
+%%% sie in dieser Arbeit nur insoweit nennen, wie sie f"ur das
+%%% Verst"andnis der Zielsetzung der Migration n"otig sind.
+
+%------------------------------------------------------------------------
+\section{The Approach}
+%%% \section{Ansatz und Aufgabenstellung}
+
+Diese Arbeit stellt einen Ansatz vor, wie Anwendungsprogramme in Lisp
+unter Ausnutzung des vollen Leistungsumfanges interaktiver
+Lisp-Systeme entwickelt und danach effizient, portabel und
+integrationsf"ahig implementiert werden k"onnen. Grundannahme ist,
+da"s die Entwicklung eines Programmes von dessen Anwendung klar zu
+trennen und in der Anwendung nicht mehr der volle Leistungsumfang des
+Entwicklungssystems n"otig ist.
+
+%------------------------------------------------------------------------
+\subsection{Program Development}
+%%%\subsection{Programmentwicklung}
+
+Die Entwicklung eines Lisp-Programmes geschieht in der Regel in einem
+interaktiven Common-Lisp-System, h"aufig im Sinne von {\em rapid
+prototyping}, und unter Ausnutzung des vollen Leistungsumfangs von
+Common Lisp. Der schnelle Entwicklungszyklus wird dabei durch das
+interaktive System selbst, durch die in einem konkreten System
+zus"atzlich bereitgestellte Funktionalit"at und auch durch die der
+Sprache Lisp eigenen flexiblen und dynamischen Sprachkonstrukte
+unterst"utzt. Insbesondere der in einem interpretierenden System
+m"ogliche Test unvollst"andiger Programme spielt dabei eine wichtige
+Rolle. 
+
+Wir halten dies f"ur ein Leistungsmerkmal von Lisp und pl"adieren
+ausdr"ucklich nicht f"ur eine Programmentwicklung in der bereits im
+letzten Abschnitt erw"ahnten Sprache CommonLisp$_0$. Viele
+Lisp-Anwendungen, aber auch viele in Lisp-Anwendungen benutzte
+Programmiertechniken sind durch "`Experimente in Lisp"' entstanden,
+und dies stellt eine eigene Qualit"at dar, die nicht aufgegeben werden
+sollte. 
+
+Wir hoffen andererseits, da"s der aus softwaretechnischer Sicht
+n"otige und sich an die Programmentwicklung anschlie"sende
+Migrationsschritt letztlich auch {\em normativ} auf die
+Programmentwicklung auswirkt. Genauer: Dort, wo der
+Programmentwicklungsproze"s durch die rechtzeitige Verwendung
+"ubersetzbarer oder effizienter Datenstrukturen und Algorithmen
+nicht gehemmt w"urde, sollten diese auch verwendet werden.
+
+%------------------------------------------------------------------------
+\subsection{Migration}
+
+Analysiert man vorhandene Lisp-Applikationen genauer, so stellt man
+fest, da"s sie an verschiedenen Stellen unverwechselbar den Charakter
+von Prototypen aufweisen:
+
+\begin{itemize}
+
+\item[$\bullet$] Sie enthalten h"aufig kein Hauptprogramm, sondern
+bestehen nur aus einer Reihe von Definitionen, und ein Programmablauf
+besteht aus dem mehr oder weniger koordinierten und dokumentierten
+Aufrufen der zur Verf"ugung gestellten Funktionalit"at in einem
+interaktiven Lisp-System. Es sei an dieser Stelle darauf hingewiesen,
+da"s manche in Lisp implementierten Systeme ihrem Wesen nach den
+Charakter von Spracherweiterungen von Lisp haben, die im Zusammenhang
+mit einem interaktiven Lisp-System zur Programmentwicklung genutzt
+werden sollen. Diese Systeme selbst sind keine Lisp-Applikationen in
+dem hier verwendeten Sinne. Erst ihre Anwendungen w"urden wir als
+Lisp-Applikationen bezeichnen.
+
+\item[$\bullet$] Sie enthalten eine Reihe von Programmteilen, die den
+Entwicklungsproze"s unterst"utzen, die f"ur einen Programmablauf aber
+v"ollig irrelevant sind. Dies sind z.B.\ Funktionen zum automatischen
+Rekompilieren, zum automatischen Nachladen oder zur
+Konsistenzerhaltung des Programmes, falls nur Teile redefiniert oder
+nachgeladen werden.
+
+\item[$\bullet$] Sie enthalten eine Reihe von Mehrfachdefinitionen
+derselben Funktion oder Prozedur, die in der Entwicklung der Reihe
+nach entstanden sind und von denen in einer interaktiven
+Entwicklungsumgebung jeweils nur die als letzte in das System geladene
+die g"ultige ist.
+
+\item[$\bullet$] Sie enthalten eine Reihe von Programmpfaden und auch
+Funktionsdefinitionen, die nur zu Testzwecken entstanden sind und die
+in einem tats"achlichen Programmlauf nicht aufgerufen werden. Neben
+totem Code, den jeder gute Compiler eliminieren kann, sind dies aber
+auch Programmteile, die zwar formal aufgerufen, tats"achlich jedoch
+nie erreicht werden.
+
+\item[$\bullet$] Sie enthalten eine Reihe von Programmiertricks unter
+Ausnutzung sehr flexibler dynamischer, h"aufig reflektiver
+Lisp-Konstrukte, die im Entwicklungsproze"s zugunsten der schnellen
+Entwicklung durchaus ihre Berechtigung hatten und dann im Programm
+verblieben sind.  
+
+\item[$\bullet$] Sie nutzen h"aufig Funktionalit"at, die nicht zur
+Sprache Lisp, wohl aber zu dem in einem konkreten Lisp-System
+bereitgestellten Funktionsumfang geh"ort.
+
+\end{itemize}
+
+Man stellt also fest, da"s die Programme ohne "Anderungen nicht den
+erforderlichen Einschr"ankungen gen"ugen, die f"ur Programme einer
+effizient kompilierbaren Teilsprache von Common Lisp verlangt werden
+m"ussen. 
+
+Vor der Kompilation ist daher ein weiterer Schritt n"otig, den wir als
+{\em Migration} bezeichnen. Unter diesem Begriff verstehen wir eine
+lokale oder globale Sourcecode-Transformation von Programmen in einer
+Sprache in Programme in einer anderen (in unserem Fall einer Teilsprache
+der ersten) unter Erhaltung der Funktionalit"at des urspr"unglichen
+Programms. Der Begriff l"a"st sich zwischen automatischer,
+semantikerhaltender Programmtransformation und Reimplementation
+einordnen. (vgl. Abbildung \ref{migration})
+%%% \\[0.8cm]
+\begin{figure*}[htb] %[htb]
+\def\epsfsize#1#2{0.4#1}
+\centerline{\epsffile{emigration.eps}}
+\vspace*{0.6cm}
+\caption{Migration \label{migration}}
+\end{figure*}
+%%%\\[0.5cm]
+
+Dieser Migrationsschritt entspricht hier seinem Wesen nach einer
+manuellen Transformation, die durch das Entwicklungssystem und auch den
+"Ubersetzer unterst"utzt wird. Der Grund ist, da"s CommonLisp$_0$ eine
+strikte Teilsprache von Common Lisp ist und somit die im Sinne einer
+"Ubersetzung m"oglichen automatischen Sourcecode-Transformationen per
+se entfallen, da sie syntaktisch und semantisch identischen Code
+erzeugen m"u"sten. Die Striktheit der Teilsprachenbeziehung hat einen
+weiteren nutzbringenden Effekt: Die Migration kann inkrementell in
+einem Lisp-System durchgef"uhrt werden, da jeder Migrationsschritt
+wieder zu einem g"ultigen Common-Lisp-Programm f"uhrt. 
+
+Nachdem der erste Migrationsschritt, die Montage des Programmes (siehe
+den folgenden Abschnitt) durchgef"uhrt ist, l"a"st sich der
+Komplettcompiler als Werkzeug benutzen, um n"otige Migrationsschritte
+aufzudecken und durch eine weitgehende statische Programmanalyse
+Programmierfehler zu finden.
+
+Es wird in den folgenden Abschnitten deutlich, da"s sich das Programm
+in seiner Struktur durch die Migration nicht wesentlich "andert,
+sondern h"ochstens um einige Teile erg"anzt wird. Damit kann das
+migrierte Programm als Ausgangspunkt f"ur die Wartung und
+Weiterentwicklung dienen, und Migrationsschritte sind nur noch
+f"ur die dann neu entwickelten Teile n"otig. (vgl.\ Abbildung
+\ref{lifecycle})
+
+%%% Fassen wir die genannten Schritte zusammen, so ergibt sich insgesamt
+%%% das in Abbildung \ref{lifecycle} dargestellte Bild.
+\begin{figure*}[htb] %[htb]
+\def\epsfsize#1#2{0.4#1}
+\centerline{\epsffile{elifecycle.eps}}
+\par
+\caption{Migration and Compilation \label{lifecycle}}
+\end{figure*}
+
+%------------------------------------------------------------------------
+\subsection{Complete Compilation}
+%%% \subsection{Komplettkompilation}
+
+Nachdem ein g"ultiges CommonLisp$_0$-Programm entstanden ist, kann der
+Komplettcompiler daraus durch "Ubersetzung nach C eine eigenst"andig
+ablauf\/f"ahige Applikation generieren. Diese zeichnet sich aus durch
+
+\begin{itemize}
+\item[$\bullet$] einen sparsamen Umgang mit Ressourcen, d.h.\ durch
+Speicherplatz- und Laufzeit\-effi\-zienz,
+\item[$\bullet$] Portabilit"at auf der Basis von C-Sourcecode und
+\item[$\bullet$] die Integrationsf"ahigkeit, zum einen mit
+Fremdsoftware, zum anderen als Programm oder Modul in
+Standard-DV-Umgebungen.
+\end{itemize}
+
+%------------------------------------------------------------------------
+\section{Methodology}
+%%% \section{Methodisches Vorgehen}
+\label{vorgehen}
+
+In diesem Abschnitt soll das methodische Vorgehen bei der Migration
+von Common-Lisp-Anwendungen nach CommonLisp$_0$ aufgezeigt werden.
+Zun"achst gilt es, festzustellen, ob ein Programm tats"achlich als
+schl"usselfertige Applikation vorliegt, f"ur die es prinzipiell Sinn
+macht, sie mit einem explizit ausprogrammierten Hauptprogramm zu
+versehen und als eigenst"andig ablauf\/f"ahiges Programm auszuliefern.
+
+Die n"otigen Arbeiten, die wir im folgenden motivieren und genauer
+beschreiben wollen, lassen sich wie folgt klassifizieren:
+
+\begin{enumerate}
+\item Montage des Programmes
+\item Bereinigung des Programmes
+\item Erzeugen eines Hauptprogrammes
+\item Elimination von Reflexion
+\item Entkopplung vom Entwicklungssystem
+\item Modularisierung
+\end{enumerate}
+
+Die ersten vier Schritte werden in der Regel in der angegebenen
+Reihenfolge durchgef"uhrt, die Montage des Programmes ist notwendige
+Voraussetzung f"ur alle anderen Schritte. Die letzten beiden Schritte
+sind nur f"ur spezielle Anwendungen erforderlich, insbesondere ist die
+Modularisierung nur dann zwingend, wenn die separate Kompilation
+einzelner Module des Programmes angestrebt wird. Dies ist
+typischerweise bei gro"sen Anwendungen der Fall, oder wenn
+die Anwendung mit Fremdsprachenmodulen integriert werden soll.
+
+
+%------------------------------------------------------------------------
+\subsection{Program Assembly}
+%%% \subsection{Montage des Programmes}
+
+In der Regel sind Lisp-Anwendungen in verschiedenen Dateien abgelegt,
+und es ist nicht leicht, das eigentliche Programm zwischen ebenfalls
+vorhandenen Testroutinen und Hilfsmitteln zur Erleichterung des
+Entwicklungsprozesses auszumachen. Eine mehr oder weniger komplizierte
+Laderoutine, teilweise mit Unterst"utzung von {\em dynamischem
+Nachladen} (engl. {\em autoloading}) oder automatischer Rekompilation,
+Pfadnamenanpassungen u."a.\ dient zum Laden des Programmes in ein
+interaktives Lisp-System. 
+
+Um die Applikation zu einem Programm im Sinne von CommonLisp$_0$
+zusammenzusetzen, ist folgendes n"otig:
+
+\begin{itemize} 
+\item[$\bullet$] Analyse der Ladereihenfolge beim Laden der Dateien in
+ein interaktives Lisp-System. 
+\item[$\bullet$] Auffinden der Dateien, die zu der eigentlichen Applikation
+geh"oren.
+\item[$\bullet$] Erzeugen einer Programmdatei, deren einziger Inhalt
+Ladeanweisungen auf Haupt\-pro\-gramm\-ebe\-ne f"ur die zum Programm
+geh"orenden Dateien sind.
+\end{itemize}
+
+Der erste Schritt ist auch f"ur die Bereinigung des Programmes
+erforderlich, um bei eventuellen Mehrfachdefinitionen von Funktionen
+die g"ultige, d.h.\ die {\em zuletzt} geladene, finden zu k"onnen.
+
+Die Haupt-Programmdatei stellt nunmehr das eigentliche Programm dar,
+das allerdings noch nicht "uber ein Hauptprogram verf"ugen mu"s
+(vgl.\ Abschnitt \ref{mainprog}). 
+
+%------------------------------------------------------------------------
+\subsection{Program Cleanup}
+%%% \subsection{Bereinigung des Programmes}
+
+Da ein interaktives Lisp-System Mehrfachdefinitionen von Funktionen
+zul"a"st (die letzte geladene Funktion ist die aktuell verwendete), in
+CommonLisp$_0$ Mehrfachdefinitionen aber nicht zul"assig sind, sind die
+nicht aktuellen Funktionsdefinitionen zu streichen. Ebenfalls
+sollten die Programmteile, die ausschlie"slich zu Testzwecken oder zur
+Erleichterung des Entwicklungsprozesses dienen, eliminiert werden,
+soweit dies nicht bereits bei der Montage des Programmes geschehen
+ist. 
+
+Sind nur noch die Bestandteile der eigentlichen Applikation "ubrig und
+ist eine Haupt-Programmdatei (vgl.\ den vorherigen Abschnitt)
+vorhanden, so kann nunmehr der Compiler als Werkzeug zur statischen
+Programmanalyse verwendet werden, um weitere Stellen zu finden,
+an denen Migrationsarbeiten, insbesondere auch zur Bereinigung des
+Programmes, vorgenommen werden m"ussen. 
+
+H"aufig finden sich Aufrufe nicht definierter Funktionen. Diese sind
+entweder zu definieren oder sie befinden sich in Programmpfaden, die
+nie durchlaufen werden, so da"s sie als {\em toter Code} gel"oscht werden
+k"onnen. Diese Situation kann auftreten, wenn in einem Programm
+Funktionalit"at vorgesehen war, die aber nicht oder anders
+implementiert worden ist. 
+
+Funktionalit"at, die nicht Bestandteil der in \cite{steele90}
+angegebenen Sprache Common Lisp ist,
+sondern von dem speziellen interaktiven Common-Lisp-System {\em
+geborgt} wurde, mu"s reimplementiert werden. Dies hat nat"urlich immer
+zu geschehen, wenn eine Anwendung in nicht portablem Common Lisp
+entwickelt wurde und nun portiert werden soll.
+
+%------------------------------------------------------------------------
+\subsection{Construction of the Main Program}
+%%% \subsection{Erzeugen eines Hauptprogrammes}
+\label{mainprog}
+
+Eine Lisp-Anwendung, die nur aus Definitionen besteht, kann im
+Zusammenhang mit einem interaktiven Lisp-System durchaus nutzbar
+sein, da dieses die Dialog-Umgebung der Anwendung darstellen kann. Zum
+Zwecke der Komplettkompilation mu"s allerdings ein {\em Hauptprogramm}
+explizit ausprogrammiert werden, das Bestandteil der
+Haupt-Programmdatei werden sollte.
+
+Dieser Schritt ist in vielen Anwendungen leicht, da nur der Aufruf der
+Hauptfunktion in die Haupt-Programmdatei zus"atzlich aufgenommen
+werden mu"s. Existiert allerdings keine Hauptfunktion, so ist in der
+Regel zus"atzliche Design- und Implementationsarbeit zu leisten:
+
+\begin{itemize}
+\item[$\bullet$] Der Umfang der dem Programmbenutzer als {\em
+Dialogschnittstelle} zur Verf"ugung gestellten Funktionalit"at mu"s
+festgelegt werden. 
+\item[$\bullet$] Die so festgelegte Dialogschnittstelle mu"s
+implementiert werden. Ihr Aufruf wird zum Hauptprogramm, das nunmehr
+nur noch antizipierte Dialoge bearbeiten kann. Der Aufruf beliebiger
+Funktionen der Anwendung wird damit unterbunden, was die Dynamik
+einschr"ankt, aber auch die Sicherheit gegen Fehlbedienungen erh"oht.
+\end{itemize}
+
+%------------------------------------------------------------------------
+\subsection{Elimination of Reflection}
+%%% \subsection{Elimination von Reflexion}
+
+In \cite{Smith82} \cite{Smith84} taucht der Begriff {\em Reflexion}
+(engl. {\em reflection}) zuerst auf. Programme, die "`Wissen "uber
+ihren eigenen Programmtext"' haben, werden dort als reflektiv
+bezeichnet. Folgerichtig nennen wir Programmiersprachen, die die
+Programmierung reflektiver Programme gestatten, ebenfalls reflektiv,
+und die Sprachbestandteile, die das Ausdr"ucken von Reflexion
+gestatten, nennen wir reflektive Sprachkonstrukte der Sprache.
+
+M. Wand und D.Friedman \cite{Wand/Friedman86} unterscheiden die
+Begriffe {\em reflection} und {\em reification}. Der "Ubergang von
+Programm zu Datum, genauer von einem Abschnitt des abstrakten
+mathematischen Objektes {\em Programm} in dessen textuelle
+Repr"asentation, wird dort als {\em reification} bezeichnet. Als {\em
+reflection} wird der eigentlich kritische "Ubergang von Datum zu
+Programm bezeichnet, also die Einbindung von Programmtext in das
+abstrakte Programm, die im ung"unstigen Fall eben auch eine
+Modifikation des Programmes selbst hervorrufen kann.
+
+Lisp, speziell auch Common Lisp, ist eine reflektive
+Programmiersprache, in der auch der ung"unstige Fall der
+Selbstmodifikation eines Programmes ausdr"uckbar ist. Um es ganz
+deutlich zu machen: Es ist nicht der Umgang eines Programmes mit
+Funktionen oder Prozeduren als Daten erster Klasse ({\em first class
+citizens}), der die Reflexion ausmacht. Dieser beinhaltet keine
+Uminterpretation von Daten in Programm. Es ist vielmehr die in Lisp
+m"ogliche freie Uminterpretation von Lisp-Daten, speziell Listen, in
+Programmausdr"ucke, also die Ausf"uhrung von zum Programm geh"orenden,
+aber im Programmtext i.a.\ nicht sichtbaren Lisp-Ausdr"ucken.
+
+Der klassische Vertreter eines reflektiven Sprachbestandteils von Lisp
+ist die Funktion {\tt (eval\ \ldots\,)}\,, die einen als Lisp-Liste
+"ubergebenen Ausdruck in der globalen Laufzeitumgebung des Programmes
+auswertet oder ausf"uhrt.
+
+Dem Leser d"urfte schnell klar sein, welche Konsequenzen z.B.\ das
+Vorhandensein einer Funktionsdefinition der Form
+
+\begin{verbatim}
+       (defun f () (eval (read)))
+\end{verbatim}
+
+in einem Programm hat. Zun"achst kann der "Ubersetzer diese Funktion
+ohne die M"oglichkeit der Kompilation zur Laufzeit des durch {\tt (read)}
+eingegebenen Ausdrucks nicht implementieren. Zum zweiten
+k"onnen keine globalen Programmoptimierungen mehr durchgef"uhrt
+werden, die von der vollst"andigen Kenntnis des Programmtextes
+abh"angen, da dieser eben nicht bekannt ist. Zum dritten erlaubt
+beispielsweise die Eingabe des Ausdrucks
+
+\begin{verbatim}
+       > (defun g (...) ...)
+\end{verbatim}
+
+die Definition zus"atzlicher oder die Modifikation vorhandener
+Funktionen des Programmes zur Laufzeit, speziell z.B.\ auch die
+Modifikation der Funktion {\tt f} selbst.
+
+Insgesamt werden Programme dadurch i.a.\ unn"otig gro"s, unn"otig
+langsam und aus softwaretechnischer Sicht fehleranf"alig und nahezu
+unwartbar. 
+
+Trotzdem ist die durch {\tt (eval\,\ldots\,)} und verwandte
+Sprachkonstrukte gegebene hohe Flexi\-bi\-li\-t"at w"ahrend des
+Programmentwicklungsprozesses durchaus sehr hilfreich.
+
+%%%  wie wir in dem
+%%% abschlie"senden kleinen Beispiel dieses Abschnittes zeigen wollen.
+
+\subsubsection*{Reflection in Common Lisp}
+%%% \subsubsection*{Reflektive Bestandteile von Common Lisp}
+
+Wir beschr"anken uns im Rahmen dieser Arbeit auf den imperativen Kern
+der Sprache Common Lisp ohne die objektorientierte Erweiterung CLOS,
+die mit ihrem Meta-Objekt-Protokoll ebenfalls reflektive
+Sprachkonstrukte enth"alt.
+
+Nat"urlich ist die Funktion {\tt (eval\,\ldots\,)} reflektiv. Ebenso
+klar ist, da"s die Funktionen {\tt (compile\,\ldots\,)} und {\tt
+(load\,\ldots\,)}  die gleiche M"achtigkeit haben. Diese Funktionen
+d"urfen in der Sprache CommonLisp$_0$ nicht vorkommen. Eine Ausnahme
+bildet {\tt (load\,\ldots\,)}, das auf Hauptprogrammebene mit
+konstantem Dateinamen-Argument erlaubt ist und syntaktisch in den
+Inhalt der angegebenen Datei expandiert.
+
+Die Funktionen
+
+\begin{verbatim}
+       (funcall <function> <arg-1> ... <arg-n>)
+       (apply <function> <arg-1> ... <arg-k> <arglist>)
+\end{verbatim}
+
+erlauben in Common Lisp auf der Position des funktionalen Arguments
+auch Symbole (interpretiert als Funktionsnamen) und Listen der Form
+{\tt (lambda {\it parlist} {\it body})} (als Funktionen interpretiert).
+Sie erlauben auf der Argumentposition Ausdr"ucke, die zu
+Funktionsnamen oder Lambda-Listen evaluieren. Damit l"a"st sich die
+Funktion {\tt eval} nat"urlich leicht durch
+
+\begin{verbatim}
+       (defun eval (form) (funcall (list 'LAMBDA () form)))
+\end{verbatim}
+
+programmieren. F"ur diese Funktionen wie auch f"ur {\tt
+(mapcar\,\ldots\,)}, {\tt (mapc\,\ldots\,)} usw. ist in CommonLisp$_0$
+der Definitionsbereich eingeschr"ankt, indem nur Funktionen, nicht
+aber Funktionsnamen oder Lambda-Listen auf der Position des
+funktionalen Arguments zugelassen sind.
+
+Die Funktion {\tt (\,setf symbol-function\,)} erlaubt in Common Lisp
+durch
+
+\begin{verbatim}
+       (setf (symbol-function 'f) ...)
+\end{verbatim}
+
+die Redefinition globaler Funktionen. Diese Funktion ist in
+CommonLisp$_0$ nicht vorhanden.
+
+Es gibt einige weitere Stellen, z.B.\ in Typdefinitionen, beim
+Einlesen konstanter Strukturen oder in der Funktion {\tt
+(format\,\ldots\,)}, die in CommonLisp$_0$ eingeschr"ankt sind, da
+sich auch hier die M"oglichkeit der Interpretation eines beliebigen
+Ausdrucks zur Laufzeit des Programmes programmieren l"a"st. Im Rahmen
+der vorliegenden Arbeit soll auf eine vollst"andige und genaue
+Darstellung verzichtet werden.
+
+\subsubsection*{Program Specific Interpretation}
+%%% \subsubsection*{Programmspezifische Interpretation}
+\label{progeval}
+
+Wie bereits aus den Bemerkungen des vorherigen Abschnitts deutlich
+geworden ist, verbietet CommonLisp$_0$ alle reflektiven
+Sprachbestandteile von Common Lisp, teilweise durch Streichen,
+teilweise dadurch, da"s der Definitionsbereich von Funktionen derart
+eingeschr"ankt ist, da"s ein dynamischer "Ubergang von Datum zu
+Programm nicht mehr m"oglich ist. Reflektive Sprachbestandteile sind
+also zu eliminieren.
+
+%%% Das Ziel der Migration bez"uglich
+%%% reflektiver Programmbestandteile ist also deren Eliminierung.
+
+%%% Der aufmerksame Leser wird bereits bemerkt haben, da"s die Funktion
+%%% {\tt (eval\,\ldots\,)} semantisch "au"serst kompliziert ist und da"s
+%%% sie h"aufig sehr viel mehr Funktionalit"at zur Verf"ugung stellt als
+%%% mit ihrer Verwendung intendiert war. 
+
+Die universelle Lisp-Funktion {\tt (eval\,\ldots\,)} zur
+Interpretation beliebiger Lisp-Ausdr"ucke stellt h"aufig sehr viel
+mehr Funktionalit"at zur Verf"ugung, als mit ihrer Verwendung
+intendiert ist. Ein Grund daf"ur ist die komplizierte Semantik von
+{\tt (eval\,\ldots\,)} \cite{Wand/Friedman86}.  In der Regel wei"s der
+Programmierer jedoch sehr genau, welche Art von Ausdr"ucken durch die
+Verwendung von {\tt (eval\,\ldots\,)} interpretiert werden sollen. In
+den meisten F"allen handelt es sich um den Aufruf von Funktionen, die
+ihrerseits durch das Programm definiert werden. Hier liegt es nahe,
+statt des allgemeinen Interpretationsmechanismus' einen
+programmspezifischen Interpreter auszuprogrammieren, der genau die
+gew"unschten Ausdr"ucke interpretieren kann und alle weiteren, die
+beispielsweise durch Programmierfehler oder Fehlbedienungen entstehen,
+explizit abweist.  Wir wollen dies in einem Beispiel tun, indem wir
+
+\begin{verbatim}
+       (eval (read))
+\end{verbatim}
+
+unter Ausnutzung der zus"atzlichen Information, da"s nur Ausdr"ucke
+der Form
+\vspace*{0.5cm}
+
+%%% \begin{verbatim}
+%%%        e ::= <number> | (+ e1 ... en) | (- e1 ... en) | (* e1 ... en)
+%%% \end{verbatim}
+\centerline{\tt $e$ ::= {\it number} | (\,+ $e_1$\,\ldots\,$e_n$\,) | 
+(\,- $e_1$\,\ldots\,$e_n$\,) | (\,* $e_1$\,\ldots\,$e_n$\,)}
+
+\vspace*{0.3cm}
+interpretiert werden sollen, in den Ausdruck
+
+\begin{verbatim}
+       (my-eval (read))
+\end{verbatim}
+
+"andern, wobei die Funktion {\tt my-eval} definiert ist durch
+
+\begin{verbatim}
+       (defun my-eval (form)
+         (cond ((numberp form) form)
+               ((eq (car form) '+) 
+                  (apply #'+ (mapcar #'my-eval (cdr form))))
+               ((eq (car form) '-) 
+                  (apply #'- (mapcar #'my-eval (cdr form))))
+               ((eq (car form) '*) 
+                  (apply #'* (mapcar #'my-eval (cdr form))))
+               (T (error "unknown form ~s" form))))
+\end{verbatim}
+
+Es ist klar, da"s es sich hierbei um eine Programmtransformation
+handelt, die nicht semantisch "aquivalent ist. Das ge"anderte Programm
+verh"alt sich aber bzgl.\ der intendierten "`"au"seren"' Semantik
+"aquivalent und ist zudem sicherer und wartbarer geworden, da
+Fehlbedienungen ausgeschlossen wurden und mehr Informationen explizit
+niedergeschrieben sind.
+
+Nat"urlich lassen sich bestimmte Anwendungen von {\tt
+(eval\,\ldots\,)}, {\tt (funcall\,\ldots\,)} oder {\tt
+(apply\,\ldots\,)} auch ohne Kenntnis der "au"seren Semantik des
+Programmes semantisch "aquivalent transformieren, beispielsweise gilt
+bei leerer lexikalischer Umgebung
+
+\begin{verbatim}
+     (eval '(f arg-1 ... arg-n))         ==  (f arg-1 ... arg-n)
+     (eval (cons 'f arglist))            ==  (apply #'f arglist)
+     (apply 'f arglist)                  ==  (apply #'f arglist)
+     (apply '(lambda (...)...) arglist)  
+            ==  (apply #'(lambda (...)...) arglist)
+\end{verbatim}
+ 
+Diese F"alle kann nat"urlich auch der "Ubersetzer selbst abdecken, so
+da"s sie f"ur die Migration eher uninteressant sind. Es wird an dieser
+Stelle noch einmal deutlich, da"s die Migration ihrem Wesen nach eine
+Aufgabe ist, die der Programmierer eigenh"andig und unter Ausnutzung
+seiner Kenntnis "uber die Bedeutung oder die intendierte "au"sere
+Semantik seines Programmes vornehmen sollte.
+
+\subsubsection*{Replacing Expressions by Closures}
+%%% \subsubsection*{Ersetzen von Ausdr"ucken durch Closures}
+
+Sehr h"aufig finden sich in Lisp-Programmen globale konstante
+Datenstrukturen, die der Speicherung von zu interpretierenden
+Ausdr"ucken oder von in bestimmten F"allen aufzurufenden Funktionen
+dienen. Als Beispiel seien hier eine Assoziationsliste mit Zuordnungen
+von Symbolen zu Interpretationsfunktionen
+
+\begin{verbatim}
+     (defvar *fun-alist* '((+ . eval-plus) (- . eval-minus) ...))
+\end{verbatim}
+
+oder auch einfach eine Liste von Ausdr"ucken
+
+\begin{verbatim}
+     (defvar *expr-list* '((+ 3 *x*) (* *y* *x*) ...))
+\end{verbatim}
+
+genannt. Typischerweise tauchen dann in dem Programm Ausdr"ucke der
+Form
+
+\begin{verbatim}
+     (apply (cdr (assoc '+ *fun-alist*)) args)
+\end{verbatim}
+
+oder
+
+\begin{verbatim}
+     (eval (second *expr-list*))
+\end{verbatim}
+
+auf, die nat"urlich nicht im Sprachumfang von CommonLisp$_0$ enthalten
+sind, da z.B.\ der Ausdruck {\tt (cdr (assoc '+ *fun-a-list*))} ein
+Symbol, nicht aber eine Funktion liefern wird.
+
+In derartigen F"allen erm"oglicht der "Ubergang von Ausdr"ucken zu
+{\em closures}, d.h.\ zu parameterlosen unbenannten Funktionen, bzw.\
+der "Ubergang von Symbolen zu den entsprechenden Funktionen selbst den
+n"otigen Migrationsschritt. Im ersten Fall ersetzen wir die konstante
+Assoziationsliste durch eine, die statt der Symbole {\tt eval-plus}
+usw.\ die Funktionen {\tt \#'eval-plus} usw.\ enth"alt:
+
+\begin{verbatim}
+     (defvar *fun-alist*
+       (list (cons '+ #'eval-plus)
+             (cons '- #'eval-minus)
+             ...))
+\end{verbatim}
+
+und k"onnen den Aufruf sogar unver"andert lassen. Im zweiten Fall
+ersetzen wir die Liste von Ausdr"ucken durch eine Liste von {\em
+closures}
+\begin{verbatim}
+     (defvar *expr-list*
+       (list #'(lambda () (* 3 *x*))
+             #'(lambda () (* *y* *x*))
+             ...))
+\end{verbatim}
+
+und ersetzen den Ausdruck {\tt (eval (second *expr-list*))} durch den
+Funktionsaufruf 
+\begin{verbatim}
+     (funcall (second *expr-list*))
+\end{verbatim}
+
+
+%------------------------------------------------------------------------
+\subsection{Example}
+%%% \subsection{Ein Beispiel}
+
+An einem sehr kleinen Beispiel, einem Programm zum symbolischen
+Differenzieren von Poly\-no\-men, wollen wir eine typische
+Programmentwicklung, die entstehende Lisp-Anwendung und die
+wesentlichen Schritte bei der Migration zu einem
+CommonLisp$_0$-Programm aufzeigen.
+
+\subsubsection*{Program Development}
+%%% \subsubsection*{Programmentwicklung}
+
+Die Aufgabe ist die Entwicklung eines symbolischen Differenzierers
+f"ur Polynome:
+
+\pagebreak
+
+\begin{center}
+\begin{itemize}
+\item[] Eingabe: \quad $p(x) = a_nx^n\,+\,\cdots\,+\,a_1x\,+\,a_0$
+\item[] Ausgabe: \quad $p'(x) = na_nx^{n-1}\,+\,\cdots\,+\,a_1$
+\end{itemize}
+\end{center}
+
+Wir gehen im Sinne des {\em rapid prototyping} vor und vereinfachen die
+Aufgabenstellung in einer f"ur Lisp typischen Weise, indem wir die
+Programmierung der konkreten Text-Ein/Ausgabe verschieben und zun"achst
+den Kern, n"amlich die Differenzierung einer abstrakten Listendarstellung
+des Polynoms, entwickeln. Die zu Testzwecken n"otige Eingabe stellt
+der Lisp-Reader zur Verf"ugung. Damit ist die Aufgabe nun sehr einfach
+geworden:
+
+Wir stellen das Polynom in abstrakter Syntax dar, aufgebaut aus Ausdr"ucken
+der Form\\[0.2cm]
+
+\centerline{\tt (PLUS $e_1$ $e_2$)}
+\centerline{\tt (MINUS $e_1$ $e_2$)}
+\centerline{\tt (MULT $e_1$ $e_2$)}
+\centerline{\tt (EXPP $e$ $n$)\,.}
+\vspace*{0.2cm}
+
+Das Polynom $p(x) = x^2 + 2x + 2$
+beispielsweise wird dargestellt durch die folgende
+Lisp-Liste:\\[0.1cm]
+
+\centerline{\tt (PLUS (EXPP x 2) (PLUS (MULT 2 x) 2))}
+\vspace*{0.4cm}
+
+Mit den Ableitungsregeln
+\begin{itemize}
+\item[$\bullet$] $c' = y' = 0\quad\mbox{f"ur Konstanten $c$ und
+Variablen $y \not\equiv x$}$
+\item[$\bullet$] $x' = 1$
+\item[$\bullet$] $(f + g)' = f' + g'$
+\item[$\bullet$] $(f\,g)' = f' g + f g'$
+\item[$\bullet$] $(f^n)' = n f' f^{n-1}$ f"ur $n\,\ge\,2$
+\end{itemize}
+ist es nun einfach, die Funktion {\tt diff}
+auszuprogrammieren:\\[0.1cm]
+
+{\tt
+(defun diff (e x)\\
+\hspace*{2ex}(cond ((numberp e) 0)\\
+\hspace*{9ex}((eq e x) 1)\\
+\hspace*{9ex}((symbolp e) 0)\\
+\hspace*{9ex}((consp e)\\
+\hspace*{11ex}(case (first e)\\
+\hspace*{13ex}((PLUS MINUS)\ \ldots\,)\\
+\hspace*{13ex}((MULT) (list 'PLUS\\
+\hspace*{24ex}(list 'MULT (diff (second e) x)\\
+\hspace*{31ex}(third e))\\
+\hspace*{24ex}(list 'MULT (second e)\\
+\hspace*{31ex}(diff (third e) x))))\\
+\hspace*{13ex}((EXPP)\ \ldots\,)\\
+\hspace*{13ex}(t e)))\\
+\hspace*{9ex}(t e)))
+}
+
+Die komplette Funktionsdefinition findet sich im Anhang.
+Ein erster Test ergibt nun, da"s wir mit dem Ergebnis noch nicht
+zufrieden sind, da das differenzierte Polynom noch erheblich vereinfacht
+werden kann:
+
+\[p(x) = x^2 + 2x + 2\]
+
+%%% \begin{center}
+%%% {\tt
+%%% (diff '(PLUS (EXPP x 2) 2) 'x) =\\
+%%% \hspace*{3ex}(PLUS (MULT 1 (MULT 2 (EXPP x (MINUS 2 1)))) 0)
+%%% }
+%%% \end{center}
+
+\begin{verbatim}
+(diff '(PLUS (EXPP x 2) (PLUS (MULT 2 x) 2)) 'x) =
+  (PLUS (MULT 1 (MULT 2 (EXPP X (MINUS 2 1)))) 
+        (PLUS (PLUS (MULT 0 X) (MULT 2 1)) 0))
+\end{verbatim}
+
+Die Vereinfachung kann durch partielles Auswerten des Ergebnisses
+geschehen, indem wir die Funktionen {\tt PLUS, MINUS, MULT,
+EXPP} schreiben und den entstandenen Ausdruck evaluieren.
+Als Beispiel seien die Funktionen {\tt MULT} und {\tt EXPP} mit den
+entsprechenden Auswertungsregeln angegeben:
+
+\[(\mbox{{\tt MULT}}\ e_1\ e_2)\ =\ \left\{%
+   \begin{array}{l@{\quad\quad,\:}l}
+     e_1 e_2 & \mbox{falls}\ e_1, e_2\ \mbox{Zahlen sind}\\
+     0 & \mbox{falls}\ e_1 = 0\ \mbox{oder}\ e_2 = 0\\
+     e_2 & \mbox{falls}\ e_1 = 1\\
+     e_1 & \mbox{falls}\ e_2 = 1\\
+     (\mbox{{\tt MULT}}\ e_1\ e_2) & \mbox{sonst}
+   \end{array} \right.\]
+
+\begin{verbatim}
+(defun MULT (e1 e2)
+  (cond ((and (numberp e1) (numberp e2)) (* e1 e2))
+        ((or (eql 0 e1) (eql 0 e2)) 0)
+        ((eql e1 1) e2)
+        ((eql e2 1) e1)
+        (t (list 'MULT e1 e2))))
+\end{verbatim}
+
+\[(\mbox{{\tt EXPP}}\ e\ n)\ =\ \left\{%
+   \begin{array}{l@{\quad\quad,\:}l}
+     e^{n} & \mbox{falls}\ e, n\ \mbox{Zahlen sind}\\
+     1 & \mbox{falls}\ n = 0\\
+     e & \mbox{falls}\ n = 1\\
+     (\mbox{{\tt EXPP}}\ e\ n) & \mbox{sonst}
+   \end{array} \right.\]
+
+\begin{verbatim}
+(defun EXPP (e n)
+  (cond ((and (numberp e) (numberp n)) (^ e n))
+        ((eql 0 n) 1)
+        ((eql n 1) e)
+        (t (list 'EXPP e n))))
+\end{verbatim}
+
+Die Funktion zur partiellen Auswertung der entstehenden Ausdr"ucke, die wir
+{\tt simplify} nennen wollen, kann dann einfach die Lisp-Funktion
+{\tt eval} aufrufen. Damit ergibt sich eine erste Version des
+Programmes, vervollst"andigt durch Definitionen der Funktionen
+{\tt parse} und {\tt unparse}, die aufgrund der verabredeten Vereinfachung
+nur die als Argument "ubergebene abstrakte Darstellung des Polynoms identisch
+zur"uckgeben:
+
+\begin{verbatim}
+(defun diff ... )
+
+(defun PLUS ... )
+(defun MINUS ... )
+(defun MULT ... )
+(defun EXPP ... )
+
+(defun simplify (p) (eval p))
+(defun parse (p) p)
+(defun unparse (p) p)
+
+(defun test (p)
+  (unparse (simplify (diff (parse p) 'x))))
+\end{verbatim}
+
+Das komplette Programm findet sich im Anhang.
+
+\subsubsection*{Migration}
+
+Zur Montage des Programmes ist nichts zu tun. Eine zus"atzliche
+Haupt-Programmdatei ist nicht erforderlich. Wir k"onnen also den
+"Ubersetzer auf das Programm ansetzen, um Stellen zu finden, bei denen
+Migrationsschritte n"otig sind. Die statisch semantische Analyse des
+"Ubersetzers zeigt uns, da"s weder die Funktion {\tt (eval\,\ldots\,)}, deren
+Aufruf in der Funktion {\tt simplify} auftritt, noch die Funktion
+{\tt (\^\,\ldots\,)}, die in {\tt EXPP} aufgerufen wird, im Sprachumfang
+von CommonLisp$_0$ vorhanden sind.
+
+Die Funktion {\tt (\^\,\ldots\,)} ist tats"achlich keine definierte
+Funktion in Common Lisp. Wir haben einen Programmierfehler entdeckt, der
+deshalb bislang nicht zutage getreten ist, weil der entsprechende Fall
+in der Funktion {\tt EXPP} nie erreicht wurde und auch nie erreicht werden
+wird. Ausdr"ucke der Form {\tt (EXPP $n_1$ $n_2$\,)} mit Zahlen $n_1$ und
+$n_2$ tauchen in den Ergebnissen von {\tt diff} nicht auf, wenn wir
+sicherstellen, da"s die Funktion {\tt parse} reduzierte abstrakte
+Repr"asentationen liefert. Damit kann der Aufruf von
+{\tt (\^\,\ldots\,)} beispielsweise durch die Fehlermeldung
+
+\begin{verbatim}
+         (error "in function EXPP")
+\end{verbatim}
+
+ersetzt werden.
+
+Um den Aufruf der Funktion {\tt (eval\,\ldots\,)} zu eliminieren,
+entscheiden wir uns f"ur die Programmierung eines programmspezifischen
+Interpretierers {\tt diff-eval}, den wir stattdessen in der Funktion
+{\tt simplify} aufrufen. Dieser l"a"st sich nach demselben
+Schema programmieren, das wir bereits im Abschnitt \ref{progeval} benutzt
+haben:
+
+\begin{verbatim}
+(defun diff-eval (e)
+  (cond 
+    ((or (numberp e) (symbolp e)) e)
+    ((eq (first e) 'PLUS) 
+      (apply #'PLUS (mapcar #'diff-eval (rest e))))
+    ((eq (first e) 'MINUS) 
+      (apply #'MINUS (mapcar #'diff-eval (rest e))))
+    ((eq (first e) 'MULT) 
+      (apply #'MULT (mapcar #'diff-eval (rest e))))
+    ((eq (first e) 'EXPP) 
+      (apply #'EXPP (mapcar #'diff-eval (rest e))))
+    (t (error "Unknown expression ~s." e))))
+\end{verbatim}
+
+Erg"anzen wir das entstandene Programm nun noch um ein Hauptprogramm, das aus
+einer Schleife besteht, die jeweils ein zu differenzierendes Polynom einliest
+und das differenzierte Polynom ausdruckt, dann entsteht letztlich als
+Ergebnis der Migration das folgende Programm, das im Anhang vollst"andig
+wiedergegeben ist:
+
+\begin{verbatim}
+(defun diff ... )
+
+(defun PLUS ... )
+(defun MINUS ... )
+(defun MULT ... )
+
+(defun EXPP (e n)
+  (cond ((and (numberp e) (numberp n)) (error "in function EXPP"))
+        ((eql 0 n) 1)
+        ((eql n 1) e)
+        (t (list 'EXPP e n))))
+
+(defun diff-eval (e) ... )
+(defun simplify (p) (diff-eval p))
+
+(defun parse (p) p)
+(defun unparse (p) p)
+
+(defun test (p)
+  (unparse (simplify (diff (parse p) 'x))))
+
+(defun main ()
+  (loop 
+    (princ "Enter expression : ")
+    (let ((e (read))) 
+      (if (member e '(quit exit end stop halt)) 
+        (return) 
+        (format t "~&~s~%" (test1 e))))))
+
+(main)
+\end{verbatim}
+
+Dieses Programm k"onnen wir nun komplett "ubersetzen. Die generierte
+eigenst"andig ablauf\/f"ahige Applikation f"uhrt das Hauptprogramm, also den
+Aufruf der Funktion {\tt (main)} aus. Im Anschlu"s w"urden die
+Funktionen {\tt parse} und {\tt unparse} entwickelt werden, die eine
+Textrepr"asentation eines Polynoms lesen und in abstrakte Syntax
+umwandeln bzw.\ erzeugen.
+
+%------------------------------------------------------------------------
+\section{Results}
+%%% \section{Resultate}
+
+Mit dem in dieser Arbeit vorgestellten methodischen Vorgehen sind im
+Rahmen des APPLY-Projektes eine Reihe mittelgro"ser bis gro"ser
+Lisp-Applikationen auch externer Partner des Projektes erfolgreich
+migriert, "ubersetzt und auch auf kleine Anwendungsrechner portiert
+worden. Exemplarisch seien hier zwei Expertensystemanwendungen und ein
+Interpreter f"ur eine KI-Sprache genannt, die im folgenden mit XPS1,
+XPS2 und KI-S bezeichnet werden sollen.
+
+Die folgende Tabelle zeigt f"ur diese Anwendungen einen Vergleich der
+Codegr"o"sen. Dabei sind die Sourcecode-Gr"o"sen, die
+Bin"arcode-Gr"o"se eines mit herk"ommlicher Technik erzeugten
+Lisp-Images in Allegro-CL 4.1 und die Bin"arcode-Gr"o"sen der mit der
+hier vorgestellten Technik "ubersetzten ausf"uhrbaren Programme
+zueinander in Beziehung gesetzt:
+
+\begin{center}
+\begin{tabular}{|l||c|c|c|}\hline
+& XPS 1 & XPS 2 & KI-S \\ \hline\hline
+Lisp-Source-Code & 10120 lines of code & 10671 lines of code & 3185 lines of code \\
+                 & 485 KB & 505 KB & 92.4 KB \\ \hline
+C-Source-Code & 2073.5 KB & 2212.1 KB & 556 KB \\ \hline\hline
+Lisp-Image & 8.6 MB & 8.8 MB & 7.8 MB \\ \hline\hline
+Programm (SPARC) & 794.6 KB & 942.0 KB & 464.0 KB \\ \hline
+Programm (AT-386) & 620.9 KB & 747.9 KB & 178.0 KB \\ \hline
+\end{tabular}
+\end{center}
+
+Alle hier angegebenen Programme sind auf PC-ATs ohne Einschr"ankungen
+ablauf\/f"ahig, sogar auf Notebooks mit nur 2MByte Hauptspeicher.
+
+Fassen wir die Vorteile des Vorgehens im Hinblick auf die entstandenen
+ablauf\/f"ahigen Programme zusammen, so ergibt sich:
+\begin{enumerate}
+\item Sparsamer Umgang mit Ressourcen
+  \begin{itemize}
+   \item[$\bullet$] Drastische Verringerung der Code-Gr"o"sen
+   \item[$\bullet$] Ablauf\/F"ahigkeit auf Kleinrechnern (Expertensystem
+        auf einem 2MB Notebook)
+  \end{itemize}
+\item Portabilit"at
+  \begin{itemize}
+   \item[$\bullet$] maschinenunabh"angiger C-Code
+  \end{itemize}
+\item Integrierbarkeit
+  \begin{itemize}
+   \item[$\bullet$] als Programme in Standard-DV-Umgebungen
+   \item[$\bullet$] mit C-basierter Standardsoftware, z.B.
+                    Bedienoberfl"achen, Datenbanken oder
+                    Kommunikationssoftware 
+%%%      \begin{itemize}
+%%%       \item Bedienoberfl"achen
+%%%       \item Datenbanken
+%%%       \item Kommunikationssoftware
+%%%      \end{itemize}
+  \end{itemize}
+\end{enumerate}
+
+Das in dieser Arbeit vorgeschlagene Vorgehen, um Lisp-Anwendungen zu
+entwickeln, zu migrieren und sie schlie"slich als eigenst"andig
+ablauf\/f"ahige Applikationen zu implementieren, hat bei einer Reihe von
+nichttrivialen Anwendungen zum Erfolg gef"uhrt.
+
+Dabei bleibt die Produktivit"at beim Programmieren in Lisp erhalten,
+wegweisende Entwicklungen in der symbolischen Datenverarbeitung und
+Wissensverarbeitung werden nicht gehemmt und das schnelle 
+Entstehen von Prototypen wird beg"unstigt.
+
+Wir haben ein methodisches Vorgehen vorgeschlagen und ausgearbeitet,
+wie die entstandenen Prototypen zu Anwendungen weiterentwickelt werden
+k"onnen, die den klassischen Anforderungen an Laufzeit- und
+Speicherplatzeffizienz gen"ugen, und die insbesondere der Anforderung
+gerecht werden, sich in vorhandene Datenverarbeitungsumwelten
+integrieren zu lassen.
+
+Sie k"onnen Industriestandards nutzen, wie beispielsweise Datenbanken,
+Bedienoberfl"achen oder Kommunikationssoftware. Dies ist nicht neu.
+Auch die bekannten kommerziell verf"ugbaren Common-Lisp-Systeme bieten
+durch ein Foreign-Language-Interface die technischen Voraussetzungen
+dazu.
+
+Neu ist, da"s sich Lisp-Programme selbst diesen Standards entsprechend
+verhalten, sich also als Programme oder Module wie solche jeder
+anderen Programmiersprache nutzen lassen. Anwender m"ussen nicht Lisp
+lernen, um Lisp-Programme nutzen zu k"onnen, und die
+Anwendungsumgebung mu"s nur noch die Rechenleistung f"ur die
+Anwendung vorhalten, nicht aber die f"ur die Nutzung eines kompletten
+Lisp-Systems n"otige.
+
+Der Preis, den man f"ur diese Vorteile zu zahlen hat, ist der
+Arbeitsaufwand f"ur die Migration. Wir meinen, da"s dieser aus
+softwaretechnischer Sicht sowieso n"otig ist, um von Prototypen zu
+Anwendungen zu gelangen.
+
+%------------------------------------------------------------------------
+\section{Related Work}
+%% \section{Vergleichbare Arbeiten}
+
+Es gibt heute eine Reihe weiterer "Ubersetzerbauprojekte, in denen C
+erfolgreich als Zielsprache der "Ubersetzung h"oherer Sprachen
+verwendet wird \cite{APPLY/CAU/IV.4/1}.  Dazu geh"oren "Ubersetzer von
+Fortran, Scheme und ML nach C. Aber auch die "Ubersetzung von Common
+Lisp nach C erf"ahrt mehr und mehr Beachtung. Es seien hier z.B.\ KCL
+(Kyoto Common Lisp), WCL (Wade Common Lisp) und auch der kommerziell
+verf"ugbare Chestnut Lisp-to-C-Translator genannt.
+
+KCL \cite{kcl86} ist ein in C implementiertes interaktives
+Lisp-System. Der inkrementelle "Ubersetzer erzeugt zwar C-Code, der
+aber nicht eigenst"andig ablauf\/f"ahig ist, sondern durch dynamisches
+Linken als inkrementell "ubersetzter Programmbestandteil im
+Entwicklungssystem nutzbar wird.
+
+WCL \cite{Hennessey92} verfolgt einen eher mit dem von APPLY
+vergleichbaren Ansatz. In WCL werden Common-Lisp-Programme ebenfalls
+nach C "ubersetzt, die ablauf\/f"ahigen Programme ben"otigen allerdings
+die vollst"andige Common-Lisp-Laufzeitbibliothek in Form einer
+sogenannten {\em shared library}. Damit ist die Portabilit"at der
+Anwendungen im wesentlichen auf Unix-Umgebungen beschr"ankt, zudem
+besteht wegen der Reflektivit"at des vollen Common Lisp kaum eine
+nennenswerte M"oglichkeit, globale Programmoptimierungen auszunutzen.
+
+Am ehesten vergleichbar mit dem APPLY-Ansatz ist der kommerziell
+verf"ugbare Chestnut Lisp-to-C-Translator, der eigenst"andig
+ablauf\/f"ahigen C-Code erzeugt, dies aber mit einem Hauptaugenmerk auf
+die Lesbarkeit und Wartbarkeit des entstehenden C-Codes, der im
+APPLY-Ansatz nur als portabler Zwischencode dient und im Hinblick auf
+Effizienz, nicht aber in erster Linie im Hinblick auf Lesbarkeit
+erzeugt wird. 
+
+%------------------------------------------------------------------------
+\section{Acknowledgements}
+
+We would like to thank Ulrich Hoffmann and Heinz Knutzen who provided
+a lot of additional experience resulting from practical migration work
+actually performed on different large scale and medium scale programs.
+Moreover, many authors of Common Lisp applications supplied us with
+their sources and a lot of help in understanding them, and, hence,
+helped us very much in improving our results. Thank you very much.
+
+%------------------------------------------------------------------------
+%%% \section{Ausblick}
+
+%------------------------------------------------------------------------
+\nocite{Wand/Friedman86}
+\nocite{Smith84}
+\nocite{Smith82}
+\nocite{CLiCC91}
+\nocite{gosi91}
+\nocite{APPLY/IfKI/I.1/1}
+
+%------------------------------------------------------------------------
+%%% \pagebreak
+%%% \pagenumbering{roman}
+
+%%% \bibliographystyle{alpha} 
+%%% \bibliography{diss,apply}
+
+%------------------------------------------------------------------------
+\newcommand{\etalchar}[1]{$^{#1}$}
+\begin{thebibliography}{BCF{\etalchar{+}}91}
+
+\bibitem[BCF{\etalchar{+}}91]{APPLY/IfKI/I.1/1}
+Harry Bretthauer, Thomas Christaller, Horst Friedrich, Wolfgang Goerigk,
+  Winfried Heicking, Dieter Hovekamp, Heinz Knutzen, J\"urgen Kopp, E.~Ulrich
+  Kriegel, Ingo Mohr, Rainer Rosenm\"uller, and Friedemann Simon.
+\newblock {S}pezifikation der {F}unktionalit\"at des {APPLY}-{S}ystems.
+\newblock APPLY-Arbeitspapier APPLY/IfKI/I.1/1, CAU/GMD/IfKI/VW-GEDAS, Sankt
+  Augustin, October 1991.
+
+\bibitem[BGK91]{CLiCC91}
+O.~Burkart, W.~Goerigk, and H.~Knutzen.
+\newblock {CLICC}: {A} {N}ew {A}pproach to the {C}ompilation from {C}ommon
+  {L}isp {P}rograms to {C}.
+\newblock In {\em Work\-shop der Fachgruppe 2.1.4. {\sl ``Alternative Konzepte
+  f\"ur Sprachen und Rechner''} der Gesellschaft f\"ur Informatik}, erschienen
+  als Bericht Nr.\ 8/91-I des Instituts f\"ur angewandte Mathematik und
+  Informatik der Univ.\ M\"unster, 1991.
+
+\bibitem[GS91]{gosi91}
+W.~Goerigk and F.~Simon.
+\newblock {Z}ielsetzungen im {V}erbundvorhaben {APPLY}.
+\newblock In {\em Work\-shop der Fachgruppe 2.1.4. {\sl ``Alternative Konzepte
+  f\"ur Sprachen und Rechner''} der Gesellschaft f\"ur Informatik}, erschienen
+  als Bericht Nr.\ 8/91-I des Instituts f\"ur angewandte Mathematik und
+  Informatik der Univ.\ M\"unster, 1991.
+
+\bibitem[Hen92]{Hennessey92}
+W.~Hennessey.
+\newblock {WCL}: {D}elivering {E}fficient {C}ommon {L}isp {A}pplications under
+  {U}nix.
+\newblock In {\em Proc. of the 1992 ACM Conference on Lisp and Functional
+  Programming}, pages 260--269, San Francisco, CA, 1992.
+
+\bibitem[Hof93]{APPLY/CAU/IV.4/1}
+Ulrich Hoffmann.
+\newblock {\"U}ber {C} als {Z}ielcode der {\"U}bersetzung hoher
+  {P}rogrammiersprachen.
+\newblock APPLY-Arbeitspapier APPLY/CAU/IV.4/1,
+  Christian-Albrechts-Universit\"at, Kiel, May 1993.
+
+\bibitem[KG93]{Knemeyer93}
+U.~Knemeyer and {J.-M.} {Graf von der Schulenburg}.
+\newblock ``{E}xpertensysteme'' - {W}elche {F}aktoren f\"ordern und hemmen die
+  {I}mplementation und {D}iffusion der {T}echnologie in der
+  {V}ersicherungswirtschaft.
+\newblock In F.~Puppe and A.~G\"unter, editors, {\em Expertensysteme '93},
+  Berlin, Heidelberg, New York, 1993. Informatik aktuell, Springer Verlag.
+
+\bibitem[Knu92]{APPLY/CAU/II.2/1}
+Heinz Knutzen.
+\newblock {\sc CommonLisp}$_0$-{S}prachdefinition.
+\newblock APPLY-Arbeitspapier APPLY/CAU/II.2/1,
+  Christian-Albrechts-Universit\"at, Kiel, April 1992.
+
+\bibitem[MBG90]{Mertens93}
+P.~Mertens, V.~Barowski, and W.~Geis.
+\newblock {\em {B}etriebliche {E}xpertensystem-{A}nwendungen}.
+\newblock 2. Auflage, Springer Verlag, Berlin, Heidelberg, New York, 1990.
+
+\bibitem[Smi82]{Smith82}
+{B.C.} Smith.
+\newblock {R}eflection and {S}emantics in a {P}rocedural {L}anguage.
+\newblock Technical report MIT-LCS-TR-272, Massachusetts Institute of
+  Technology, Cambridge, MA, 1982.
+
+\bibitem[Smi84]{Smith84}
+{B.C.} Smith.
+\newblock {R}eflection and {S}emantics in {L}isp.
+\newblock In {\em Proceedings of the 11th ACM Symposium on Principles of
+  Programming Languages POPL'84}, pages 23--35, 1984.
+
+\bibitem[Ste84]{steele}
+{G.L.} Steele.
+\newblock {\em {Common Lisp}: {T}he {L}anguage}.
+\newblock Digital Press, Bedford, MA, 1984.
+
+\bibitem[Ste90]{steele90}
+{G.L.} Steele.
+\newblock {\em {Common Lisp}: {T}he {L}anguage. Second Edition}.
+\newblock Digital Press, Bedford, MA, 1990.
+
+\bibitem[TM86]{kcl86}
+Y.~Taiichi and H.~Masami.
+\newblock {K}yoto {C}ommon {L}isp {R}eport.
+\newblock Technical report, Research Institute for Mathematical Science, Kyoto
+  University, 1986.
+
+\bibitem[Weu93]{Weule93}
+H.~Weule.
+\newblock {E}xpertensysteme im industriellen {E}insatz.
+\newblock In F.~Puppe and A.~G\"unter, editors, {\em Expertensysteme '93},
+  Berlin, Heidelberg, New York, 1993. Informatik aktuell, Springer Verlag.
+
+\bibitem[WF86]{Wand/Friedman86}
+M.~Wand and {D.P.} Friedman.
+\newblock {T}he {M}ystery of the {T}ower {R}evealed: {A} {N}on-{R}eflective
+  {D}escription of the {R}eflective {T}ower.
+\newblock In {\em Proceedings of the 1986 ACM-Conference on Lisp and Functional
+  Programming}, pages 298--307, Cambridge, MA, 1986.
+
+\end{thebibliography}
+
+%------------------------------------------------------------------------
+\thispagestyle{empty}
+
+%------------------------------------------------------------------------
+\begin{appendix}
+
+%------------------------------------------------------------------------
+\newpage
+%%% \section{Das Beispielprogramm}
+\section{The Example Program}
+
+\begin{verbatim}
+;;;---------------------------------------------------------------------
+;;;
+;;; Symbolic Differentiation of Polynoms
+;;;
+;;;---------------------------------------------------------------------
+
+(defun diff (e x)
+  (cond ((numberp e) 0)
+        ((eq e x) 1)
+        ((symbolp e) 0)
+        ((consp e)
+         (case (first e)
+           ((PLUS MINUS) (list (first e) 
+                               (diff (second e) x) 
+                               (diff (third e) x)))
+           ((MULT) (list 'PLUS
+                         (list 'MULT (diff (second e) x) (third e))
+                         (list 'MULT (second e) (diff (third e) x))))
+           ((EXPP) (list 'MULT
+                        (diff (second e) x)
+                        (list 'MULT
+                              (third e)
+                              (list 'EXPP 
+                                    (second e) 
+                                    (list 'MINUS (third e) 1)))))
+           (t e)))
+        (t e)))
+
+;;;---------------------------------------------------------------------
+   
+(defun PLUS (e1 e2)
+   ;;;
+   ;;;  (PLUS n1 n2) = n1 + n2
+   ;;;  (PLUS 0 e2) = e2
+   ;;;  (PLUS e1 0) = e1
+   ;;;
+  (cond ((and (numberp e1) (numberp e2)) (+ e1 e2))
+        ((eql 0 e1) e2)
+        ((eql 0 e2) e1)
+        (t (list 'PLUS e1 e2))))
+
+(defun MINUS (e1 e2)
+   ;;;
+   ;;;  (MINUS n1 n2) = n1 - n2
+   ;;;  (MINUS e1 0) = e1
+   ;;;
+  (cond ((and (numberp e1) (numberp e2)) (- e1 e2))
+        ((eql 0 e2) e1)
+        (t (list 'MINUS e1 e2))))
+
+(defun MULT (e1 e2)
+   ;;;
+   ;;;  (MULT n1 n2) = n1 * n2
+   ;;;  (MULT 0 e2) = (MULT e1 0) = 0
+   ;;;  (MULT 1 e2) = e2
+   ;;;  (MULT e1 1) = e1 
+   ;;;
+  (cond ((and (numberp e1) (numberp e2)) (* e1 e2))
+        ((or (eql 0 e1) (eql 0 e2)) 0)
+        ((eql e1 1) e2)
+        ((eql e2 1) e1)
+        (t (list 'MULT e1 e2))))
+
+(defun EXPP (e n)
+   ;;;
+   ;;;  (EXPP n1 n2) = n1 ^ n2
+   ;;;  (EXPP e 0) = 1
+   ;;;  (EXPP e 1) = e
+   ;;;
+  (cond ((and (numberp e) (numberp n)) (^ e n))
+        ((eql 0 n) 1)
+        ((eql n 1) e)
+        (t (list 'EXPP e n))))
+
+;;;---------------------------------------------------------------------
+
+(defun parse (p) p)
+(defun unparse (p) p)
+
+(defun simplify (p) (eval p))
+
+;;;---------------------------------------------------------------------
+
+(defun test (p)
+  (setq x 'x)
+  (unparse (simplify (diff (parse p) 'x))) )
+
+;;;---------------------------------------------------------------------
+\end{verbatim}
+
+%------------------------------------------------------------------------
+\newpage
+%%% \section{Das Beispielprogramm nach der Migration}
+\section{The Example Program after Migration}
+
+\begin{verbatim}
+;;;---------------------------------------------------------------------
+;;;
+;;; Symbolic Differentiation of Polynoms (after migration)
+;;;
+;;;---------------------------------------------------------------------
+
+(defun diff (e x)
+  (cond ((numberp e) 0)
+        ((eq e x) 1)
+        ((symbolp e) 0)
+        ((consp e)
+         (case (first e)
+           ((PLUS MINUS) (list (first e) 
+                               (diff (second e) x) 
+                               (diff (third e) x)))
+           ((MULT) (list 'PLUS
+                         (list 'MULT (diff (second e) x) (third e))
+                         (list 'MULT (second e) (diff (third e) x))))
+           ((EXPP) (list 'MULT
+                        (diff (second e) x)
+                        (list 'MULT
+                              (third e)
+                              (list 'EXPP 
+                                    (second e) 
+                                    (list 'MINUS (third e) 1)))))
+           (t e)))
+        (t e)))
+  
+;;;---------------------------------------------------------------------
+
+(defun PLUS (e1 e2)
+   ;;;
+   ;;;  (PLUS n1 n2) = n1 + n2
+   ;;;  (PLUS 0 e2) = e2
+   ;;;  (PLUS e1 0) = e1
+   ;;;
+  (cond ((and (numberp e1) (numberp e2)) (+ e1 e2))
+        ((eql 0 e1) e2)
+        ((eql 0 e2) e1)
+        (t (list 'PLUS e1 e2))))
+
+(defun MINUS (e1 e2)
+   ;;;
+   ;;;  (MINUS n1 n2) = n1 - n2
+   ;;;  (MINUS e1 0) = e1
+   ;;;
+  (cond ((and (numberp e1) (numberp e2)) (- e1 e2))
+        ((eql 0 e2) e1)
+        (t (list 'MINUS e1 e2))))
+
+(defun MULT (e1 e2)
+   ;;;
+   ;;;  (MULT n1 n2) = n1 * n2
+   ;;;  (MULT 0 e2) = (MULT e1 0) = 0
+   ;;;  (MULT 1 e2) = e2
+   ;;;  (MULT e1 1) = e1 
+   ;;;
+  (cond ((and (numberp e1) (numberp e2)) (* e1 e2))
+        ((or (eql 0 e1) (eql 0 e2)) 0)
+        ((eql e1 1) e2)
+        ((eql e2 1) e1)
+        (t (list 'MULT e1 e2))))
+
+
+(defun EXPP (e n)
+   ;;;
+   ;;;  (EXPP n1 n2) = n1 ^ n2
+   ;;;  (EXPP e 0) = 1
+   ;;;  (EXPP e 1) = e
+   ;;;
+  (cond ((and (numberp e) (numberp n)) (error "in function EXPP"))
+        ((eql 0 n) 1)
+        ((eql n 1) e)
+        (t (list 'EXPP e n))))
+
+;;;---------------------------------------------------------------------
+
+(defun parse (p) p)
+(defun unparse (p) p)
+
+(defun simplify (p) (diff-eval p))
+
+;;;---------------------------------------------------------------------
+
+(defun test (p)
+  (unparse (simplify (diff (parse p) 'x))) )
+
+;;;---------------------------------------------------------------------
+
+(defun diff-eval (e)
+  (cond ((or (numberp e) (symbolp e)) e)
+        ((eq (first e) 'PLUS) 
+          (apply #'PLUS (mapcar #'diff-eval (rest e))))
+        ((eq (first e) 'MINUS) 
+          (apply #'MINUS (mapcar #'diff-eval (rest e))))
+        ((eq (first e) 'MULT) 
+          (apply #'MULT (mapcar #'diff-eval (rest e))))
+        ((eq (first e) 'EXPP) 
+          (apply #'EXPP (mapcar #'diff-eval (rest e))))
+        (t (error "Unknown expression ~s." e))))
+
+;;;---------------------------------------------------------------------
+
+(defun main ()
+  (loop 
+    (princ "Enter expression : ")
+    (let ((e (read))) 
+      (if (member e '(quit exit end stop halt)) 
+        (return) 
+        (format t "~&~s~%" (test e))))))
+
+(main)
+\end{verbatim}
+
+%------------------------------------------------------------------------
+\end{appendix}
+
+%------------------------------------------------------------------------
+\end{document}

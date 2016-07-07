@@ -1,52 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- * Funktion : Laufzeitsystem
- *            - FUNCALL, APPLY
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * $Revision: 1.13 $
- * $Log: funcall.c,v $
- * Revision 1.13  1994/05/18  15:19:04  sma
- * Makros für Zugriff auf funktionale Objekte nach obrepX verlagert.
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
  *
- * Revision 1.12  1994/02/03  17:34:08  sma
- * Änderungen für Optimierung von &rest-Paramtern.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ * Function : FUNCALL, APPLY
  *
- * Revision 1.11  1994/01/25  15:15:21  sma
- * STACK(base, x) -> ARG(x)
- *
- * Revision 1.10  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.9  1993/04/22  10:29:34  hk
- * fun_decl.h -> sys.h.
- *
- * Revision 1.8  1993/04/06  17:22:16  hk
- * Tabs entfernt.
- *
- * Revision 1.7  1993/03/25  12:55:43  sma
- * neuer Look
- *
- * Revision 1.6  1993/02/17  15:37:21  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.5  1992/10/07  15:56:21  hk
- * Schreibfehler.
- *
- * Revision 1.4  1992/09/28  17:20:28  hk
- * Lerror -> Labort, neues Lerror mit Lisp-Parameter
- *
- * Revision 1.3  1992/09/23  14:46:39  hk
- * Falls funcall mit einem Argument aufgerufen wird, das keine Funktion
- * ist, dann wird dieses Argument in der Fehlermeldung angegeben.
- *
- * Revision 1.2  1992/04/15  11:09:08  hk
- * Aufruf von Continuation eingefuegt.
- *
- * Revision 1.1  1992/03/24  17:03:37  hk
- * Initial revision
+ * $Revision: 1.14 $
+ * $Id: funcall.c,v 1.14 1994/11/22 14:54:01 hk Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>

@@ -1,51 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem, Initialisierung
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.12 $
-;;; $Log: startup.lisp,v $
-;;; Revision 1.12  1993/12/09  17:14:26  sma
-;;; *package-array* und *keyword-package* werden jetzt in packg.lisp
-;;; definiert.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.11  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Initialisierung, Starten der Applikation
 ;;;
-;;; Revision 1.10  1993/04/22  10:41:32  hk
-;;;  (in-package "RUNTIME") -> (in-package "LISP"),
-;;; fast die gesamte Initialisierung findet jetzt in lisp.lisp statt,
-;;; nur noch init-keysort, Error-Catcher und Aufruf des Hauptprogramms.
-;;;
-;;; Revision 1.9  1993/03/12  09:56:45  ft
-;;; Anpassung an die geaenderte Repraesentation ungebundener Slot-Werte.
-;;;
-;;; Revision 1.8  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.12 $ eingefuegt
-;;;
-;;; Revision 1.7  1993/01/19  16:09:10  hk
-;;; filesys-init
-;;;
-;;; Revision 1.6  1993/01/14  16:44:41  hk
-;;; :par-spec fuer lisp-main eingefuegt.
-;;;
-;;; Revision 1.5  1992/12/16  12:14:05  ft
-;;; Initialisierung von *unbound-slot*.
-;;;
-;;; Revision 1.4  1992/08/06  16:00:10  hk
-;;; Aufruf von init-keysort eingefuegt.
-;;;
-;;; Revision 1.3  1992/07/29  14:17:32  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.2  1992/07/06  11:38:27  hk
-;;; string-char --> character.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.13 $
+;;; $Id: startup.lisp,v 1.13 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")

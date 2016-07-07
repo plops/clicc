@@ -1,49 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
  *------------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
  * Funktion : obrep1.c - datenrepräsentationsspezifisch
  *
- * $Revision: 1.10 $
- * $Log: obrep1.c,v $
- * Revision 1.10  1994/06/17  15:25:48  sma
- * forwaertsreferenz auf save_form eingefuegt.
- *
- * Revision 1.9  1994/05/18  15:20:18  sma
- * Anpassung für obrep2.
- *
- * Revision 1.8  1994/05/05  14:40:34  uho
- * In 'goto begin; break;'-Folgen das break geloescht, da es Warnungen
- * mit BC++ V4 erzeugt.
- *
- * Revision 1.7  1994/02/18  12:10:30  uho
- * Das Ermitteln konstanter Datenobjekte und der Heapkonsistenz wird
- * durch Makroaufrufe vorgenommen.
- *
- * Revision 1.6  1994/01/24  16:28:32  sma
- * Die AR_SIZE-Komponente von Strukturen enthaelt jetzt nur noch die
- * Anzahl der Slots, nicht #Slots + 1. Spart einige +/-1 Berechnungen bei
- * new-struct und struct-size.
- *
- * Revision 1.5  1994/01/21  13:31:45  sma
- * Erneute Änderung der Symbolrepräsentation und somit auch des
- * entsprechenden Codes zur Garbage-Collection. Änderug für neue
- * Repräsentation von #<unbound>.
- *
- * Revision 1.4  1994/01/13  16:41:33  sma
- * Änderung der Symbol-Repräsentation.
- *
- * Revision 1.3  1993/12/09  15:12:25  sma
- * Neuer Garbage-collector für neue Repräsentation der arrays. Ist besser
- * kommentiert, optimiert und vermeidet konsequent tail-end-Rekursionen.
- *
- * Revision 1.2  1993/10/29  15:19:41  sma
- * Änderung wegen neuer Verwaltung von Array-Dimensionen.
- *
- * Revision 1.1  1993/10/14  15:42:33  sma
- * Initial revision
- *
+ * $Revision: 1.16 $
+ * $Id: obrep1.c,v 1.16 1995/03/08 15:17:31 wg Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>
@@ -55,7 +35,7 @@
 #include <malloc.h>
 #endif
 
-#if __OBREP == 1
+#if OBREP == 1
 
 #define GC_FORWARD    128
 #define LOAD_FORWARD(fw_ptr, loc) \
@@ -125,6 +105,8 @@ CL_FORM *form;
    case CL_CODE:
    case CL_CFILE:
    case CL_UNIQUE_TAG:
+   case CL_C_PRIMITIVE:
+   case CL_C_STRING:
       break;
       
       /* Garbage-Collection von Floats */
@@ -306,17 +288,44 @@ CL_FORM *form;
          form = form_toh++;
          goto begin;
 
-         /* Foreign-Datentypen */
-         /*--------------------*/
-      case CL_C_CHAR:
-      case CL_C_UNSIGNED_CHAR:
-      case CL_C_SHORT:
-      case CL_C_INT:
-      case CL_C_LONG:
-      case CL_C_UNSIGNED_SHORT:
-      case CL_C_UNSIGNED_INT:
-      case CL_C_UNSIGNED_LONG:
+      case CL_C_FLOATING:
+      {
+         double *fptr = GET_C_FLOATING_PTR(form);
+         
+         if (FL_CONSTANTq(fptr))      /* Konstantes Datum */
+            return;
+         
+         /* Test auf Inkonsistenz im GC */
+         
+         if (FL_OUT_OF_HEAPq(fptr))
+            Labort ("Unexpected pointer out of heap."); 
+         if (FL_WRONG_HEAPq(fptr)) 
+            Labort ("Unexpected pointer in wrong heap.");
+         
+         *fl_toh = *fptr;          /* In neuen Heap kopieren */
+         GET_C_FLOATING_PTR(form) = fl_toh++;
+         
+         if (fl_toh >= fl_eoh) 
+            Labort("Float-Heap Overflow.");
          break;
+      }
+         
+      case CL_C_STRUCT:
+      case CL_C_UNION:
+      case CL_C_ARRAY:
+      case CL_C_HANDLE:
+         /* CONS-Knoten kopieren. */
+         COPY(fptr,     form_toh);
+         COPY(fptr + 1, form_toh + 1);
+         
+         /* Zeiger auf kopierten Knoten setzen. */
+         GET_FORM(form) = form_toh;
+         LOAD_FORWARD(form_toh, fptr);
+         fptr = form_toh;
+         form_toh += 2;
+
+         form = fptr;
+         goto begin;
          
       default:
          fprintf(stderr, ";;; Unkonwn data type %d by GC\n", TYPE_OF(form));

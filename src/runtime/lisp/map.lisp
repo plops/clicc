@@ -1,36 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem: MAPCAR, MAPLIST, MAPC, MAPL, MAPCAN, MAPCON
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.7 $
-;;; $Log: map.lisp,v $
-;;; Revision 1.7  1994/02/02  09:45:16  hk
-;;; mapcar, maplist, mapcan, mapcon mit der Deklaration
-;;; simp-when-no-result versehen. Definition von mapc und mapl nach vorn
-;;; gezogen, da sie in den Deklarationen verwendet werden..
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.6  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : MAPCAR, MAPLIST, MAPC, MAPL, MAPCAN, MAPCON
 ;;;
-;;; Revision 1.5  1993/04/22  10:47:09  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Exports eingefuegt.
-;;;
-;;; Revision 1.4  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.7 $ eingefuegt
-;;;
-;;; Revision 1.3  1992/07/06  15:16:14  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.2  1992/07/06  15:15:49  hk
-;;; 'runtime --> "RUNTIME"
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.8 $
+;;; $Id: map.lisp,v 1.8 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")

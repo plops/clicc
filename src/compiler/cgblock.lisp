@@ -1,69 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Codegenerierung: Continuations, Spruenge
 ;;;
-;;; $Revision: 1.18 $
-;;; $Log: cgblock.lisp,v $
-;;; Revision 1.18  1994/01/07  11:36:41  hk
-;;; In cg-app(cont) für das Zwischenergebnis bei einem nichtlokalen Sprung
-;;; (stacktop-result-location) statt (stacktop-location) verwendet.
-;;;
-;;; Revision 1.17  1993/09/09  09:59:50  uho
-;;; Funktion 'CC-caller-stack' nach cg-code verschoben. Dadurch entfaellt
-;;; auch die Sonderbehandlung fuer CMU-CL.
-;;;
-;;; Revision 1.16  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.15  1993/04/07  16:16:21  hk
-;;; Fehlermeldung verschoenert.
-;;;
-;;; Revision 1.14  1993/02/16  16:08:21  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.13  1992/11/05  09:04:19  kl
-;;; Labels fuer CMU-Lisp herausgezogen.
-;;;
-;;; Revision 1.12  1992/10/02  14:07:22  hk
-;;; Fehlerbehandlung jetzt lokal
-;;;
-;;; Revision 1.11  1992/09/21  11:18:52  hk
-;;; Die eigentliche C-Codegenerierung uebersichtlicher gestaltet
-;;;
-;;; Revision 1.10  1992/08/11  12:30:18  hk
-;;; C-Ln --> C-Decl, falls lokale variablen deklariert werden.
-;;;
-;;; Revision 1.9  1992/08/10  11:55:15  hk
-;;; *mv-spec* und *mv-produced* gestrichen, da Analyse komplett in Pass3.
-;;;
-;;; Revision 1.8  1992/08/10  10:29:27  hk
-;;; Labels herausgezogen fuer CMU-Lisp.
-;;;
-;;; Revision 1.7  1992/07/21  13:58:25  hk
-;;; Semikolon hinter "goto Marke" vergessen.
-;;;
-;;; Revision 1.6  1992/06/11  11:14:39  hk
-;;; cg-error -> error.
-;;;
-;;; Revision 1.5  1992/06/10  14:56:46  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.4  1992/06/04  15:40:49  hk
-;;; Namen der Marken bei Continuations und Tagbody vor deren Anwendung
-;;; bekanntgeben.
-;;;
-;;; Revision 1.3  1992/06/04  14:50:15  hk
-;;; In cg-app (cont) die Ueberpruefung der Anzahl der Arg. korrigiert.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.19 $
+;;; $Id: cgblock.lisp,v 1.19 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

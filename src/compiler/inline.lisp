@@ -1,168 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Funktionen zur Inline-Compilation von Funktionsapplikationen.
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.46 $
-;;; $Log: inline.lisp,v $
-;;; Revision 1.46  1994/06/11  00:10:17  hk
-;;; In kleinen Funktinen nur dann nicht inlinen, wenn sie exportiert
-;;; werden. (diese Regel ist noch nicht optimal)
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.45  1994/06/10  23:36:07  hk
-;;; F"ur neue Namen globaler definierender Vorkommen (Funktionen, named
-;;; const) wird jetzt nicht das Resultat von intern ber"ucksichtigt,
-;;; sondern es wird geschaut, ob bereits ein Programmobjekt gleichen
-;;; Namens im Modul definiert ist.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion: Inline-Compilation von Funktionsapplikationen.
 ;;;
-;;; Revision 1.44  1994/06/10  14:23:29  hk
-;;; F"ur globale definierende Vorkommen (Funktionen, named const) d"urfen
-;;; die Namen keine uninterned Symbols sein.
-;;;
-;;; Revision 1.43  1994/06/10  12:31:15  jh
-;;; *max-inline-weight* wegen der Änderung in weight.lisp auf 30 gesetzt.
-;;;
-;;; Revision 1.42  1994/06/10  10:45:00  hk
-;;; Kein gentemp mehr verwendet, um bei verschiedenen Compiler-L"aufen
-;;; reproduzierbare Namen zu erhalten.
-;;;
-;;; Revision 1.41  1994/06/09  15:18:29  hk
-;;; *max-inline-weight* auf 38 erh"oht, damit struct-ref inline compiliert
-;;; wird. named-constants m"ussen doch einen mit gentemp generierten Namen haben.
-;;;
-;;; Revision 1.40  1994/06/09  07:40:20  hk
-;;; Noch ein Schreibfehler. ?symbol nicht auf dynamic anwenden.
-;;;
-;;; Revision 1.39  1994/06/08  16:32:49  hk
-;;; Schreibfehler
-;;;
-;;; Revision 1.38  1994/06/08  16:27:36  hk
-;;; Fehler behoben: gentemp nicht auf Symbol anwenden. Viele gentemps
-;;; gestrichen, und den Namen der kopierten Variablen genommen.
-;;;
-;;; Revision 1.37  1994/06/08  15:06:24  jh
-;;; Imported-funs sind immer copyable.
-;;;
-;;; Revision 1.36  1994/06/08  11:59:27  hk
-;;; In dynamic-var-problems:test-opt&key explizites Block eingef"ugt (f"ur
-;;; CLISP)
-;;;
-;;; Revision 1.35  1994/06/07  17:28:06  jh
-;;; Funktionen zur Parametervereinfachung eingebaut und Inlining
-;;; verbessert.
-;;;
-;;; Revision 1.34  1994/04/29  11:02:37  hk
-;;; Slots mv-position und fn-on-mv-pos von Continuations werden von zs-cp
-;;; nicht kopiert, da diese Slots bei importierten Funktionen nicht
-;;; gesetzt sind. Level nur bei lokalen Funktionen abfragen.
-;;;
-;;; Revision 1.33  1994/04/05  15:11:25  jh
-;;; Inlining importierter Funktionen eingebaut.
-;;;
-;;; Revision 1.32  1994/02/08  11:25:28  sma
-;;; Überflüssiges `"' gelöscht.
-;;;
-;;; Revision 1.31  1994/02/08  11:09:22  sma
-;;; Neue Funktion clicc-message-line zeichnet die übliche Trennline.
-;;;
-;;; Revision 1.30  1994/02/01  15:20:21  hk
-;;; make-instance 'xxx --> make-xxx
-;;;
-;;; Revision 1.29  1994/02/01  11:32:36  hk
-;;; zs-cp (fun): nur bei defined-fun den used Slot erhöhen.
-;;;
-;;; Revision 1.28  1994/01/31  13:53:23  hk
-;;; inline-app-p ist nur dann wahr, wenn eine definierte Funktion
-;;; angewendet wird. Bei importierten Funktionen wird der Body in einem
-;;; :raw Slot stecken.
-;;;
-;;; Revision 1.27  1994/01/21  13:23:12  sma
-;;; max-inline-weight von 25 auf 35 erhöht.
-;;;
-;;; Revision 1.26  1994/01/10  08:52:41  hk
-;;; write-inline-statistics: (apply #'+ (mapcar #'cdr *inline-statistics*))
-;;; führt zu Problemen, wenn *inline-statistics* mehr als
-;;; lambda-paramerts-limit Elemente enthält.  Stattdessen reduce verwendet.
-;;;
-;;; Revision 1.25  1993/09/29  08:09:57  jh
-;;; Fehler in keywords-ok-p behoben.
-;;;
-;;; Revision 1.24  1993/09/20  14:35:41  jh
-;;; An die neue Version der weight-Funktion angepasst. Bei Funktionen mit nur
-;;; einer Anwendung wird der Rumpf nicht kopiert, sondern das Original weiter-
-;;; verwendet.
-;;;
-;;; Revision 1.23  1993/09/10  15:36:15  hk
-;;; apply '+ --> apply #'+, weil das erste kein CL_0 ist.
-;;;
-;;; Revision 1.22  1993/08/05  11:31:38  jh
-;;; foreign-funs eingebaut.
-;;;
-;;; Revision 1.21  1993/08/04  17:10:00  hk
-;;; Unbekannter Seiteneffekt in read- und write-list wird jetzt durch -1
-;;; und nicht mehr durch :UNKNOWN ausgedrückt.
-;;;
-;;; Revision 1.20  1993/07/26  14:35:39  wg
-;;; Lokale Funktionen in Methoden fuer CMU global definiert.
-;;;
-;;; Revision 1.19  1993/07/23  13:18:49  hk
-;;; Neue Variabale *inline-verbosity*.
-;;;
-;;; Revision 1.18  1993/07/22  12:46:45  jh
-;;; Fehler in mc-form behoben.
-;;;
-;;; Revision 1.17  1993/07/21  12:45:06  jh
-;;; structured-literals in Funktionen, die inline kompiliert werden sollen,
-;;; werden in defined-named-const verpackt.
-;;;
-;;; Revision 1.16  1993/07/20  13:49:22  jh
-;;; Die Funktion error wird nicht mehr inline kompiliert.
-;;;
-;;; Revision 1.15  1993/07/19  09:53:29  jh
-;;; structured-literals werden wieder inline kompiliert, da sie jetzt in
-;;; named-const verpackt werden.
-;;;
-;;; Revision 1.14  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.13  1993/06/07  08:31:15  jh
-;;; Kommentar in bind-arguments eingeguegt.
-;;;
-;;; Revision 1.12  1993/06/05  22:27:34  hk
-;;; structured-literals werden zunaechst nicht inline kompiliert.
-;;;
-;;; Revision 1.11  1993/06/05  18:57:28  hk
-;;; In bind-arguments bei der Bearbeitung von Keyword Parametern
-;;; (push a-key processed-keys) eingefuegt.
-;;;
-;;; Revision 1.10  1993/05/27  12:51:22  jh
-;;; Inlining von tagbody-forms und let/cc-forms eingebaut.
-;;;
-;;; Revision 1.9  1993/05/25  13:36:36  jh
-;;; Testmeldungen entfernt.
-;;;
-;;; Revision 1.8  1993/05/25  13:29:26  jh
-;;; Inlining von Funktionen mit &key- und &rest-Parametern eingebaut.
-;;;
-;;; Revision 1.7  1993/05/19  11:37:24  jh
-;;; *max-inline-weight* von 20 auf 10 verkleinert.
-;;;
-;;; Revision 1.6  1993/05/18  09:16:55  jh
-;;; Die Reihenfolge der neuen Parametervariablen korrigiert.
-;;;
-;;; Revision 1.5  1993/05/11  09:03:04  hk
-;;; inline-app, arguments: Fehler bei optionalen Paramtern behoben.
-;;;
-;;; Revision 1.4  1993/05/10  12:24:15  jh
-;;; Schalter *no-inlining* eingebaut. mv-lambda wird jetzt unterstuetzt.
-;;;
-;;; Revision 1.3  1993/02/16  15:16:47  hk
-;;; $ eingefuegt.
-;;;
-;;; Revision 1.2  1993/01/28  12:06:07  jh
-;;; Fehler beseitigt.
+;;; $Revision: 1.48 $
+;;; $Id: inline.lisp,v 1.48 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -637,8 +498,6 @@
                            empty-list
                            (make-app :form list-fun
                                      :arg-list (queue2list rest-queue)
-                                     :read-list -1
-                                     :write-list -1
                                      :called-funs (list list-fun)
                                      :downfun-list ()
                                      :other-funs nil))
@@ -655,8 +514,6 @@
                        (if (is-used (?rest params))
                            (make-app :form list-fun
                                      :arg-list args
-                                     :read-list -1
-                                     :write-list -1
                                      :called-funs (list list-fun)
                                      :downfun-list ()
                                      :other-funs nil)
@@ -784,8 +641,6 @@
             :arg-list (mapcar #'(lambda (a-form)
                                   (zs-cp a-form subst-map))
                               (?arg-list an-app))
-            :read-list (?read-list an-app)
-            :write-list (?write-list an-app)
             :mv-used (?mv-used an-app)
             :downfun-list (if (slot-boundp an-app 'downfun-list)
                               (?downfun-list an-app)

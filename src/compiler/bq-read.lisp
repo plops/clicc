@@ -1,38 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem:  Backquote-Reader + Simplifier
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.9 $
-;;; $Log: bq-read.lisp,v $
-;;; Revision 1.9  1994/01/11  16:12:37  hk
-;;; Fehler in bq-attach-append bei `( ..... . const) behoben.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.8  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : eigener Backquote-Reader + Simplifier
 ;;;
-;;; Revision 1.7  1993/06/04  13:04:39  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.6  1993/06/04  12:44:21  hk
-;;; vector-reader verbessert
-;;;
-;;; Revision 1.5  1993/05/12  13:02:24  hk
-;;; VECTOR -> BQ-VECTOR.
-;;;
-;;; Revision 1.4  1993/02/16  16:08:30  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.3  1993/01/26  17:22:06  hk
-;;; (in-package CLICC) statt (in-package RUNTIME)
-;;;
-;;; Revision 1.2  1992/12/22  16:38:48  hk
-;;; cons-reader von allegro wird nun benutzt.
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.10 $
+;;; $Id: bq-read.lisp,v 1.10 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

@@ -1,82 +1,37 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;--------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Die Globalen Variablen der Voranalyse, der 
-;;;            Seiteneffektanalyse, der Let-optimierung und der 
-;;;            Tail-Rekursion.
-;;; $Revision: 1.1 $
-;;; $Log: se-init.lisp,v $
-;;; Revision 1.1  1993/11/09  15:36:01  atr
-;;; Initial revision
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Data structures for storing side effect information
+;;; $Revision: 1.5 $
+;;; $Id: se-init.lisp,v 1.5 1994/11/22 14:49:16 hk Exp $
 ;;;-------------------------------------------------------------------------
 
-;;;-------------------------------------------------------------------------
-;;; Die globalen Variablen der Voranalyse.
-;;;-------------------------------------------------------------------------
 (in-package "CLICC")
 
-(defvar *upward-fun-args* nil )    
-                                   
-(defvar *down-fun-args* nil)       
-(defvar *se-var-env* nil)
-(defvar *se-vars-to-funs* )
-(defvar *se-fun-counter*)
-
-;;;--------------------------------------------------------------------------
-;;; Globale Variablen der Seiteneffektanalyse .
-;;;--------------------------------------------------------------------------
-(defvar *current-function* )  ;; Die gerade analysierte Funktion.
-
-(defvar *error-function* nil) ;; Die Funktion clicc-lisp::error wird 
-                              ;; gesondert behandelt.
-
-(defvar *effect-work-set* )   ;; enthaelt die zu analysierenden Funktionen 
-                              ;; waehrend der Fixpunktiteration.
-
-(defvar *jump-level* )        ;; Zu welchem Niveau wird es gesprungen ??.
-
-(defvar *static-level* 0)     ;; aktuelles statisches Niveau.
-
-;;;--------------------------------------------------------------------------
-;;; Schalter f"ur die Analyse, die Let-Optimierung und die Tail-Rekursion.
-;;;--------------------------------------------------------------------------
-
-(defvar *Side-effect-info-level* 1)
-(defvar *no-pre-analysis* nil)
-(defvar *no-let-optimizing* nil)    
-(defvar *no-tail-recursion* nil)
-
-(defvar *eliminated-vars* 0)
-(defvar *eliminated-lets* 0)
-(defvar *subst-number*    0)
-(defvar *let-effect* )
-(defvar *local-effect*)
-(defvar *vars-bound-but-not-used* 0)
-
-;;;--------------------------------------------------------------------------
-;;; Die globale Variablen der Tail-Rekursion.
-;;;--------------------------------------------------------------------------
-(defvar *new-body*)           ;; Der neue Rumpf einer Funktion nach der
-                              ;; Tail-Rekursion ist ein Tagbody-konstrukt.
-
-(defvar *body-tag*)           ;; Der Anfang des Rumpfes.
-
-(defvar *result-var*)         ;; Der Resultatswert der Funktion wird nun
-                              ;; an den ersten Parameter der Funktion
-                              ;; zugewiesen, und der Parameter wird dann
-                              ;; als Resultat der Funktion zurueckgegeben.
-
-(defvar *app-counter*)        ;; Diese Variablen sind nur momentan fuer mich
-(defvar *optimized-funs*)     ;; da.
-
-;;;--------------------------------------------------------------------------
-;;; Bei der Analyse der ZWS-Formen werden die gelesenen Variablen bzw
-;;; die vera"nderten Variablen in den read-list-Slot bzw in den 
-;;; write-list-Slot eingetragen.
-;;;--------------------------------------------------------------------------
+;;--------------------------------------------------------------------------
+;; Bei der Analyse der ZWS-Formen werden die gelesenen Variablen bzw
+;; die vera"nderten Variablen in den read-list-Slot bzw in den 
+;; write-list-Slot eingetragen.
+;;--------------------------------------------------------------------------
 (defclass1 effect  ()
   (read-list   :initform nil :type (or integer list ))
   (write-list  :initform nil :type (or integer list ))
@@ -85,13 +40,13 @@
                                             :alloc-dest-jump)))
 
   
-;;;-------------------------------------------------------------------------
-;;; Diese Strukture dient zum Abspeichern der textuell sichtbaren 
-;;; Effekte durch ein SETQ oder Referenzen von Variablen.
-;;;-------------------------------------------------------------------------
+;;-------------------------------------------------------------------------
+;; Diese Strukture dient zum Abspeichern der textuell sichtbaren 
+;; Effekte durch ein SETQ oder Referenzen von Variablen.
+;;-------------------------------------------------------------------------
 (defclass1 local-effect ()
   (read-list  :initform nil :type list)
   (write-list :initform nil :type list))
 
-;;;-------------------------------------------------------------------------
+;;-------------------------------------------------------------------------
 (provide "se-init")    

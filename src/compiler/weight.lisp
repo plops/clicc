@@ -1,54 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Abschaetzung der zu erwartenden Codelaenge
 ;;;
-;;; $Revision: 1.13 $
-;;; $Log: weight.lisp,v $
-;;; Revision 1.13  1994/06/22  07:47:38  hk
-;;; Fehler in weight-eq und weight-eql behoben.
-;;;
-;;; Revision 1.12  1994/06/12  19:12:32  hk
-;;; Fehler in weight-gen-classes behoben: vertauschte Zweige in einem
-;;; if-Ausdruck bewirkten, da"s ein unzul"assiges strukturiertes Literal
-;;; mit value = NIL entstand.
-;;;
-;;; Revision 1.11  1994/06/10  12:34:43  jh
-;;; Für einfache Literale und Symbole wird jetzt auch auf die
-;;; let-Optimierung vertraut.
-;;;
-;;; Revision 1.10  1994/06/09  16:02:09  jh
-;;; Abschätzung, die auf die let-Optimierung hofft, eingebaut.
-;;;
-;;; Revision 1.9  1994/06/09  10:36:20  hk
-;;; Anpassungen an cginline vorgenommen
-;;;
-;;; Revision 1.8  1994/04/05  15:13:01  jh
-;;; Funktion export-weight definiert.
-;;;
-;;; Revision 1.7  1994/03/03  13:55:33  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.6  1994/01/06  17:29:35  sma
-;;; Aufruf von opt-args um den Paramter fun ergänzt.
-;;;
-;;; Revision 1.5  1993/12/23  12:03:03  hk
-;;; Variable *current-fun* wird gebunden wegen einer Änderung in opt-args.
-;;;
-;;; Revision 1.4  1993/12/16  18:14:22  pm
-;;; Eigenen Fehler in weight-fun-def in weight-fun-def behoben
-;;;
-;;; Revision 1.3  1993/12/06  11:28:04  hk
-;;; Fehler in weight-gen-classes behoben
-;;;
-;;; Revision 1.2  1993/11/18  14:40:50  pm
-;;; Methode fuer weight-form ueber foreign-funs.
-;;;
-;;; Revision 1.1  1993/09/20  14:29:13  jh
-;;; Initial revision
-;;;
+;;; $Revision: 1.20 $
+;;; $Id: weight.lisp,v 1.20 1994/12/17 11:56:00 pm Exp $
+;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
 
@@ -221,8 +197,8 @@
   (+ w-source w-dest 2))
 
 (defun weight-C-goto ()
-  1)
-
+  4)                                    ; wahrscheinlich mehr Zeit im Rumpf
+                                        ; als f"ur den Funktionsaufruf
 (defun weight-C-break ()
   1)
 
@@ -540,11 +516,7 @@
     (mapcan #'(lambda (class)
                 (if (?slot-descr-list class)
                     `(,(?class-precedence-list class)
-                      ,(make-instance 'structured-literal
-                        :value (mapcar #'get-rt-slot-info
-                                (?slot-descr-list class))
-                        :needs-fixnum-array nil
-                        :needs-float-array nil))
+                      ,(transform-slot-desc-list (?slot-descr-list class)))
                     `(,(?class-precedence-list class))))
             (?class-def-list *module*)))
    ;; Eine Klassenbeschreibung ist besteht aus 6 CL_FORM, also 12 Worten.
@@ -969,10 +941,11 @@
             4 w-dest)))))               ; LOAD_GLOBFUN
 
 ;;------------------------------------------------------------------------------
-;; *** Welcher Wert muss hier hin??? ***
+;; Gewicht fuer Foreigen Funs. Schaetzwerte:
+;; Durchschnittliche Zahl an Argumenten: 4, 1 Resultat
 ;;------------------------------------------------------------------------------
 (defmethod weight-form ((fun foreign-fun))
-  4)
+  (+ 4 1))
 
 ;;------------------------------------------------------------------------------
 (defmethod weight-form ((fun defined-fun))

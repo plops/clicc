@@ -1,14 +1,16 @@
 #------------------------------------------------------------------------------
-# Project  : APPLY - A Practicable And Portable Lisp Implementation
-#            ------------------------------------------------------
+# CLiCC: The Common Lisp to C Compiler
+# Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+# Christian-Albrechts-Universitaet zu Kiel, Germany
+#------------------------------------------------------------------------------
 # Function : Generates C runtime-modules for CLICC.
 #            Uses optional parameter OPTIMIZE = <-{O | g}>.
 #            Uses Environment variable CLICCROOT.
 #
-# $Revision: 1.6 $
-# $Source: /home3/apply/public/clicc-0.6.4/src/runtime/c/RCS/Makefile,v $
-# $Author: uho $
-# $Date: 1993/06/04 16:50:19 $
+# $Revision: 1.7 $
+# $Source: /home2/karlo/uho/clicc-pre-0.6.5/src/runtime/c/RCS/Makefile,v $
+# $Author: hk $
+# $Date: 1994/11/22 14:54:01 $
 #------------------------------------------------------------------------------
 
 CC	= acc

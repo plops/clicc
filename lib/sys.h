@@ -4,6 +4,17 @@
 # define P_(s) ()
 #endif
 
+/* ../src/runtime/c/arith.c */
+extern double get_float P_((CL_FORM *base));
+extern double *make_float P_((CL_FORM *base, double num_float));
+extern void no_num_err P_((CL_FORM *base));
+extern void Fplus P_((CL_FORM *base, int nargs));
+extern void Fminus P_((CL_FORM *base, int nargs));
+extern void Fmult P_((CL_FORM *base, int nargs));
+extern void Fdiv P_((CL_FORM *base, int nargs));
+extern void F1plus P_((CL_FORM *base));
+extern void F1minus P_((CL_FORM *base));
+extern void F1minusfix P_((CL_FORM *base));
 /* ../src/runtime/c/array.c */
 extern void rt_plain_vector_element_code P_((CL_FORM *base));
 extern void rt_make_vector_t P_((CL_FORM *base));
@@ -17,6 +28,7 @@ extern void rt_sbvref P_((CL_FORM *base));
 extern void rt_set_sbvref P_((CL_FORM *base));
 extern void rt_bitop P_((CL_FORM *base));
 extern void rt_shrink_smstr P_((CL_FORM *base));
+extern void rt_shrink_pvector P_((CL_FORM *base));
 /* ../src/runtime/c/catch.c */
 extern void unwind_to P_((CL_FORM *saved_bind_top));
 extern void rt_catch P_((CL_FORM *base));
@@ -61,69 +73,69 @@ extern void c_fputc P_((CL_FORM *base));
 extern void c_ungetc P_((CL_FORM *base));
 /* ../src/runtime/c/foreign.c */
 extern void rt_make_c_char P_((CL_FORM *base));
-extern void rt_make_c_short P_((CL_FORM *base));
-extern void rt_make_c_int P_((CL_FORM *base));
-extern void rt_make_c_long P_((CL_FORM *base));
-extern void rt_make_c_unsigned_char P_((CL_FORM *base));
-extern void rt_make_c_unsigned_short P_((CL_FORM *base));
-extern void rt_make_c_unsigned_int P_((CL_FORM *base));
-extern void rt_make_c_unsigned_long P_((CL_FORM *base));
-extern void rt_make_c_float P_((CL_FORM *base));
-extern void rt_make_c_double P_((CL_FORM *base));
-extern void rt_make_c_long_double P_((CL_FORM *base));
+extern void rt_make_c_char_2 P_((CL_FORM *base));
 extern void rt_cast_c_char P_((CL_FORM *base));
+extern void rt_make_c_short P_((CL_FORM *base));
 extern void rt_cast_c_short P_((CL_FORM *base));
+extern void rt_make_c_int P_((CL_FORM *base));
 extern void rt_cast_c_int P_((CL_FORM *base));
+extern void rt_make_c_long P_((CL_FORM *base));
 extern void rt_cast_c_long P_((CL_FORM *base));
+extern void rt_make_c_unsigned_char P_((CL_FORM *base));
+extern void rt_make_c_unsigned_char_2 P_((CL_FORM *base));
 extern void rt_cast_c_unsigned_char P_((CL_FORM *base));
+extern void rt_make_c_unsigned_short P_((CL_FORM *base));
 extern void rt_cast_c_unsigned_short P_((CL_FORM *base));
+extern void rt_make_c_unsigned_int P_((CL_FORM *base));
 extern void rt_cast_c_unsigned_int P_((CL_FORM *base));
+extern void rt_make_c_unsigned_long P_((CL_FORM *base));
 extern void rt_cast_c_unsigned_long P_((CL_FORM *base));
+extern void rt_make_c_float P_((CL_FORM *base));
 extern void rt_cast_c_float P_((CL_FORM *base));
+extern void rt_make_c_double P_((CL_FORM *base));
 extern void rt_cast_c_double P_((CL_FORM *base));
-extern void rt_cast_c_long_double P_((CL_FORM *base));
+extern void rt_make_c_string P_((CL_FORM *base));
+extern void rt_copy_c_string P_((CL_FORM *base));
+extern void c_primitive_p P_((CL_FORM *base));
+extern void c_floating_p P_((CL_FORM *base));
+extern void c_char_p P_((CL_FORM *base));
+extern void c_short_p P_((CL_FORM *base));
+extern void c_int_p P_((CL_FORM *base));
+extern void c_long_p P_((CL_FORM *base));
+extern void c_unsigned_char_p P_((CL_FORM *base));
+extern void c_unsigned_short_p P_((CL_FORM *base));
+extern void c_unsigned_int_p P_((CL_FORM *base));
+extern void c_unsigned_long_p P_((CL_FORM *base));
+extern void c_float_p P_((CL_FORM *base));
+extern void c_double_p P_((CL_FORM *base));
 extern void rt_make_lisp_character P_((CL_FORM *base));
 extern void rt_make_lisp_integer P_((CL_FORM *base));
 extern void rt_make_lisp_float P_((CL_FORM *base));
-extern void rt_internal_make_lisp_string P_((CL_FORM *base));
-extern void rt_internal_make_c_string P_((CL_FORM *base));
-extern void rt_internal_copy_c_string P_((CL_FORM *base));
-extern void FFI_c_char_p P_((CL_FORM *base));
-extern void FFI_c_short_p P_((CL_FORM *base));
-extern void FFI_c_int_p P_((CL_FORM *base));
-extern void FFI_c_long_p P_((CL_FORM *base));
-extern void FFI_c_unsigned_char_p P_((CL_FORM *base));
-extern void FFI_c_unsigned_short_p P_((CL_FORM *base));
-extern void FFI_c_unsigned_int_p P_((CL_FORM *base));
-extern void FFI_c_unsigned_long_p P_((CL_FORM *base));
-extern void FFI_c_float_p P_((CL_FORM *base));
-extern void FFI_c_double_p P_((CL_FORM *base));
-extern void FFI_c_long_double_p P_((CL_FORM *base));
-extern void FFI_c_string_p P_((CL_FORM *base));
-extern void rt_internal_c_struct_p P_((CL_FORM *base));
-extern void rt_internal_c_union_p P_((CL_FORM *base));
-extern void rt_internal_c_handle_p P_((CL_FORM *base));
-extern void rt_internal_c_array_p P_((CL_FORM *base));
-extern void rt_internal_make_c_struct P_((CL_FORM *base));
-extern void _make_c_struct_ptr P_((CL_FORM *base, CL_FORM *symbol, char *address));
-extern void rt_internal_make_c_union P_((CL_FORM *base));
-extern void _make_c_union_ptr P_((CL_FORM *base, CL_FORM *symbol, char *address));
-extern void rt_internal_make_c_array P_((CL_FORM *base));
-extern void _make_c_array_ptr P_((CL_FORM *base, CL_FORM *symbol, char *address));
-extern void _make_c_handle P_((CL_FORM *base, CL_FORM *symbol, char *address));
-extern void rt_internal_copy_c_struct P_((CL_FORM *base));
-extern void rt_internal_copy_c_union P_((CL_FORM *base));
-extern void rt_internal_copy_c_array P_((CL_FORM *base));
-extern void rt_internal_get_struct_pointer P_((CL_FORM *base));
-extern void rt_internal_get_union_pointer P_((CL_FORM *base));
-extern void rt_internal_get_array_pointer P_((CL_FORM *base));
+extern void rt_make_lisp_string P_((CL_FORM *base));
+extern void rt_copy_c_struct P_((CL_FORM *base));
+extern void rt_copy_c_union P_((CL_FORM *base));
+extern void rt_copy_c_array P_((CL_FORM *base));
+extern void rt_struct_p P_((CL_FORM *base));
+extern void rt_union_p P_((CL_FORM *base));
+extern void rt_array_p P_((CL_FORM *base));
+extern void rt_handle_p P_((CL_FORM *base));
+extern void FFI_free P_((CL_FORM *base));
 extern void c_struct_p P_((CL_FORM *base));
 extern void c_union_p P_((CL_FORM *base));
 extern void c_array_p P_((CL_FORM *base));
 extern void c_handle_p P_((CL_FORM *base));
 extern void rt_internal_get_symbol P_((CL_FORM *base));
 extern void rt_internal_get_address P_((CL_FORM *base));
-extern void FFI_free P_((CL_FORM *base));
+extern void rt_check_char P_((CL_FORM *base));
+extern void rt_check_short P_((CL_FORM *base));
+extern void rt_check_int P_((CL_FORM *base));
+extern void rt_check_long P_((CL_FORM *base));
+extern void rt_check_unsigned_char P_((CL_FORM *base));
+extern void rt_check_unsigned_short P_((CL_FORM *base));
+extern void rt_check_unsigned_int P_((CL_FORM *base));
+extern void rt_check_unsigned_long P_((CL_FORM *base));
+extern void rt_check_float P_((CL_FORM *base));
+extern void rt_check_double P_((CL_FORM *base));
 /* ../src/runtime/c/fspecs.c */
 extern void rt_calc_radix P_((CL_FORM *base));
 extern void rt_calc_mant_dig P_((CL_FORM *base));
@@ -143,16 +155,13 @@ extern void keysort P_((CL_FORM *first_arg, int nargs, int nkey, CL_FORM *keylis
 extern void Flist P_((CL_FORM *base, int nargs));
 extern void FlistX P_((CL_FORM *base, int nargs));
 extern void Fappend P_((CL_FORM *base, int nargs));
+/* ../src/runtime/c/logexpt.c */
+extern void rt_expt P_((CL_FORM *base));
+extern void rt_log P_((CL_FORM *base));
+extern void Fsqrt P_((CL_FORM *base));
 /* ../src/runtime/c/main.c */
 extern int main P_((int argc, char *argv[]));
-/* ../src/runtime/c/number.c */
-extern double get_float P_((CL_FORM *base));
-extern double *make_float P_((CL_FORM *base, double num_float));
-extern void Fzerop P_((CL_FORM *base));
-extern void Fplusp P_((CL_FORM *base));
-extern void Fminusp P_((CL_FORM *base));
-extern void Foddp P_((CL_FORM *base));
-extern void Fevenp P_((CL_FORM *base));
+/* ../src/runtime/c/ncompare.c */
 extern void Fnumeql P_((CL_FORM *base, int nargs));
 extern void Fnumneql P_((CL_FORM *base, int nargs));
 extern void Flt P_((CL_FORM *base, int nargs));
@@ -160,38 +169,27 @@ extern void Fltfix P_((CL_FORM *base));
 extern void Fgt P_((CL_FORM *base, int nargs));
 extern void Fle P_((CL_FORM *base, int nargs));
 extern void Fge P_((CL_FORM *base, int nargs));
-extern void Fplus P_((CL_FORM *base, int nargs));
-extern void Fminus P_((CL_FORM *base, int nargs));
-extern void Fmult P_((CL_FORM *base, int nargs));
-extern void Fdiv P_((CL_FORM *base, int nargs));
-extern void F1plus P_((CL_FORM *base));
-extern void F1minus P_((CL_FORM *base));
-extern void F1minusfix P_((CL_FORM *base));
-extern void rt_expt P_((CL_FORM *base));
-extern void rt_log P_((CL_FORM *base));
-extern void Fsqrt P_((CL_FORM *base));
-extern void Fsin P_((CL_FORM *base));
-extern void Fcos P_((CL_FORM *base));
-extern void Ftan P_((CL_FORM *base));
-extern void Fasin P_((CL_FORM *base));
-extern void Facos P_((CL_FORM *base));
-extern void Fatan P_((CL_FORM *base));
+/* ../src/runtime/c/nconvert.c */
 extern void rt_float P_((CL_FORM *base));
-extern void convert_to_int P_((CL_FORM *base, int ctype));
-extern void rt_floor P_((CL_FORM *base));
-extern void rt_ceiling P_((CL_FORM *base));
-extern void rt_truncate P_((CL_FORM *base));
-extern void rt_round P_((CL_FORM *base));
+extern void rt_convert_to_int P_((CL_FORM *base));
 extern void Finteger_length P_((CL_FORM *base));
 extern void Fdecode_float P_((CL_FORM *base));
+/* ../src/runtime/c/npredic.c */
+extern void Fzerop P_((CL_FORM *base));
+extern void Fplusp P_((CL_FORM *base));
+extern void Fminusp P_((CL_FORM *base));
+extern void Foddp P_((CL_FORM *base));
+extern void Fevenp P_((CL_FORM *base));
 /* ../src/runtime/c/obrep1.c */
-extern void do_gc P_((CL_FORM *top));
-extern void save_form P_((CL_FORM *form));
 /* ../src/runtime/c/obrep2.c */
+extern void do_gc P_((CL_FORM *top));
+extern void gc_relocate P_((CL_FORM *f));
+extern void gc_scan_newheap P_((void));
+extern void init_ob P_((void));
+extern CL_FORM *make_flt P_((CL_FORM *base, double *fl));
 /* ../src/runtime/c/progv.c */
 extern void rt_progv P_((CL_FORM *base));
 /* ../src/runtime/c/string.c */
-extern char *get_c_string P_((CL_FORM *lisp_string));
 extern void make_string P_((CL_FORM *base, char *string));
 /* ../src/runtime/c/structure.c */
 extern void rt_new_struct P_((CL_FORM *base));
@@ -216,6 +214,13 @@ extern void Labort P_((char *msg));
 extern long FLAbort P_((char *msg));
 extern void Lerror P_((CL_FORM *base, char *msg));
 extern void warning P_((char *warning_str));
+/* ../src/runtime/c/trigonom.c */
+extern void Fsin P_((CL_FORM *base));
+extern void Fcos P_((CL_FORM *base));
+extern void Ftan P_((CL_FORM *base));
+extern void Fasin P_((CL_FORM *base));
+extern void Facos P_((CL_FORM *base));
+extern void Fatan P_((CL_FORM *base));
 /* ../src/runtime/c/unix.c */
 extern void unix_current_directory P_((CL_FORM *base));
 extern void unix_file_mode P_((CL_FORM *base));

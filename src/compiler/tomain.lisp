@@ -1,101 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Funktionen zur Optimierungen, die auf den Typinformationen
 ;;;            aufbauen.
 ;;;
-;;; $Revision: 1.29 $
-;;; $Log: tomain.lisp,v $
-;;; Revision 1.29  1994/04/06  11:46:20  jh
-;;; Einfachen Spezialfall des if-Splittings eingebaut.
-;;;
-;;; Revision 1.28  1994/02/18  14:00:53  hk
-;;; Nur noch If-Ausdr"ucke, deren Pr"adikat den Typ NULL oder not NULL
-;;; haben werden optimiert. Let*, Progn, setq etc., die Teilausdr"ucke des
-;;; Typs bottom haben werden nicht mehr optimiert, da diese als Vorkommen
-;;; von Typfehlern angesehen werden, die in look-for-type-errors gemeldet
-;;; werden.
-;;;
-;;; Revision 1.27  1993/10/28  07:29:11  kl
-;;; Verwendung von has-no-side-effect gestrichen. Soll in seo... erledigt werden.
-;;;
-;;; Revision 1.26  1993/09/21  15:04:36  jh
-;;; dec-used-slot eingebaut.
-;;;
-;;; Revision 1.25  1993/09/16  17:39:29  jh
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.24  1993/08/27  15:51:40  hk
-;;; Kleinen Fehler in (to-1form app) behoben.
-;;;
-;;; Revision 1.23  1993/08/26  14:48:30  jh
-;;; Statistik erweitert.
-;;;
-;;; Revision 1.22  1993/07/23  09:40:08  hk
-;;; Neues Macro eliminating-msg fuer Meldung, dass Ausdrucke eliminiert
-;;; werden. Benutzt *optimize-verbosity*.
-;;;
-;;; Revision 1.21  1993/06/30  13:46:41  jh
-;;; An optimain.lisp angepasst.
-;;;
-;;; Revision 1.20  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.19  1993/06/10  09:54:18  kl
-;;; Bindung der Variable *current-fun* korrigiert.
-;;;
-;;; Revision 1.18  1993/06/08  13:13:37  jh
-;;; Variable *no-to* zum Ausschalten der Optimierungen eingebaut.
-;;;
-;;; Revision 1.17  1993/05/27  12:49:40  jh
-;;; Optimierung fuer bottom-getypte Form einer Applikation eingebaut.
-;;;
-;;; Revision 1.16  1993/05/25  15:12:52  jh
-;;; bottom-Optimierung fuer mv-lambda eingebaut.
-;;;
-;;; Revision 1.15  1993/05/19  14:40:12  jh
-;;; Einige bottom-Optimierungen eingebaut.
-;;;
-;;; Revision 1.14  1993/05/13  13:19:26  jh
-;;; Durch Optimierung entstandene forms werden jetzt ebenfalls optimiert.
-;;;
-;;; Revision 1.13  1993/05/13  10:15:23  jh
-;;; In switch-forms wird jetzt auch otherwise optimiert.
-;;;
-;;; Revision 1.12  1993/05/12  08:47:43  kl
-;;; Schreibfehler korrigiert.
-;;;
-;;; Revision 1.11  1993/05/09  16:26:42  kl
-;;; Ausgabe erweitert.
-;;;
-;;; Revision 1.10  1993/05/09  13:05:40  kl
-;;; Fehler in to-1form (if-form) behoben.
-;;;
-;;; Revision 1.9  1993/05/07  10:06:26  hk
-;;; Schreibfehler in (to-parts switch-form) behoben.
-;;;
-;;; Revision 1.8  1993/05/06  13:31:06  kl
-;;; Verwendung von has-no-side-effect eingebaut und Ausgabe erweitert.
-;;;
-;;; Revision 1.7  1993/05/05  11:04:22  jh
-;;; Spezialbehandlung fuer bottom-t bei if-Optimierung eingebaut.
-;;;
-;;; Revision 1.6  1993/04/30  14:32:02  hk
-;;; do-to deaktiviert, da Fehler in Typinferenz oder Typoptimierungen.
-;;;
-;;; Revision 1.5  1993/04/30  13:26:32  hk
-;;; Hier wurde bisher JEDES (mv-lambda args body) zu args optimiert.
-;;;
-;;; Revision 1.4  1993/04/21  11:35:30  jh
-;;; mv-lambda eingebaut.
-;;;
-;;; Revision 1.3  1993/02/16  16:09:13  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.2  1993/01/07  12:59:31  jh
-;;; Statistik fuer die if-Optimierungen eingebaut.
+;;; $Revision: 1.31 $
+;;; $Id: tomain.lisp,v 1.31 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -143,7 +72,7 @@
             (T an-if-form))))
     (when (and eliminated-case (> *optimize-verbosity* 1))
       (clicc-message "(in ~A) Eliminating unreachable ~A-case."
-                     *current-fun*
+                     (?symbol *current-fun*)
                      eliminated-case))
     result))
 

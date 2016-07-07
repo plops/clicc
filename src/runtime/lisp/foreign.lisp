@@ -1,44 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Laufzeitfunktionen des FFI
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.11 $
-;;; $Log: foreign.lisp,v $
-;;; Revision 1.11  1994/04/18  12:21:33  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Laufzeitsystemfunktionen des FFI hinzugefuegt bzw.ueberarbeitet.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.10  1993/12/16  16:41:43  pm
-;;; FFI-Funktionen vom rt:: Package ins FFI: Package geschoben.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Laufzeitfunktionen des FFI
 ;;;
-;;; Revision 1.9  1993/11/03  12:32:30  pm
-;;; Inkonsistenzen in den Symbolnamen behoben.
-;;;
-;;; Revision 1.8  1993/09/19  15:12:36  pm
-;;; Erweiterungen fuer C-Strings
-;;;
-;;; Revision 1.7  1993/08/24  11:21:59  pm
-;;; Erweiterungen um C-Pointer
-;;;
-;;; Revision 1.6  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.5  1993/05/23  17:56:08  pm
-;;; Alle in Lisp geschriebenen Konstruktor- und Konvertierungs-
-;;; Funktionen fuer die primitiven C-Typen implementiert
-;;;
-;;; Revision 1.4  1993/05/21  13:59:37  pm
-;;; c-int in int umbenannt
-;;;
-;;; Revision 1.3  1993/05/06  14:38:36  pm
-;;; erste Versuche fuer int's
-;;;
-;;; Revision 1.2  1993/04/28  09:10:27  pm
-;;; initial revision
-;;;
+;;; $Revision: 1.15 $
+;;; $Id: foreign.lisp,v 1.15 1994/12/17 11:58:18 pm Exp $
 ;;------------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -46,177 +31,234 @@
 
 (export
  '(ffi:c-char ffi:c-short ffi:c-int ffi:c-long
-   ffi:c-unsigned-char ffi:c-unsigned-short 
+   ffi:c-unsigned-char ffi:c-unsigned-short
    ffi:c-unsigned-int ffi:c-unsigned-long
-   ffi:c-float ffi:c-double ffi:c-long-double
-   ffi:c-handle ffi:c-string
-   ffi:lisp-integer ffi:lisp-character ffi:lisp-float ffi:make-lisp-string
-   ffi:make-c-string ffi:copy-c-string)
- "FFI")
+   ffi:c-float ffi:c-double 
+   ffi:make-c-string
+   
+   ffi:lisp-integer ffi:lisp-character ffi:lisp-float
+   ffi:make-lisp-string 
+   
+   ffi:c-char-p ffi:c-short-p ffi:c-int-p ffi:c-long-p 
+   ffi:c-unsigned-char-p ffi:c-unsigned-short-p 
+   ffi:c-unsigned-int-p ffi:c-unsigned-long-p 
+   ffi:c-float-p ffi:c-double-p 
+   
+   ffi:copy-c-string
+   ) "FFI")
+
 
 ;;------------------------------------------------------------------------------
 ;; Die C-Typen anlegen
 ;;------------------------------------------------------------------------------
-(deftype ffi:c-char ()  `(satisfies ffi::c-char-p))
-(deftype ffi:c-short () `(satisfies ffi::c-short-p))
-(deftype ffi:c-int ()   `(satisfies ffi::c-int-p))
-(deftype ffi:c-long ()  `(satisfies ffi::c-long-p))
-(deftype ffi:c-unsigned-char ()  `(satisfies ffi::c-unsigned-char-p))
-(deftype ffi:c-unsigned-short () `(satisfies ffi::c-unsigned-short-p))
-(deftype ffi:c-unsigned-int ()   `(satisfies ffi::c-unsigned-int-p))
-(deftype ffi:c-unsigned-long ()  `(satisfies ffi::c-unsigned-long-p))
-(deftype ffi:c-float ()        `(satisfies ffi::c-float-p))
-(deftype ffi:c-double ()       `(satisfies ffi::c-double-p))
-(deftype ffi:c-long-double ()  `(satisfies ffi::c-long-double-p))
+(deftype ffi:c-char ()  `(satisfies ffi:c-char-p))
+(deftype ffi:c-short () `(satisfies ffi:c-short-p))
+(deftype ffi:c-int ()   `(satisfies ffi:c-int-p))
+(deftype ffi:c-long ()  `(satisfies ffi:c-long-p))
+(deftype ffi:c-unsigned-char ()  `(satisfies ffi:c-unsigned-char-p))
+(deftype ffi:c-unsigned-short () `(satisfies ffi:c-unsigned-short-p))
+(deftype ffi:c-unsigned-int ()   `(satisfies ffi:c-unsigned-int-p))
+(deftype ffi:c-unsigned-long ()  `(satisfies ffi:c-unsigned-long-p))
+(deftype ffi:c-float ()        `(satisfies ffi:c-float-p))
+(deftype ffi:c-double ()       `(satisfies ffi:c-double-p))
 
-(deftype ffi:c-string () '(satisfies ffi::c-string-p))
+(deftype ffi:c-string () '(satisfies ffi:c-string-p))
 
 ;;------------------------------------------------------------------------------
-;; Die Konstruktor-Funktionen zum Anlegen von C-Daten
+;; Konstanten
+;;------------------------------------------------------------------------------
+(defconstant NO-CHARACTER "The evaluated value ~S is not a character.")
+(defconstant NO-INTEGER "The evaluated value ~S is not an integer.")
+(defconstant NO-FLOAT "The evaluated value ~S is not an float.")
+(defconstant NO-STRING "The evaluated value ~S is not a string")
+
+;;------------------------------------------------------------------------------
+;; Die Konvertierungsfunktionen-Funktionen zum "Casten" von C-Daten.
 ;;------------------------------------------------------------------------------
 (defun ffi:c-char (value)
   (cond 
-    ((typep value 'character)
-      (rt::make-c-char value))
-    ((ffi:c-char-p value)
+    ((characterp value)                 ; Lisp-Character
+     (rt::make-c-char value))
+    ((integerp value)                   ; Lisp-Integer
+     (rt::make-c-char-2 value))         
+    ((rt::c-primitive-p value)          ; c-char
      (rt::cast-c-char value))
-    (t (error-in "C-CHAR"
-                "The evaluated value ~S is not of type character." value))))
+    (t (error-in "C-CHAR" NO-CHARACTER value))))
 
 (defun ffi:c-short (value)
   (cond 
-    ((typep value 'integer)
-      (rt::make-c-short value))
-    ((ffi:c-short-p value)
+    ((integerp value)
+     (rt::make-c-short value))
+    ((rt::c-primitive-p value)
      (rt::cast-c-short value))
-    (t (error-in "C-SHORT"
-                 "The evaluated value ~S is not of type fixnum." value))))
-    
+    (t (error-in "C-SHORT" NO-INTEGER value))))
+
 (defun ffi:c-int (value)
   (cond 
-    ((typep value 'integer)
-      (rt::make-c-int value))
-    ((ffi:c-int-p value)
+    ((integerp value)
+     (rt::make-c-int value))
+    ((rt::c-primitive-p value)
      (rt::cast-c-int value))
-    (t (error-in "C-INT"
-                 "The evaluated value ~S is not of type fixnum." value))))
-    
+    (t (error-in "C-INT" NO-INTEGER value))))
+
 (defun ffi:c-long (value)
   (cond 
-    ((typep value 'integer)
-      (rt::make-c-long value))
-    ((ffi:c-long-p value)
+    ((integerp value)
+     (rt::make-c-long value))
+    ((rt::c-primitive-p value)
      (rt::cast-c-long value))
-    (t (error-in "C-LONG"
-                 "The evaluated value ~S is not of type fixnum." value))))
-    
+    (t (error-in "C-LONG" NO-INTEGER value))))
+
 (defun ffi:c-unsigned-char (value)
   (cond 
-    ((typep value 'character)
-      (rt::make-c-unsigned-char value))
-    ((ffi:c-unsigned-char-p value)
+    ((characterp value)                 ; Lisp-Character
+     (rt::make-c-unsigned-char value))
+    ((integerp value)                   ; Lisp-Integer
+     (rt::make-c-unsigned-char-2 value))         
+    ((rt::c-primitive-p value)          ; c-char
      (rt::cast-c-unsigned-char value))
-    (t (error-in "C-UNSIGNED-CHAR"
-                "The evaluated value ~S is not of type character." value))))
+    (t (error-in "C-UNSIGNED-CHAR" NO-CHARACTER value))))
 
 (defun ffi:c-unsigned-short (value)
   (cond 
-    ((typep value 'integer)
-      (rt::make-c-unsigned-short value))
-    ((ffi:c-unsigned-short-p value)
+    ((integerp value)
+     (rt::make-c-unsigned-short value))
+    ((rt::c-primitive-p value)
      (rt::cast-c-unsigned-short value))
-    (t (error-in "C-UNSIGNED-SHORT"
-                 "The evaluated value ~S is not of type fixnum." value))))
-    
+    (t (error-in "C-UNSIGNED-SHORT" NO-INTEGER value))))
+
 (defun ffi:c-unsigned-int (value)
   (cond 
-    ((typep value 'integer)
-      (rt::make-c-unsigned-int value))
-    ((ffi:c-unsigned-int-p value)
+    ((integerp value)
+     (rt::make-c-unsigned-int value))
+    ((rt::c-primitive-p value)
      (rt::cast-c-unsigned-int value))
-    (t (error-in "C-UNSIGNED-INT"
-                 "The evaluated value ~S is not of type fixnum." value))))
-    
+    (t (error-in "C-UNSIGNED-INT" NO-INTEGER value))))
+
 (defun ffi:c-unsigned-long (value)
   (cond 
-    ((typep value 'integer)
-      (rt::make-c-unsigned-long value))
-    ((ffi:c-unsigned-long-p value)
+    ((integerp value)
+     (rt::make-c-unsigned-long value))
+    ((rt::c-primitive-p value)
      (rt::cast-c-unsigned-long value))
-    (t (error-in "C-UNSIGNED-LONG"
-                 "The evaluated value ~S is not of type fixnum." value))))
-    
+    (t (error-in "C-UNSIGNED-LONG" NO-INTEGER value))))
+
+;;------------------------------------------------------------------------------
+;; 
+;;------------------------------------------------------------------------------
 (defun ffi:c-float (value)
   (cond 
-    ((typep value 'float)
-      (rt::make-c-float value))
-    ((ffi:c-float-p value)
+    ((floatp value)
+     (rt::make-c-float value))
+    ((rt::c-floating-p value)
      (rt::cast-c-float value))
-    (t (error-in "C-FLOAT"
-                 "The evaluated value ~S is not of type float." value))))
-    
+    (t (error-in "C-FLOAT" NO-FLOAT value))))
+
 (defun ffi:c-double (value)
   (cond 
-    ((typep value 'float)
-      (rt::make-c-double value))
-    ((ffi:c-double-p value)
+    ((floatp value)
+     (rt::make-c-double value))
+    ((rt::c-floating-p value)
      (rt::cast-c-double value))
-    (t (error-in "C-DOUBLE"
-                 "The evaluated value ~S is not of type float." value))))
-    
-(defun ffi:c-long-double (value)
-  (cond 
-    ((typep value 'float)
-      (rt::make-c-long-double value))
-    ((ffi:c-long-double-p value)
-     (rt::cast-c-long-double value))
-    (t (error-in "C-LONG-DOUBLE"
-                 "The evaluated value ~S is not of type float." value))))
+    (t (error-in "C-DOUBLE" NO-FLOAT value))))
 
 ;;------------------------------------------------------------------------------
 ;; 
 ;;------------------------------------------------------------------------------
 (defun ffi:make-c-string (value)
-  (if (typep value 'string)
-      (rt::internal-make-c-string value)
-      (error-in "MAKE-C-STRING"
-                "The evaluated value ~S is not of type string." value)))
+  (cond
+    ((stringp value)
+     (rt::make-c-string value))
+    ((ffi:c-string-p value)
+     value)
+    (t (error-in "MAKE-C-STRING" NO-STRING value))))
 
-(defun ffi:copy-c-string (c-value)
-  (if (ffi::c-string-p c-value)
-      (rt::internal-copy-c-string c-value)
-      (error-in "MAKE-C-STRING"
-                "The evaluated value ~S is not of type c-string." c-value)))
-  
+;;------------------------------------------------------------------------------
+;; Kopierfunktion fuer Zeichenketten
+;;------------------------------------------------------------------------------
+(defun ffi:copy-c-string (value)
+  (if (ffi:c-string-p value)
+      (rt::copy-c-string value)
+      (error-in "COPY-C-STRING" NO-STRING value)))
+
+;;------------------------------------------------------------------------------
+;; Konvertierungsfunktionen von C nach Lisp.
+;;------------------------------------------------------------------------------
+(defun ffi:lisp-character (value)
+  (cond
+    ((rt::c-primitive-p value)
+     (rt::make-lisp-character value))
+    ((characterp value)
+     value)
+    (t (error-in "LISP-CHARACTER" NO-CHARACTER value))))
+
+(defun ffi:lisp-integer (value)
+  (cond 
+    ((rt::c-primitive-p value)
+     (rt::make-lisp-integer value))
+    ((integerp value)
+     value)
+    (t (error-in "LISP-INTEGER" NO-INTEGER value))))
+
+(defun ffi:lisp-float (value)
+  (cond
+    ((rt::c-floating-p value)
+     (rt::make-lisp-float value))
+    ((floatp value)
+     value)
+    (t (error-in "LISP-FLOAT" NO-FLOAT value))))
+
+(defun ffi:make-lisp-string (value)
+  (cond
+    ((ffi:c-string-p value)
+     (rt::make-lisp-string value))
+    ((stringp value)
+     value)
+    (t (error-in "MAKE-LISP-STRING" NO-STRING value))))
+
+;;------------------------------------------------------------------------------
+;; Testfunktionen
+;;------------------------------------------------------------------------------
+(defun ffi:c-char-p (object)
+  (or (rt::c-char-p object)
+      (rt::check-char object)))
+
+(defun ffi:c-short-p (object)
+  (or (rt::c-short-p object)
+      (rt::check-short object)))
+
+(defun ffi:c-int-p (object)
+  (or (rt::c-int-p object)
+      (rt::check-int object)))
+
+(defun ffi:c-long-p (object)
+  (or (rt::c-long-p object)
+      (rt::check-long object)))
+
+(defun ffi:c-unsigned-char-p (object)
+  (or (rt::c-unsigned-char-p object)
+      (rt::check-unsigned-char object)))
+
+(defun ffi:c-unsigned-short-p (object)
+  (or (rt::c-unsigned-short-p object)
+      (rt::check-unsigned-short object)))
+
+(defun ffi:c-unsigned-int-p (object)
+  (or (rt::c-unsigned-int-p object)
+      (rt::check-unsigned-int object)))
+
+(defun ffi:c-unsigned-long-p (object)
+  (or (rt::c-unsigned-long-p object)
+      (rt::check-unsigned-long object)))
+
+(defun ffi:c-float-p (object)
+  (or (rt::c-float-p object)
+      (rt::check-float object)))
+
+(defun ffi:c-double-p (object)
+  (or (rt::c-double-p object)
+      (rt::check-double object)))
+
 ;;------------------------------------------------------------------------------
 ;; 
 ;;------------------------------------------------------------------------------
-(defun ffi:lisp-character (c-value)
-  (if (or (ffi::c-char-p c-value)
-          (ffi::c-unsigned-char-p c-value))
-      (rt::make-lisp-character c-value)
-      (error-in 
-       "LISP-CHARACTER"
-       "The evaluated value ~S is not of type c-<char>." c-value)))
-
-(defun ffi:lisp-integer (c-value)
-  (if (or (ffi::c-long-p c-value)
-          (ffi::c-unsigned-long-p c-value))
-      (rt::make-lisp-integer c-value)
-      (error-in
-       "LISP-INTEGER"
-       "The evaluated value ~S is not of type c-<integer>." c-value)))
-
-(defun ffi:lisp-float (c-value)
-  (if (ffi::c-long-double-p c-value)
-      (rt::make-lisp-float c-value)
-      (error-in
-       "LISP-FLOAT"
-       "The evaluated value ~S is not of type c-<float>." c-value)))
-
-(defun ffi:make-lisp-string (c-value)
-  (if (ffi::c-string-p c-value)
-      (rt::internal-make-lisp-string c-value)
-      (error-in
-       "MAKE-LISP-STRING"
-       "The evaluated value ~S is not of type c-string." c-value)))

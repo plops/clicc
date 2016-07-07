@@ -1,19 +1,14 @@
------------------------------------------------------------------------------
- Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
------------------------------------------------------------------------------
- Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-            ------------------------------------------------------
- Funktion : AKCL specific README for CLICC
-
- $Revision: 1.1 $
- $Id: README.akcl,v 1.1 1993/12/23 14:26:03 hk Exp $
------------------------------------------------------------------------------
-
-
+---------------------------------------------------------------------
+ CLiCC: The Common Lisp to C Compiler
+ Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ Christian-Albrechts-Universitaet zu Kiel, Germany
+---------------------------------------------------------------------
+ $Revision: 1.2 $
+ $Id: README.akcl,v 1.2 1994/11/22 15:13:29 hk Exp $
+---------------------------------------------------------------------
 
 Please read the files README, COPYRIGHT and INSTALL first.
 This file contains only AKCL specific information.
-
 
 --------------------------------------------------------------------------------
 

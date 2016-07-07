@@ -1,19 +1,21 @@
 #------------------------------------------------------------------------------
-# Project  : APPLY - A Practicable And Portable Lisp Implementation
-#            ------------------------------------------------------
+# CLiCC: The Common Lisp to C Compiler
+# Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+# Christian-Albrechts-Universitaet zu Kiel, Germany
+#------------------------------------------------------------------------------
 # Function : Generates C runtime-modules for CLICC.
 #            Uses optional parameter OPTIMIZE = <-{O | g}>.
 #            Uses Environment variable CLICCROOT and CROSS386.
 #
-# $Revision: 1.6 $
-# $Source: /home3/apply/public/clicc-0.6.4/src/runtime/c/RCS/GNUmakefile386,v $
+# $Revision: 1.8 $
+# $Source: /home2/karlo/uho/clicc-pre-0.6.5/src/runtime/c/RCS/GNUmakefile386,v $
 # $Author: uho $
-# $Date: 1993/06/08 12:59:14 $
+# $Date: 1995/03/02 03:49:22 $
 #------------------------------------------------------------------------------
 
 CC	= $(CROSS386)/gcc
 OPTIMIZE = -O # alternative to -O is -g
-CFLAGS	= -I$(CLICCROOT)/lib $(OPTIMIZE)
+CFLAGS	= -I$(CLICCROOT)/lib $(OPTIMIZE) -DCROSSCOMPILE=1
 ARFLAGS	= r
 
 ifeq ($(findstring -g,$(OPTIMIZE)), -g)

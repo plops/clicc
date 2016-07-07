@@ -1,102 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Structures
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.26 $
-;;; $Log: p1struct.lisp,v $
-;;; Revision 1.26  1994/06/03  14:09:33  hk
-;;; :PRINT-FUNCTION wird ber"ucksichtigt
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.25  1994/01/13  16:36:23  sma
-;;; Statt set-struct-ref/set-struct-constructor werden jetzt setf-Methoden
-;;; benutzt.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Structures
 ;;;
-;;; Revision 1.24  1993/06/29  10:22:53  wg
-;;; Einige (clicc-warning ...) in (clicc-message ...) geaendert.
-;;;
-;;; Revision 1.23  1993/06/25  09:02:11  wg
-;;; BOA-Konstruktoren (by order of arguments) mit einfachen
-;;; Parameterlisten fuer (DEFSTRUCT ...) eingebaut. (Steele S.482f).
-;;; Mehrfach-Definition der Option (:CONSTRUCTOR ...) und
-;;; (:CONSTRUCTOR nil) sind jetzt moeglich.
-;;;
-;;; Revision 1.22  1993/06/22  12:54:15  uho
-;;; Typ und default-Wert von name in Struktur SLOT auf Symbol/NIL geandert.
-;;;
-;;; Revision 1.21  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.20  1993/04/22  11:32:41  hk
-;;; Sonderbehandlung bei *CLICC-MODULE*, *CLICC-LISP-PROGRAM* gestrichen.
-;;;
-;;; Revision 1.19  1993/04/14  12:12:31  hk
-;;; L:: eingefuegt, Inline Deklarationen entfernt,
-;;; (defun (setf f) ..) fuer Slot-Update Funktionen verwendet.
-;;;
-;;; Revision 1.18  1993/03/18  12:13:33  ft
-;;; Abbruch fuer nicht implementierte Struktur Optionen hinzugefuegt.
-;;;
-;;; Revision 1.17  1993/02/17  07:10:15  kl
-;;; Falsche Klammerung in p1-defstruct behoben.
-;;;
-;;; Revision 1.16  1993/02/16  16:39:13  hk
-;;; Revision Keyword eingefuegt, Zugriffe auf *CLICC-PACKAGE* gestrichen.
-;;;
-;;; Revision 1.15  1993/01/22  15:50:10  ft
-;;; Vorkommen von STRING-CHAR in p1-defstruct-options durch STANDARD-CHAR
-;;; ersetzt.
-;;;
-;;; Revision 1.14  1993/01/11  15:35:12  hk
-;;; Schreibfehler
-;;;
-;;; Revision 1.13  1993/01/11  15:34:28  hk
-;;; Schreibfehler
-;;;
-;;; Revision 1.12  1993/01/11  14:36:18  hk
-;;; structure -> struct
-;;;
-;;; Revision 1.11  1993/01/11  11:11:18  hk
-;;; Defaultwerte von :type und :read-only bei included Slots korrigiert.
-;;;
-;;; Revision 1.10  1993/01/08  15:45:35  hk
-;;; Fehler bei :include + :readonly behoben.
-;;;
-;;; Revision 1.9  1993/01/07  14:01:51  hk
-;;; Abfrage gestrichen, die verhinderte, einen Slot mit dem Namen einer
-;;; benannten Konstanten in defstruct zu definieren. Die Abfrage war motiviert
-;;; durch eine nicht verstandene Fehlermeldung in Lucid CL 4.0.
-;;;
-;;; Revision 1.8  1992/08/11  16:19:13  hk
-;;; Fehler mit (go ..) in p1-defstruct-options beseitigt.
-;;;
-;;; Revision 1.7  1992/08/05  10:01:36  hk
-;;; Nur syntaktische Aenderungen.
-;;;
-;;; Revision 1.6  1992/08/05  09:59:07  hk
-;;; Nur syntaktische Aenderungen.
-;;;
-;;; Revision 1.5  1992/07/06  11:10:17  hk
-;;; Komponente init-value in Slot in init-form umbenannt.
-;;; Init-form wird nicht mehr in Pass1 evaluiert, bzw. nur bei literal
-;;; Instances.
-;;;
-;;; Revision 1.4  1992/07/02  13:56:52  hk
-;;; structdescr-slots enthaelt Vector und muss entsprechend bearbeitet werden.
-;;;
-;;; Revision 1.3  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.2  1992/06/01  10:24:34  hk
-;;; defstructs fuer structdescr und slot aus clcdef eingefuegt.
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
-;;; Changes  : 03.07.91 CLICC-SUBTYPEP gibt Warnung, falls es keine exakte
-;;;                     Aussage ueber die angegebenen Typen machen kann.
+;;; $Revision: 1.28 $
+;;; $Id: p1struct.lisp,v 1.28 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -348,15 +275,18 @@
       (flet ((p1-make-struct-access-fn (slot-descriptor)
                (let ((conc-name-slot
                       (intern-prefixed conc-name (slot-name slot-descriptor)))
-                     (index (slot-index slot-descriptor)))
+                     (index (slot-index slot-descriptor))
+                     (type (slot-type slot-descriptor)))
                  (push
                   `(L::DEFUN ,conc-name-slot (struct)
-                    (rt::STRUCT-REF struct ,index (L::QUOTE ,struct-name)))
+                    (L::THE ,type
+                     (rt::STRUCT-REF struct ,index (L::QUOTE ,struct-name))))
                   defstruct-code)
                  (push 
                   `(L::DEFUN (L::SETF ,conc-name-slot) (newvalue struct)
                     (L::SETF (rt::STRUCT-REF
-                              struct ,index (L::QUOTE ,struct-name)) newvalue))
+                              struct ,index (L::QUOTE ,struct-name))
+                     (L::THE ,type newvalue)))
                   defstruct-code))))
         
         ;; Body of FLET

@@ -1,54 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funkion  : System-Funktionen (18. Strings)
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.11 $
-;;; $Log: string.lisp,v $
-;;; Revision 1.11  1994/01/05  12:42:23  sma
-;;; make-string benutzt jetzt rt::make-vector-char zum Anlegen eines
-;;; (simple-)strings und nicht mehr das allgemeine make-array.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.10  1993/12/14  12:43:50  sma
-;;; char und schar optimiert. Benutzen jetzt direkt row-major-aref bzw.
-;;; pvset, eine private Funktion aus array.lisp um doppelte Typ-Tests
-;;; einzusparen.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function  : Strings
 ;;;
-;;; Revision 1.9  1993/12/12  15:42:49  sma
-;;; make-string benutzt jetzt make-array.
-;;;
-;;; Revision 1.8  1993/12/09  17:17:50  sma
-;;; Aufgrund neuer Repräsentation für arrays auch strings verändert. char,
-;;; schar sind jetzt in Lisp implementiert. (when (not ... -> (unless.
-;;; Weitere kleine Änderungen.
-;;;
-;;; Revision 1.7  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.6  1993/05/08  18:13:50  hk
-;;; Aufrufe von set-char-internal und set-schar-internal geaendert.
-;;;
-;;; Revision 1.5  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.4  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.11 $ eingefuegt
-;;;
-;;; Revision 1.3  1992/07/06  10:15:30  hk
-;;; STRING-CHAR vorlaeufig durch CHARACTER, (wegen CLTL2).
-;;;
-;;; Revision 1.2  1992/07/06  09:22:14  hk
-;;; Neue Syntax fuer declaim fun-spec.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.14 $
+;;; $Id: string.lisp,v 1.14 1994/11/22 14:55:56 hk Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -60,6 +35,9 @@
    string-left-trim string-right-trim string-upcase string-downcase
    string-capitalize nstring-upcase nstring-downcase nstring-capitalize
    string))
+
+(defmacro set-seq-end (end length)
+  `(when (null ,end) (setq ,end ,length)))
 
 ;;-----------------------------------------------------------------------------
 ;; 18.1. String Access
@@ -75,18 +53,12 @@
 ;; CHAR string index
 ;;-----------------------------------------------------------------------------
 (defun char (string index)
-  (unless (stringp string)
-    (error WRONG_TYPE string 'string))
   (row-major-aref string index))
 
 ;;-----------------------------------------------------------------------------
 ;; (SETF CHAR) character string index
 ;;-----------------------------------------------------------------------------
 (defun (setf char) (character string index)
-  (unless (stringp string)
-    (error WRONG_TYPE string 'string))
-  (unless (characterp character)
-    (error WRONG_TYPE character 'character))
   (setf (row-major-aref string index) character))
 
 ;;-----------------------------------------------------------------------------
@@ -95,7 +67,9 @@
 (defun schar (simple-string index)
   (unless (simple-string-p simple-string)
     (error WRONG_TYPE simple-string 'simple-string))
-  (pvref simple-string index))
+  (unless (check-integer index 0 (1- (rt::plain-vector-length simple-string)))
+    (error OUT_OF_RANGE index (rt::plain-vector-length simple-string)))
+  (rt::pvref simple-string index))
 
 ;;-----------------------------------------------------------------------------
 ;; (SETF SCHAR) character simple-string index
@@ -105,7 +79,9 @@
     (error WRONG_TYPE simple-string 'simple-string))
   (unless (characterp character)
     (error WRONG_TYPE character 'character))
-  (setf (pvref simple-string index) character))
+  (unless (check-integer index 0 (1- (rt::plain-vector-length simple-string)))
+    (error OUT_OF_RANGE index (rt::plain-vector-length simple-string)))
+  (rt::set-pvref character simple-string index))
 
 ;;-----------------------------------------------------------------------------
 ;; 18.2. String Comparison
@@ -118,8 +94,8 @@
                         &key (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
   
   (cond
     ((= (- end1 start1) (- end2 start2))
@@ -137,8 +113,8 @@
                              &key (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (cond
     ((= (- end1 start1) (- end2 start2))
@@ -156,8 +132,8 @@
                         &key (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -181,8 +157,8 @@
                         &key (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -206,8 +182,8 @@
                          &key (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -230,8 +206,8 @@
                          &key (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -255,8 +231,8 @@
                          &key (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -278,8 +254,8 @@
                              &key (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -304,8 +280,8 @@
                                 (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -330,8 +306,8 @@
                                     (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -356,8 +332,8 @@
                                  (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
        (j start2 (1+ j))
@@ -382,8 +358,8 @@
                                  (start1 0) (end1 nil) (start2 0) (end2 nil))
   (setq string1 (string string1))
   (setq string2 (string string2))
-  (setq end1    (check-seq-start-end start1 end1 (length string1)))
-  (setq end2    (check-seq-start-end start2 end2 (length string2)))
+  (set-seq-end end1 (length string1))
+  (set-seq-end end2 (length string2))
 
   (do ((i start1 (1+ i))
         (j start2 (1+ j))
@@ -419,8 +395,8 @@
 (defun string-trim (character-bag string)
   (setq string (string string))
   (let* ((length (length string))
-         (start       0)
-         (end    length))
+         (start 0)
+         (end length))
     (loop
       (when (= start length) (return-from string-trim ""))
       (unless (find (char string start) character-bag :test #'char=)
@@ -472,7 +448,7 @@
 ;;-----------------------------------------------------------------------------
 (defun string-upcase (string &key (start 0) (end nil))
   (setq string (string string))
-  (setq end    (check-seq-start-end start end (length string)))
+  (set-seq-end end (length string))
 
   (setq string (copy-seq string))
   (do ((i start (1+ i)))
@@ -484,7 +460,7 @@
 ;;-----------------------------------------------------------------------------
 (defun string-downcase (string &key (start 0) (end nil))
   (setq string (string string))
-  (setq end    (check-seq-start-end start end (length string)))
+  (set-seq-end end (length string))
 
   (setq string (copy-seq string))
   (do ((i start (1+ i)))
@@ -496,7 +472,7 @@
 ;;-----------------------------------------------------------------------------
 (defun string-capitalize (string &key (start 0) (end nil))
   (setq string (string string))
-  (setq end    (check-seq-start-end start end (length string)))
+  (set-seq-end end (length string))
 
   (setq string (copy-seq string))
   (do ((i start (1+ i))
@@ -519,7 +495,7 @@
 ;; NSTRING-UPCASE string &KEY :start :end
 ;;-----------------------------------------------------------------------------
 (defun nstring-upcase (string &key (start 0) (end nil))
-  (setq end (check-seq-start-end start end (length string)))
+  (set-seq-end end (length string))
 
   (do ((i start (1+ i)))
       ((= i end) string)
@@ -529,7 +505,7 @@
 ;; NSTRING-DOWNCASE string &KEY :start :end
 ;;-----------------------------------------------------------------------------
 (defun nstring-downcase (string &key (start 0) (end nil))
-  (setq end (check-seq-start-end start end (length string)))
+  (set-seq-end end (length string))
 
   (do ((i start (1+ i)))
       ((= i end) string)
@@ -539,7 +515,7 @@
 ;; NSTRING-CAPITALIZE string &KEY :start :end
 ;;-----------------------------------------------------------------------------
 (defun nstring-capitalize (string &key (start 0) (end nil))
-  (setq end (check-seq-start-end start end (length string)))
+  (set-seq-end end (length string))
 
   (do ((i start (1+ i))
        (word nil)

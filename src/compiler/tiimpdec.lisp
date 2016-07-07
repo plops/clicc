@@ -1,163 +1,29 @@
-;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Typdeklarationen der Funktionstypen importierter Funktionen.
 ;;;
-;;; $Revision: 1.47 $
-;;; $Log: tiimpdec.lisp,v $
-;;; Revision 1.47  1994/06/09  12:06:27  hk
-;;; Typen von Structure-Funktionen korrigiert
-;;;
-;;; Revision 1.46  1994/01/27  19:23:32  kl
-;;; Anpassungen an den erweiterten Typverband vorgenommen.
-;;;
-;;; Revision 1.45  1994/01/26  19:13:42  kl
-;;; Typisierung für symp, rt::<fix und rt::1-fix eingeführt. Typisierung
-;;; der member-Familie verbessert.
-;;;
-;;; Revision 1.44  1994/01/15  22:30:50  kl
-;;; Typisierungen erweitert.
-;;;
-;;; Revision 1.43  1994/01/13  16:09:05  sma
-;;; Funktionsnamen korrigiert, nicht mehr existierende Funktionen
-;;; gelöscht, mehr Funktionen aus dem Laufzeitsystem hinzugefügt.
-;;;
-;;; Revision 1.42  1993/12/09  10:33:33  hk
-;;; provide wieder an das Dateiende
-;;;
-;;; Revision 1.41  1993/11/29  13:42:01  hk
-;;; Typ von digit-char-p korrigiert: char -> null or fixnum
-;;;
-;;; Revision 1.40  1993/11/22  00:11:40  kl
-;;; Typisierung der String-Funktionen korrigiert.
-;;;
-;;; Revision 1.39  1993/11/12  14:21:58  kl
-;;; Statt other-t werden nun die neuen Typen stream-t, usw. aus
-;;; titypes.lisp verwendet. Zahlreiche Typisierungen korrigiert.
-;;;
-;;; Revision 1.38  1993/11/07  14:19:01  kl
-;;; Typisierungen korrigiert und erweitert.
-;;;
-;;; Revision 1.37  1993/11/01  16:50:33  hk
-;;; Typen der Funktionen open und probe korrigiert, new-struct
-;;; hinzugefügt, Schreibfehler behoben.
-;;;
-;;; Revision 1.36  1993/11/01  15:45:19  hk
-;;; Typisierung von rt::make-instance-internal korrigiert.
-;;;
-;;; Revision 1.35  1993/11/01  08:32:01  kl
-;;; Typisierung der Package-Funktionen korrigiert.
-;;;
-;;; Revision 1.34  1993/10/22  16:42:24  kl
-;;; Typisierung der string-Funktionen korrigiert.
-;;;
-;;; Revision 1.33  1993/10/12  19:21:53  kl
-;;; Typabstraktionsfunktionen zu remove, remove-if und remove-if-not korrigiert.
-;;;
-;;; Revision 1.32  1993/10/10  18:00:20  kl
-;;; Fehler in der Typabstraktionsfunktion zu car behoben.
-;;;
-;;; Revision 1.31  1993/10/08  16:37:15  kl
-;;; Neue Typabstraktionsfunktionen zu cdar, usw. sowie (setf second), usw.
-;;;
-;;; Revision 1.30  1993/10/08  16:08:25  kl
-;;; Typabstraktionsfunktionen zu second, third, usw. korrigiert.
-;;;
-;;; Revision 1.29  1993/09/02  13:37:24  ft
-;;; Erweiterung um Typdeklarationen fuer L::class-of.
-;;;
-;;; Revision 1.28  1993/07/14  08:52:16  ft
-;;; Anpassung an die geänderten Parameter von instance-ref/set.
-;;;
-;;; Revision 1.27  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.26  1993/06/16  07:32:57  kl
-;;; Seiteneffektannotierungen importierter Funktionen entfernt, weil die
-;;; Seiteneffektanalyse das uebernehmen soll.
-;;;
-;;; Revision 1.25  1993/06/10  11:06:10  kl
-;;; Ueberfluessige rechte Klammer entfernt.
-;;;
-;;; Revision 1.24  1993/06/10  10:31:28  kl
-;;; Typisierung der Funktionen 1- und 1+ verfeinert.
-;;;
-;;; Revision 1.23  1993/06/08  11:53:27  kl
-;;; Um die Auswirkungen von Fehlern in der Seiteneffektanalyse zu begrenzen
-;;; sind einige Seiteneffektannotierungen importierter Funktionen hier
-;;; (vorlaeufig) aufgenommen worden.
-;;; Typisierung der Funktionen zum CLOS geaendert.
-;;;
-;;; Revision 1.22  1993/05/28  15:41:16  kl
-;;; Typisierung der Funktion length korrigiert.
-;;;
-;;; Revision 1.21  1993/05/27  08:41:15  kl
-;;; Typisierung der Funktion make-array geaendert.
-;;;
-;;; Revision 1.20  1993/05/23  15:56:39  kl
-;;; Umstellung auf den neuen Typverband. rt::make-struct getypt.
-;;;
-;;; Revision 1.19  1993/05/19  12:25:19  kl
-;;; Typisierung der Funktion assoc korrigiert.
-;;;
-;;; Revision 1.18  1993/05/18  16:14:50  kl
-;;; Umstellung auf die neue Implementierung des Typverbands.
-;;;
-;;; Revision 1.17  1993/05/17  06:39:25  kl
-;;; Typdeklarationen etwas erweitert.
-;;;
-;;; Revision 1.16  1993/05/14  15:04:46  kl
-;;; Typdeklarationen erweitert, vereinfacht und auf neues tidecl angepasst.
-;;;
-;;; Revision 1.15  1993/05/09  16:56:43  kl
-;;; Fehler in der Typisierung der Funktion symbol-package behoben.
-;;; Typisierungen der Listenoperationen verfeinert.
-;;;
-;;; Revision 1.14  1993/04/22  11:24:23  hk
-;;; Deklarationen fuer check-integer, set-aref, .., set-gethash auskommentiert
-;;;
-;;; Revision 1.13  1993/04/19  12:28:50  kl
-;;; Deklarationen von special-typed-funs entfernt.
-;;;
-;;; Revision 1.12  1993/04/15  08:23:55  kl
-;;; Anpassung an den verkleinerten Typverband vorgenommen.
-;;; Beschreibung fuer apply,funcall und mappings entfernt.
-;;;
-;;; Revision 1.11  1993/04/07  10:34:35  hk
-;;; Typdeklaration fuer noch nicht implementierte Lisp Funktionen
-;;; auskommentiert: bit-vector-p,special-form-p,gcd,lcm,character.
-;;;
-;;; Revision 1.10  1993/03/23  07:38:57  ft
-;;; make-instance-using-class -> make-instance.
-;;;
-;;; Revision 1.9  1993/03/12  09:33:45  ft
-;;; Anpassung an die veraenderten CLOS Laufzeitfunktionen.
-;;;
-;;; Revision 1.8  1993/03/04  09:09:20  kl
-;;; Umstellung auf neues Package-System vorgenommen.
-;;;
-;;; Revision 1.7  1993/02/16  16:11:06  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.6  1993/02/02  09:36:30  kl
-;;; Typabstraktionsfunktionen aus tidecl hierhin verlegt.
-;;;
-;;; Revision 1.5  1993/01/25  13:14:35  kl
-;;; Typdeklarationen verfeinert.
-;;;
-;;; Revision 1.4  1993/01/24  16:39:59  kl
-;;; Anstatt der konstanten Funktionen wird nun mit declare-rtype deklariert.
-;;;
-;;; Revision 1.3  1993/01/21  12:06:08  kl
-;;; Anpassung an den geaenderten Typverband und an neue Verbandsoperationen.
-;;;
-;;; Revision 1.2  1993/01/19  11:59:18  kl
-;;; Deklarationen zu Listentypen weiter verfeinert.
-;;;
-;;; Revision 1.1  1993/01/19  10:08:34  kl
-;;; Initial revision
+;;; $Revision: 1.50 $
+;;; $Id: tiimpdec.lisp,v 1.50 1994/12/17 11:55:26 pm Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -669,10 +535,10 @@
   ;; ----------------------------------------------------
   (dec-type L::concatenate (top-t sequence-t sequence-t) -> sequence-t)
   (dec-type L::map         (top-t function-t sequence-t) -> sequence-t)
-  (dec-type L::some        (function-t sequence-t) -> bool-t)
-  (dec-type L::every       (function-t sequence-t) -> bool-t)
-  (dec-type L::notany      (function-t sequence-t) -> bool-t)
-  (dec-type L::notevery    (function-t sequence-t) -> bool-t)
+  (dec-type L::some        (function-t sequence-t) -> top-t)
+  (dec-type L::every       (function-t sequence-t) -> top-t)
+  (dec-type L::notany      (function-t sequence-t) -> top-t)
+  (dec-type L::notevery    (function-t sequence-t) -> top-t)
   (dec-type L::reduce      (function-t sequence-t) -> top-t)
 
   ;; Die Funktionen mapcar, maplist, mapc und mapl sind speziell getypt. 
@@ -1031,13 +897,7 @@
   ;;----------------------------------------------------------------------------
   ;; Funktionen zum Erzeugen von Lisp-Werten aus C-Werten
   ;;----------------------------------------------------------------------------
-  (dec-type rt::make-lisp-character  (top-t) -> character-t)
-  (dec-type rt::make-lisp-integer    (top-t) -> integer-t)
-  (dec-type rt::make-lisp-float      (top-t) -> float-t)
-  
-  (dec-type ffi::make-lisp-character (top-t) -> character-t)
-  (dec-type ffi::make-lisp-integer   (top-t) -> integer-t)
-  (dec-type ffi::make-lisp-float     (top-t) -> float-t)
+  ;; (dec-type <fun> (<arg-types>) -> <ret-type>)
   
 
 

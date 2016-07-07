@@ -1,89 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Die generische Funktion simplify-1form nimmt einfache
-;;;            Verbesserungen an einem Zwischensprachknoten vor. Dabei werden
-;;;            insbesondere Optimierungen fuer einige Funktionen vorgenommen.
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.21 $
-;;; $Log: simplifier.lisp,v $
-;;; Revision 1.21  1994/06/09  15:26:29  hk
-;;; Im Laufzeitsystem soll auch if (null ..) optimiert werden, obwohl null
-;;; hier keine special-sys-fun ist, also wird erst mal der Name angeschaut
-;;; ...
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.20  1994/06/09  10:40:12  hk
-;;; not mu"s nicht special-sys-fun sein.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Einfache Verbesserungen an Zwischensprachknoten.
+;;;            Sonderbehandlung spezieller funktionsaufrufe
 ;;;
-;;; Revision 1.19  1994/03/03  13:53:13  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.18  1994/02/02  09:28:02  hk
-;;; Optimierung anhand der Annotationen simp-when-n-args,
-;;; simp-when-no-result, simp-when-arg-n=cons,
-;;; simp-when-some-arg-not-cons/pathn/string/bitv,
-;;; simp-when-some-arg-not-num/char, simp-when-only-test=value und
-;;; simp-test-fun-when-not-testnot eingefügt.
-;;; Spezialbehandlung für car, aref, assoc etc. entfernt.
-;;;
-;;; Revision 1.17  1994/01/15  22:03:41  kl
-;;; Substitutionen für car -> %car, usw. eingebaut.
-;;;
-;;; Revision 1.16  1994/01/14  14:32:10  sma
-;;; Optimierung für char=, char<, etc eingebaut. Ein 2-stelliger Aufruf
-;;; wird in eine spezielle rt-Variante konvertiert.
-;;;
-;;; Revision 1.15  1993/12/03  12:48:20  jh
-;;; Fehler in opti-equal behoben.
-;;;
-;;; Revision 1.14  1993/11/26  12:24:05  jh
-;;; equal wird jetzt moeglichst durch eql ersetzt.
-;;;
-;;; Revision 1.13  1993/11/15  12:17:31  jh
-;;; opti-assoc korrigiert.
-;;;
-;;; Revision 1.12  1993/10/22  13:48:53  jh
-;;; opti-assoc weiter verbessert und opti-+ korrigiert.
-;;;
-;;; Revision 1.11  1993/10/20  15:43:02  jh
-;;; Aufrufe der Funktion assoc werden, wenn moeglich, in Aufrufe von simple-
-;;; assoc umgewandelt. Aufrufe der Funktion + werden bei konstanten Argumenten
-;;; ausgewertet.
-;;;
-;;; Revision 1.10  1993/10/05  16:26:52  jh
-;;; Fehler in opti-apply und opti-not behoben.
-;;;
-;;; Revision 1.9  1993/09/21  15:03:28  jh
-;;; dec-used-slot eingebaut.
-;;;
-;;; Revision 1.8  1993/09/20  14:20:24  jh
-;;; opti-aref, opti-apply und simplify-1form(setq-form) eingebaut.
-;;; simplify-1form(let*-form) erweitert.
-;;;
-;;; Revision 1.7  1993/09/12  16:59:05  kl
-;;; Fehler behoben. (empty-list) -> empty-list
-;;;
-;;; Revision 1.6  1993/08/31  16:45:47  jh
-;;; Fehler in der Statistik behoben.
-;;;
-;;; Revision 1.5  1993/08/30  14:04:50  jh
-;;; opti-not eingebaut und Fehler in opti-set beseitigt.
-;;;
-;;; Revision 1.4  1993/08/26  14:48:00  jh
-;;; Statistik erweitert.
-;;;
-;;; Revision 1.3  1993/08/25  14:49:54  jh
-;;; pass2 und P2 in opti-pass bzw. OPTI umbenannt und Optimierungen fuer
-;;; mapcar, maplist, mapcan und mapcon eingebaut.
-;;;
-;;; Revision 1.2  1993/08/19  10:37:32  hk
-;;; Optimierung von (setf aref) eingebaut.
-;;;
-;;; Revision 1.1  1993/06/30  15:23:15  jh
-;;; Initial revision
-;;;
+;;; $Revision: 1.22 $
+;;; $Id: simplifier.lisp,v 1.22 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

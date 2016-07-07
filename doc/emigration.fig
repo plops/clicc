@@ -1,0 +1,19 @@
+#FIG 2.1
+# Projekt  : APPLY - A Practicable And Portable Lisp Implementation
+#            ------------------------------------------------------
+#            Bild fuer Migrationspapier (Migration)
+# 
+# $Revision: 1.1 $
+# $Id: emigration.fig,v 1.1 1993/09/03 14:59:04 wg Exp $
+80 2
+2 1 0 2 -1 0 0 0 0.000 -1 1 1
+	0 0 2.000 8.000 16.000
+	0 0 2.000 8.000 16.000
+	 254 79 254 119 9999 9999
+2 1 0 2 -1 0 0 0 0.000 -1 1 1
+	0 0 2.000 8.000 16.000
+	0 0 2.000 8.000 16.000
+	 254 199 254 239 9999 9999
+4 0 0 27 0 -1 0 0.000 4 30 233 139 51 reimplementation
+4 0 0 27 0 -1 0 0.000 4 30 127 194 169 migration
+4 0 0 27 0 -1 0 0.000 4 30 452 24 288 automatic program transformation

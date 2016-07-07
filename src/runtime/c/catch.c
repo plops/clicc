@@ -1,46 +1,31 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
- *-----------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- *  Funktion : Laufzeitsystem
- *             - Restaurieren von Special-Variablen
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
+ *------------------------------------------------------------------------------
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ *  Funktion : - Restaurieren von Special-Variablen
  *             - Special-Forms UNWIND-PROTECT, CATCH, THROW
  *               implementiert als Systemfunktionen.
  *
- * $Revision: 1.10 $
- * $Log: catch.c,v $
- * Revision 1.10  1994/01/05  12:46:50  sma
- * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
- * versehen und den Postfix _internal entfernt. STACK(base,x) -> ARG(x)
- *
- * Revision 1.9  1993/07/06  16:27:42  sma
- * OFFSET-Makro eingeführt.
- *
- * Revision 1.8  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.7  1993/04/22  10:29:34  hk
- * fun_decl.h -> sys.h.
- *
- * Revision 1.6  1993/02/17  15:29:47  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.5  1992/09/28  17:20:28  hk
- * Lerror -> Labort, neues Lerror mit Lisp-Parameter
- *
- * Revision 1.4  1992/07/28  10:14:34  hk
- * Schreibfehler.
- *
- * Revision 1.3  1992/06/05  14:22:10  hk
- * Funktion throw_internal hinzugefuegt, die MV auf dem Stack erwartet.
- * catch_internal angepasst, so dass es MV auf dem Stack erwartet.
- *
- * Revision 1.2  1992/06/04  07:19:41  hk
- * Umgestellt auf Continuations
- *
- * Revision 1.1  1992/03/24  17:03:37  hk
- * Initial revision
+ * $Revision: 1.12 $
+ * $Id: catch.c,v 1.12 1994/11/22 14:54:01 hk Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>
@@ -72,6 +57,14 @@ CL_FORM *bind_top = bind_stack;
  * die zuletzt installierte Continuation
  *----------------------------------------------------------------------------*/
 CONTENV *last_cont = NULL;
+
+/*------------------------------------------------------------------------------
+ * Wenn Pointer nicht verlustfrei in ein int konvertiert werden k"onnen,
+ * dann wird dieser Buffer in SETJMP und LONGJMP verwendet.
+ *----------------------------------------------------------------------------*/
+#ifndef INT_GE_PTR
+char *jmp_value;
+#endif
 
 /*------------------------------------------------------------------------------
  * unwind_to

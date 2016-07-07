@@ -1,71 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Inhalt   : Funktionen fuer die Durchfuehrung der Tests und 
 ;;;            ein einfaches Menue zur Auswahl der einzelnen Tests.
 ;;;
-;;; $Revision: 1.20 $
-;;; $Log: testmain.lisp,v $
-;;; Revision 1.20  1993/12/12  18:03:23  sma
-;;; Tests für Arrays eingebunden (neue Datei arrays.lisp).
-;;;
-;;; Revision 1.19  1993/05/11  14:20:43  kl
-;;; Test fuer die Seiteneffektanalyse wieder eingebunden.
-;;;
-;;; Revision 1.18  1993/05/04  06:11:58  ft
-;;; clos-test und search wieder enabled.
-;;;
-;;; Revision 1.17  1993/04/23  10:13:41  ft
-;;; side-effect, clos-test und search disabled, bis die entspr Fehler
-;;; behoben sind.
-;;;
-;;; Revision 1.16  1993/04/20  15:29:24  kl
-;;; Tests fuer die Seiteneffektanalyse eingebunden.
-;;;
-;;; Revision 1.15  1993/03/25  09:53:51  ft
-;;; Die neuen 'search'-Tests eingebunden.
-;;;
-;;; Revision 1.14  1993/02/16  17:16:36  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.13  1993/01/25  10:49:19  kl
-;;; Unter Lucid wird das Symbol USER::? uninterned.
-;;;
-;;; Revision 1.12  1993/01/12  09:40:39  ft
-;;; CLOS Tests eingebunden.
-;;;
-;;; Revision 1.11  1993/01/06  17:12:51  kl
-;;; clicc-test- in CLICC-TEST- umbenannt.
-;;;
-;;; Revision 1.10  1992/09/09  13:21:56  kl
-;;; Ausgabeformat fuer unerwartete Resultate geaendert.
-;;;
-;;; Revision 1.9  1992/09/09  13:07:41  kl
-;;; Testmacro um optionale Strings zu einzelnen Testaufrufen erweitert.
-;;;
-;;; Revision 1.8  1992/09/08  15:14:11  kl
-;;; Neue Testdateien lambda und bindings eingehaengt.
-;;;
-;;; Revision 1.7  1992/09/02  08:51:19  kl
-;;; Funktionalitaet erweitert und Menue verbessert.
-;;;
-;;; Revision 1.6  1992/08/27  12:06:08  kl
-;;; Unnoetige Variablen entfernt und Kode verkuerzt.
-;;;
-;;; Revision 1.5  1992/08/26  12:30:21  kl
-;;; *CLICC-TEST-ERRORS* eingefuehrt, Menue verschoenert, expert eingebunden.
-;;;
-;;; Revision 1.4  1992/08/26  09:50:25  kl
-;;; Test-Makro erweitert, *CLICC-TESTS* und ein Testmenue eingefuehrt.
-;;;
-;;; Revision 1.3  1992/08/20  16:37:06  kl
-;;; Neues Makro
-;;;
-;;; Revision 1.2  1992/08/16  16:29:38  kl
-;;; *CLICC-TEST-PRINT-HEADERS* eingefuehrt.
-;;;
-;;; Revision 1.1  1992/08/16  16:26:21  kl
-;;; Initial revision
+;;; $Revision: 1.21 $
+;;; $Id: testmain.lisp,v 1.21 1994/11/22 14:45:44 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "USER")

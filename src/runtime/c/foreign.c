@@ -1,82 +1,29 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
- *-----------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- * Funktion : Laufzeitsystem: Funktionen des FFI
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
+ *------------------------------------------------------------------------------
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * $Revision: 1.20 $
- * $Log: foreign.c,v $
- * Revision 1.20  1994/05/17  08:38:18  pm
- * Anpassung an den Standard-C-Compiler:
- * - Headerfiles nur bedingt einlesen
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
  *
- * Fehler behoben.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ * Function : Foreign function interface
  *
- * Revision 1.19  1994/04/28  09:58:55  pm
- * Stefans Fehler korrigiert.
- *
- * Revision 1.18  1994/04/28  09:46:06  sma
- * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
- *
- * Revision 1.17  1994/04/22  14:15:16  pm
- * Foreign Function Interface voellig ueberarbeitet.
- * - Fehler behoben.
- * - zwei weitere Hilfsfunktionen.
- *
- * Revision 1.16  1994/04/18  12:20:31  pm
- * Foreign Function Interface voellig ueberarbeitet.
- * - Funktionen zum Umgang mit Objekten vom 'Typ C` ueberarbeitet.
- *
- * Revision 1.15  1994/01/13  09:02:01  sma
- * Die bis jetzt unimplementierten Typtests c_struct_p, FFI_c_float_p,
- * FFI_c_double_p und FF_c_long_double_p geben jetzt NIL zurück.  (Damit
- * print bei (print #<unbound>) nicht versucht, ein c-float auszugeben)
- *
- * Revision 1.14  1994/01/05  12:48:02  sma
- * Namensänderung: Alle Laufzeitsystemfunktionen mit dem Präfix rt_
- * versehen und den Postfix _internal entfernt. STACK(base,x) -> ARG(x)
- *
- * Revision 1.13  1993/12/16  16:39:19  pm
- * Definition des strings IllegalType.
- *
- * Revision 1.12  1993/09/28  15:05:59  pm
- * C-Konstruktorfuntionen nach cginline geschoben.
- *
- * Revision 1.11  1993/08/27  11:52:57  sma
- * unsigned -> unsigned short  in Zeile 379.
- *
- * Revision 1.10  1993/08/27  10:26:16  pm
- * Mehr Castings eingebaut
- *
- * Revision 1.9  1993/08/24  11:21:00  pm
- * Erweiterungen um C-Pointer
- *
- * Revision 1.8  1993/07/22  09:13:35  pm
- * Funktionen zur Verwaltung von C-Strukturen
- *
- * Revision 1.7  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.6  1993/06/04  13:45:45  pm
- * Globale Variable save_stack eingefuegt
- *
- * Revision 1.5  1993/05/31  17:08:07  pm
- * Schreibfehler beseitigt
- *
- * Revision 1.4  1993/05/23  17:53:54  pm
- * alle in C geschriebenen Konstruktor-, Test- und
- * Konvertierungsfunktionen fuer die primitiven Typen implementiert
- *
- * Revision 1.3  1993/05/21  13:55:24  pm
- * c-int in int umbenannt
- *
- * Revision 1.2  1993/05/05  09:10:54  pm
- * einige Funtionen zum Umgang mit c-ints eingebaut
- *
- * Revision 1.1  1993/04/28  14:23:23  pm
- * Initial revision
- *
+ * $Revision: 1.23 $
+ * $Id: foreign.c,v 1.23 1994/12/17 11:57:20 pm Exp $
  *----------------------------------------------------------------------------*/
 
 #include <c_decl.h>
@@ -89,6 +36,25 @@
 
 #include <string.h>
 #include "sys.h"
+
+#include <limits.h>
+#include <values.h>
+#define MIN_CHAR SCHAR_MIN
+#define MAX_CHAR SCHAR_MAX
+#define MAX_UNSIGNED_CHAR UCHAR_MAX
+#define MIN_SHORT SHRT_MIN
+#define MAX_SHORT SHRT_MAX
+#define MAX_UNSIGNED_SHORT USHRT_MAX
+#define MIN_INT INT_MIN
+#define MAX_INT INT_MAX
+#define MAX_UNSIGNED_INT UINT_MAX
+#define MIN_LONG LONG_MIN
+#define MAX_LONG LONG_MAX
+#define MAX_UNSIGNED_LONG ULONG_MAX
+#define MIN_FLOAT -MAXFLOAT
+#define MAX_FLOAT MAXFLOAT
+#define MIN_DOUBLE -MAXDOUBLE
+#define MAX_DOUBLE MAXDOUBLE
 
 /*------------------------------------------------------------------------------
  * globale Variable, in der die aktuelle Stackposition beim Aufruf
@@ -104,508 +70,271 @@ char IllegalType[] = "illegal Type in Call-Out";
 
 
 /*******************************************************************************
- * Konstruktor Funktionen fuer Primitive.
+ * Konvertierungsfunktionen von Lisp nach C und von C nach C
+ * elementare C-Typen
+ * Lisp-Typen,
+ * Zeichenketten
+ *
  * Argument: object
  ******************************************************************************/
-void rt_make_c_char (base)
-CL_FORM *base;
+
+/*--- c-char -----------------------------------------------------------------*/
+/* Aufruf, wenn object vom Typ Charakter */
+LISP_FUN(rt_make_c_char) { MAKE_CL_C_CHAR(ARG(1), ARG(0)); }
+
+/* Aufruf, wenn object genuegend kleine Zahl */
+LISP_FUN(rt_make_c_char_2) { MAKE_CL_C_CHAR_2(ARG(1), ARG(0)); }
+
+/* Aufruf, wenn object C-Typ */
+LISP_FUN(rt_cast_c_char) { CAST_CL_C_CHAR(ARG(1), ARG(0)); }
+
+/*--- c-short ----------------------------------------------------------------*/
+LISP_FUN(rt_make_c_short) { MAKE_CL_C_SHORT(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_short) { CAST_CL_C_SHORT(ARG(1), ARG(0)); }
+
+/*--- c-int ------------------------------------------------------------------*/
+LISP_FUN(rt_make_c_int) { MAKE_CL_C_INT(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_int) { CAST_CL_C_INT(ARG(1), ARG(0)); }
+
+/*--- c-long -----------------------------------------------------------------*/
+LISP_FUN(rt_make_c_long) { MAKE_CL_C_LONG(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_long) { CAST_CL_C_LONG(ARG(1), ARG(0)); }
+
+/*--- c-unsigned-char --------------------------------------------------------*/
+LISP_FUN(rt_make_c_unsigned_char) { MAKE_CL_C_UNSIGNED_CHAR(ARG(1), ARG(0)); }
+LISP_FUN(rt_make_c_unsigned_char_2) { MAKE_CL_C_UNSIGNED_CHAR_2(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_unsigned_char) { CAST_CL_C_UNSIGNED_CHAR(ARG(1), ARG(0)); }
+
+/*--- c-unsigned-short -------------------------------------------------------*/
+LISP_FUN(rt_make_c_unsigned_short) { MAKE_CL_C_UNSIGNED_SHORT(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_unsigned_short) { CAST_CL_C_UNSIGNED_SHORT(ARG(1), ARG(0)); }
+
+/*--- c-unsigned-int ---------------------------------------------------------*/
+LISP_FUN(rt_make_c_unsigned_int) { MAKE_CL_C_UNSIGNED_INT(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_unsigned_int) { CAST_CL_C_UNSIGNED_INT(ARG(1), ARG(0)); }
+
+/*--- c-unsigned-long --------------------------------------------------------*/
+LISP_FUN(rt_make_c_unsigned_long) { MAKE_CL_C_UNSIGNED_LONG(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_unsigned_long) { CAST_CL_C_UNSIGNED_LONG(ARG(1), ARG(0)); }
+
+/*--- c-float ----------------------------------------------------------------*/
+LISP_FUN(rt_make_c_float) { MAKE_CL_C_FLOAT(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_float) { CAST_CL_C_FLOAT(ARG(1), ARG(0)); }
+
+/*--- c-double ---------------------------------------------------------------*/
+LISP_FUN(rt_make_c_double) { MAKE_CL_C_DOUBLE(ARG(1), ARG(0)); }
+LISP_FUN(rt_cast_c_double) { CAST_CL_C_DOUBLE(ARG(1), ARG(0)); }
+
+/*--- c-string ---------------------------------------------------------------*/
+LISP_FUN(rt_make_c_string)
 {
-   TYPE_OF(ARG(0)) = CL_C_CHAR;
+   char *loc = get_c_string(ARG(0));
+   size_t length = strlen(loc) + 1;        /* Laenge aus Slot auslesen !?!?!? */
+   char *addr = (char *)malloc(length);
+
+   (void)strcpy(addr, loc);
+   MAKE_CL_C_STRING(ARG(1), ARG(0), addr);
 }
 
-void rt_make_c_short (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_SHORT;
-}
-
-void rt_make_c_int (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_INT;
-}
-
-void rt_make_c_long (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_LONG;
-}
-
-void rt_make_c_unsigned_char (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_UNSIGNED_CHAR;
-}
-
-void rt_make_c_unsigned_short (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_UNSIGNED_SHORT;
-}
-
-void rt_make_c_unsigned_int (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_UNSIGNED_INT;
-}
-
-void rt_make_c_unsigned_long (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_UNSIGNED_LONG;
-}
-
-void rt_make_c_float (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_FLOAT;
-}
-
-void rt_make_c_double (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_DOUBLE;
-}
-
-void rt_make_c_long_double (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_LONG_DOUBLE;
-}
-
-/*******************************************************************************
- * Cast Funktionen fuer Primitive.
- * Argument: object
- ******************************************************************************/
-void rt_cast_c_char (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_CHAR;
-}
-
-void rt_cast_c_short (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_SHORT;
-}
-
-void rt_cast_c_int (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_INT;
-}
-
-void rt_cast_c_long (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_LONG;
-}
-
-void rt_cast_c_unsigned_char (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_UNSIGNED_CHAR;
-}
-
-void rt_cast_c_unsigned_short (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_UNSIGNED_SHORT;
-}
-
-void rt_cast_c_unsigned_int (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_UNSIGNED_INT;
-}
-
-void rt_cast_c_unsigned_long (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_UNSIGNED_LONG;
-}
-
-void rt_cast_c_float (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_FLOAT;
-}
-
-void rt_cast_c_double (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_DOUBLE;
-}
-
-void rt_cast_c_long_double (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_C_LONG_DOUBLE;
-}
-
-/*******************************************************************************
- * Konvertierungsfunktionen: aus C mache Lisp
- * Argument: object
- ******************************************************************************/
-void rt_make_lisp_character (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_CHAR;
-}
-
-void rt_make_lisp_integer (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_FIXNUM;
-}
-
-void rt_make_lisp_float (base)
-CL_FORM *base;
-{
-   TYPE_OF(ARG(0)) = CL_FLOAT;
-}
-
-void rt_internal_make_lisp_string (base)
-CL_FORM *base;
+LISP_FUN(rt_copy_c_string)
 {
    char *loc = GET_C_STRING(ARG(0));
-   make_string(base, loc);
+   size_t length = strlen(loc) + 1;
+   char *addr = (char *)malloc(length);
+   
+   (void)strcpy(addr, loc);
+   MAKE_CL_C_STRING(ARG(1), ARG(0), addr);
 }
+
+
+/*------------------------------------------------------------------------------
+ * Typpraedikate
+ *----------------------------------------------------------------------------*/
+LISP_FUN(c_primitive_p) 
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)));
+}
+
+LISP_FUN(c_floating_p) 
+{
+   RET_BOOL_OPT(CL_C_FLOATING_P(ARG(0)));
+}
+
+
+LISP_FUN(c_char_p)
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)) &&
+                (GET_C_CHARACTER(ARG(0)) >= MIN_CHAR) &&
+                (GET_C_CHARACTER(ARG(0)) <= MAX_CHAR));
+}
+
+LISP_FUN(c_short_p)
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)) &&
+                (GET_C_INTEGER(ARG(0)) >= MIN_SHORT) &&
+                (GET_C_INTEGER(ARG(0)) <= MAX_SHORT));
+}
+
+LISP_FUN(c_int_p)
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)) &&
+                (GET_C_INTEGER(ARG(0)) >= MIN_INT) &&
+                (GET_C_INTEGER(ARG(0)) <= MAX_INT));
+}
+
+LISP_FUN(c_long_p)
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)) &&
+                (GET_C_INTEGER(ARG(0)) >= MIN_LONG) &&
+                (GET_C_INTEGER(ARG(0)) <= MAX_LONG));
+}
+
+LISP_FUN(c_unsigned_char_p)
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)) &&
+                (GET_C_CHARACTER(ARG(0)) >= 0) &&
+                (GET_C_CHARACTER(ARG(0)) <= MAX_UNSIGNED_CHAR));
+}
+
+LISP_FUN(c_unsigned_short_p)
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)) &&
+                (GET_C_INTEGER(ARG(0)) >= 0) &&
+                (GET_C_INTEGER(ARG(0)) <= MAX_UNSIGNED_SHORT));
+}
+
+LISP_FUN(c_unsigned_int_p)
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)) &&
+                (GET_C_INTEGER(ARG(0)) >= 0) &&
+                (GET_C_INTEGER(ARG(0)) <= MAX_UNSIGNED_INT));
+}
+
+LISP_FUN(c_unsigned_long_p)
+{
+   RET_BOOL_OPT(CL_C_PRIMITIVE_P(ARG(0)) &&
+                (GET_C_INTEGER(ARG(0)) >= 0) &&
+                (GET_C_INTEGER(ARG(0)) <= MAX_UNSIGNED_LONG));
+}
+
+LISP_FUN(c_float_p)
+{
+   RET_BOOL_OPT(CL_C_FLOATING_P(ARG(0)) &&
+                (GET_C_FLOATING(ARG(0)) >= MIN_FLOAT) &&
+                (GET_C_FLOATING(ARG(0)) <= MAX_FLOAT));
+}
+
+LISP_FUN(c_double_p)
+{
+   RET_BOOL_OPT(CL_C_FLOATING_P(ARG(0)) &&
+                (GET_C_FLOATING(ARG(0)) >= MIN_DOUBLE) &&
+                (GET_C_FLOATING(ARG(0)) <= MAX_DOUBLE));
+}
+
+
+/*******************************************************************************
+ * Konvertierungsfunktionen von C nach Lisp
+ * elementare C-Typen
+ * Zeichenketten
+ *
+ * Argument: object
+ ******************************************************************************/
+
+LISP_FUN(rt_make_lisp_character) { MAKE_LISP_CHARACTER(ARG(1), ARG(0)); }
+LISP_FUN(rt_make_lisp_integer)   { MAKE_LISP_INTEGER(ARG(1), ARG(0)); }
+LISP_FUN(rt_make_lisp_float)     { MAKE_LISP_FLOAT(ARG(1), ARG(0)); }
+
+LISP_FUN(rt_make_lisp_string)
+{
+   char *loc = GET_C_STRING(ARG(0));
+
+   make_string(ARG(0), loc);
+}
+
+
+/*------------------------------------------------------------------------------
+ * Laufzeitsystemfunktionen fuer die restlichen C-Typen.
+ * Strukturen
+ * Varianten
+ * Felder
+ * Handles
+ *----------------------------------------------------------------------------*/
+/*--- Kopier-Funktionen ---*/
+/* Drei Argumente: neue Struktur, alte Struktur, Groesse */
+LISP_FUN(rt_copy_c_struct)
+{
+   memcpy(GET_C_STRUCT_PTR(ARG(0)), 
+          GET_C_STRUCT_PTR(ARG(1)),
+          GET_C_UNSIGNED_LONG(ARG(2)));
+}
+
+LISP_FUN(rt_copy_c_union)
+{
+   memcpy(GET_C_UNION_PTR(ARG(0)), 
+          GET_C_UNION_PTR(ARG(1)),
+          GET_C_UNSIGNED_LONG(ARG(2)));
+}
+
+LISP_FUN(rt_copy_c_array)
+{
+   memcpy(GET_C_ARRAY_PTR(ARG(0)), 
+          GET_C_ARRAY_PTR(ARG(1)),
+          GET_C_UNSIGNED_LONG(ARG(2)));
+}
+
+/*--- Typpraedikate ---*/
+/* Zwei Argumente: Struktur, Typpraedikat */
+LISP_FUN(rt_struct_p)
+{
+   RET_BOOL_OPT(CL_C_STRUCT_P(ARG(0)) && 
+                (GET_C_TYPESYMBOL(ARG(0)) == GET_SYMBOL(ARG(1))));
+}
+
+LISP_FUN(rt_union_p)
+{
+   RET_BOOL_OPT(CL_C_UNION_P(ARG(0)) && 
+                (GET_C_TYPESYMBOL(ARG(0)) == GET_SYMBOL(ARG(1))));
+}
+
+LISP_FUN(rt_array_p)
+{
+   RET_BOOL_OPT(CL_C_ARRAY_P(ARG(0)) && 
+                (GET_C_TYPESYMBOL(ARG(0)) == GET_SYMBOL(ARG(1))));
+}
+
+LISP_FUN(rt_handle_p)
+{
+   RET_BOOL_OPT(CL_C_HANDLE_P(ARG(0)) && 
+                (GET_C_TYPESYMBOL(ARG(0)) == GET_SYMBOL(ARG(1))));
+}
+
 
 /*------------------------------------------------------------------------------
  * 
  *----------------------------------------------------------------------------*/
-void rt_internal_make_c_string (base)
-CL_FORM *base;
+LISP_FUN(FFI_free)
 {
-   char *loc = get_c_string(ARG(0));
-   size_t length = strlen(loc) + 1;
-   char *ptr = (char *)malloc(length);
-   (void)strcpy(ptr, loc);
-   LOAD_C_STRING(ptr, ARG(0));
-}
-
-void rt_internal_copy_c_string (base)
-CL_FORM *base;
-{
-   char *loc = GET_C_STRING(ARG(0));
-   size_t length = strlen(loc) + 1;
-   char *ptr = (char *)malloc(length);
-   (void)strcpy(ptr, loc);
-   LOAD_C_STRING(ptr, ARG(0));
-}
-
-/*******************************************************************************
- * Testfunktionen fuer Primitive
- * Argument: object
- ******************************************************************************/
-void FFI_c_char_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_CHAR);
-}
-
-void FFI_c_short_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_SHORT ||
-            TYPE_OF(ARG(0)) == CL_C_CHAR);
-}
-
-void FFI_c_int_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_INT ||
-            TYPE_OF(ARG(0)) == CL_C_SHORT ||
-            TYPE_OF(ARG(0)) == CL_C_CHAR);
-}
-
-void FFI_c_long_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_LONG ||
-            TYPE_OF(ARG(0)) == CL_C_INT ||
-            TYPE_OF(ARG(0)) == CL_C_SHORT ||
-            TYPE_OF(ARG(0)) == CL_C_CHAR);
-}
-
-void FFI_c_unsigned_char_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_UNSIGNED_CHAR);
-}
-
-void FFI_c_unsigned_short_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_UNSIGNED_SHORT ||
-            TYPE_OF(ARG(0)) == CL_C_UNSIGNED_CHAR);
-}
-
-void FFI_c_unsigned_int_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_UNSIGNED_INT ||
-            TYPE_OF(ARG(0)) == CL_C_UNSIGNED_SHORT ||
-            TYPE_OF(ARG(0)) == CL_C_UNSIGNED_CHAR);
-}
-
-void FFI_c_unsigned_long_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_UNSIGNED_LONG ||
-            TYPE_OF(ARG(0)) == CL_C_UNSIGNED_INT ||
-            TYPE_OF(ARG(0)) == CL_C_UNSIGNED_SHORT ||
-            TYPE_OF(ARG(0)) == CL_C_UNSIGNED_CHAR);
-}
-
-void FFI_c_float_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_FLOAT);
-}
-
-void FFI_c_double_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_DOUBLE ||
-            TYPE_OF(ARG(0)) == CL_C_FLOAT);
-}
-
-void FFI_c_long_double_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_LONG_DOUBLE ||
-            TYPE_OF(ARG(0)) == CL_C_DOUBLE ||
-            TYPE_OF(ARG(0)) == CL_C_FLOAT);
-}
-
-void FFI_c_string_p (base)
-CL_FORM *base;
-{
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_STRING);
-}
-
-/*******************************************************************************
- * Testfunktionen fuer andere
- * Argumente: object typesymbol
- ******************************************************************************/
-void rt_internal_c_struct_p (base)
-CL_FORM *base;
-{
-   RET_BOOL((TYPE_OF(ARG(0)) == CL_C_STRUCT) && 
-            (GET_SYMBOL(OFFSET(GET_FORM(ARG(0)), 0)) == 
-             GET_SYMBOL(ARG(1))));
-}
-
-void rt_internal_c_union_p (base)
-CL_FORM *base;
-{
-   RET_BOOL((TYPE_OF(ARG(0)) == CL_C_UNION) && 
-            (GET_SYMBOL(OFFSET(GET_FORM(ARG(0)), 0)) == 
-             GET_SYMBOL(ARG(1))));
-}
-
-void rt_internal_c_handle_p (base)
-CL_FORM *base;
-{
-   RET_BOOL((TYPE_OF(ARG(0)) == CL_C_HANDLE) && 
-            (GET_SYMBOL(OFFSET(GET_FORM(ARG(0)), 0)) == 
-             GET_SYMBOL(ARG(1))));
-}
-
-void rt_internal_c_array_p (base)
-CL_FORM *base;
-{
-   RET_BOOL((TYPE_OF(ARG(0)) == CL_C_ARRAY) && 
-            (GET_SYMBOL(OFFSET(GET_FORM(ARG(0)), 0)) == 
-             GET_SYMBOL(ARG(1))));
-}
-
-/*******************************************************************************
- * Konstruktorfunktionen
- * Argumente: typesymbol object
- ******************************************************************************/
-void rt_internal_make_c_struct (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
+   int type = F_TYPE_OF(ARG(0));
    
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(2), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_STRUCT_PTR(ARG(1)), OFFSET(ptr, 2));
-   LOAD_C_STRUCT(ptr, ARG(0));
+   switch (type) 
+   {
+   case CL_C_STRUCT:
+      free((void *)GET_C_STRUCT_PTR(ARG(0)));
+      break;
+   case CL_C_UNION:
+      free((void *)GET_C_UNION_PTR(ARG(0)));
+      break;
+   case CL_C_ARRAY:
+      free((void *)GET_C_ARRAY_PTR(ARG(0)));
+      break;
+   case CL_C_STRING:
+      free((void *)GET_C_STRING(ARG(0)));
+      break;
+   }
+   LOAD_NIL(ARG(0));
 }
 
-void _make_c_struct_ptr (base, symbol, address)
-CL_FORM *base;
-CL_FORM *symbol;
-char* address;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(symbol, OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(0), 0, OFFSET(ptr, 1));
-   LOAD_CHAR_PTR(address, OFFSET(ptr, 2));
-   LOAD_C_STRUCT(ptr, ARG(0));
-}
 
-void rt_internal_make_c_union (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(2), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_UNION_PTR(ARG(1)), OFFSET(ptr, 2));
-   LOAD_C_UNION(ptr, ARG(0));
-}
-
-void _make_c_union_ptr (base, symbol, address)
-CL_FORM *base;
-CL_FORM *symbol;
-char* address;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(symbol, OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(0), 0, OFFSET(ptr, 1));
-   LOAD_CHAR_PTR(address, OFFSET(ptr, 2));
-   LOAD_C_UNION(ptr, ARG(0));
-}
-
-void rt_internal_make_c_array (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(2), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_ARRAY_PTR(ARG(1)), OFFSET(ptr, 2));
-   LOAD_C_ARRAY(ptr, ARG(0));
-}
-
-void _make_c_array_ptr (base, symbol, address)
-CL_FORM *base;
-CL_FORM *symbol;
-char* address;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(symbol, OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(0), 0, OFFSET(ptr, 1));
-   LOAD_CHAR_PTR(address, OFFSET(ptr, 2));
-   LOAD_C_ARRAY(ptr, ARG(0));
-}
-
-void _make_c_handle (base, symbol, address)
-CL_FORM *base;
-CL_FORM *symbol;
-char * address;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(symbol, OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(0), 0, OFFSET(ptr, 1));
-   LOAD_CHAR_PTR(address, OFFSET(ptr, 2));
-   LOAD_C_HANDLE(ptr, ARG(0));
-}
-
-/*******************************************************************************
- * Kopierfunktionen
- * Argumente: typesymbol object old-object size
- ******************************************************************************/
-void rt_internal_copy_c_struct (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(4), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_STRUCT_PTR(ARG(1)), OFFSET(ptr, 2));
-   memcpy(GET_C_STRUCT_PTR(ARG(1)), 
-          GET_CHAR_PTR(OFFSET(ARG(2), 2)), 
-          GET_C_INT(ARG(3)));
-   LOAD_C_STRUCT(ptr, ARG(0));
-}
-
-void rt_internal_copy_c_union (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(4), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_UNION_PTR(ARG(1)), OFFSET(ptr, 2));
-   memcpy(GET_C_UNION_PTR(ARG(1)), 
-          GET_CHAR_PTR(OFFSET(ARG(2), 2)), 
-          GET_C_INT(ARG(3)));
-   LOAD_C_UNION(ptr, ARG(0));
-}
-
-void rt_internal_copy_c_array (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(4), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_ARRAY_PTR(ARG(1)), OFFSET(ptr, 2));
-   memcpy(GET_C_ARRAY_PTR(ARG(1)), 
-          GET_CHAR_PTR(OFFSET(ARG(2), 2)), 
-          GET_C_INT(ARG(3)));
-   LOAD_C_ARRAY(ptr, ARG(0));
-}
-
-/*******************************************************************************
- * Zeiger holen
- * Argument: typesymbol object
- ******************************************************************************/
-void rt_internal_get_struct_pointer (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(2), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_STRUCT_PTR(ARG(1)), OFFSET(ptr, 2));
-   LOAD_C_STRUCT(ptr, ARG(0));
-}
-
-void rt_internal_get_union_pointer (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(2), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_UNION_PTR(ARG(1)), OFFSET(ptr, 2));
-   LOAD_C_UNION(ptr, ARG(0));
-}
-
-void rt_internal_get_array_pointer (base)
-CL_FORM *base;
-{
-   CL_FORM *ptr;
-   
-   ptr = form_alloc(base, 3);
-   LOAD_SYMBOL(GET_SYMBOL(ARG(0)), OFFSET(ptr, 0));
-   LOAD_FIXNUM(ARG(2), 0, OFFSET(ptr,1));
-   LOAD_CHAR_PTR(GET_C_ARRAY_PTR(ARG(1)), OFFSET(ptr, 2));
-   LOAD_C_ARRAY(ptr, ARG(0));
-}
 
 /*******************************************************************************
  * Fuer die Ausgabe eine Einfache Form
@@ -614,30 +343,28 @@ CL_FORM *base;
 void c_struct_p (base)
 CL_FORM *base;
 {
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_STRUCT);
+   RET_BOOL_OPT(CL_C_STRUCT_P(ARG(0)));
 }
 
 void c_union_p (base)
 CL_FORM *base;
 {
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_UNION);
+   RET_BOOL_OPT(CL_C_UNION_P(ARG(0)));
 }
 
 void c_array_p (base)
 CL_FORM *base;
 {
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_ARRAY);
+   RET_BOOL_OPT(CL_C_ARRAY_P(ARG(0)));
 }
 
 void c_handle_p (base)
 CL_FORM *base;
 {
-   RET_BOOL(TYPE_OF(ARG(0)) == CL_C_HANDLE);
+   RET_BOOL_OPT(CL_C_HANDLE_P(ARG(0)));
 }
 
-/*------------------------------------------------------------------------------
- * 
- *----------------------------------------------------------------------------*/
+
 void rt_internal_get_symbol (base)
 CL_FORM *base;
 {
@@ -650,25 +377,79 @@ CL_FORM *base;
    LOAD_FIXNUM(ARG(1), (long)GET_CHAR_PTR(OFFSET(GET_FORM(ARG(0)), 2)), ARG(0));
 }
 
+
 /*------------------------------------------------------------------------------
- * 
+ * Funktionen zum Bestimmen der Werte-Bereiche der C-Datentypen
  *----------------------------------------------------------------------------*/
-void FFI_free (base)
-CL_FORM *base;
+
+LISP_FUN(rt_check_char)
 {
-   int type = TYPE_OF(ARG(0));
-   
-   switch (type) 
-   {
-   case CL_C_STRUCT:
-   case CL_C_UNION:
-   case CL_C_ARRAY:
-      free((void *)GET_CHAR_PTR(OFFSET(GET_FORM(ARG(0)), 2)));
-      LOAD_NIL(ARG(0));
-      break;
-   case CL_C_STRING:
-      free((void*)GET_CHAR_PTR(ARG(0)));
-      LOAD_NIL(ARG(0));
-      break;
-   }
+   RET_BOOL(CL_FIXNUMP(ARG(0)) && 
+            (GET_FIXNUM(ARG(0)) >= MIN_CHAR) && 
+            (GET_FIXNUM(ARG(0)) <= MAX_CHAR));
 }
+
+LISP_FUN(rt_check_short)
+{
+   RET_BOOL(CL_FIXNUMP(ARG(0)) && 
+            (GET_FIXNUM(ARG(0)) >= MIN_SHORT) && 
+            (GET_FIXNUM(ARG(0)) <= MAX_SHORT));
+}
+
+LISP_FUN(rt_check_int)
+{
+   RET_BOOL(CL_FIXNUMP(ARG(0)) && 
+            (GET_FIXNUM(ARG(0)) >= MIN_INT) && 
+            (GET_FIXNUM(ARG(0)) <= MAX_INT));
+}
+
+LISP_FUN(rt_check_long)
+{
+   RET_BOOL(CL_FIXNUMP(ARG(0)) && 
+            (GET_FIXNUM(ARG(0)) >= MIN_LONG) && 
+            (GET_FIXNUM(ARG(0)) <= MAX_LONG));
+}
+
+LISP_FUN(rt_check_unsigned_char)
+{
+   RET_BOOL(CL_FIXNUMP(ARG(0)) && 
+            (GET_FIXNUM(ARG(0)) >= 0) && 
+            (GET_FIXNUM(ARG(0)) <= MAX_UNSIGNED_CHAR));
+}
+
+LISP_FUN(rt_check_unsigned_short)
+{
+   RET_BOOL(CL_FIXNUMP(ARG(0)) && 
+            (GET_FIXNUM(ARG(0)) >= 0) && 
+            (GET_FIXNUM(ARG(0)) <= MAX_UNSIGNED_SHORT));
+}
+
+LISP_FUN(rt_check_unsigned_int)
+{
+   RET_BOOL(CL_FIXNUMP(ARG(0)) && 
+            (GET_FIXNUM(ARG(0)) >= 0) && 
+            (GET_FIXNUM(ARG(0)) <= MAX_UNSIGNED_INT));
+}
+
+LISP_FUN(rt_check_unsigned_long)
+{
+   RET_BOOL(CL_FIXNUMP(ARG(0)) && 
+            (GET_FIXNUM(ARG(0)) >= 0) && 
+            (GET_FIXNUM(ARG(0)) <= MAX_UNSIGNED_LONG));
+}
+
+LISP_FUN(rt_check_float)
+{
+   RET_BOOL(CL_FLOATP(ARG(0)) &&
+            (GET_FLOAT(ARG(0)) >= MIN_FLOAT) &&
+            (GET_FLOAT(ARG(0)) <= MAX_FLOAT));
+}
+
+LISP_FUN(rt_check_double)
+{
+   RET_BOOL(CL_FLOATP(ARG(0)) &&
+            (GET_FLOAT(ARG(0)) >= MIN_DOUBLE) &&
+            (GET_FLOAT(ARG(0)) <= MAX_DOUBLE));
+}
+
+

@@ -1,31 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Eine Implementation der Fakultaetsfunktion.
 ;;;            Verwendet den Y-Kombinator, um Rekursion auszudruecken.
 ;;;
-;;; $Revision: 1.7 $
-;;; $Log: y-fac.lisp,v $
-;;; Revision 1.7  1994/05/19  14:45:21  hk
-;;; Fakult"at mit Zahlen als (Rest)-Listen implementiert hinzugef"ugt
-;;;
-;;; Revision 1.6  1993/02/16  17:19:06  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.5  1992/09/04  12:20:39  kl
-;;; Einige zusaetzliche Tests und in-package eingefuegt.
-;;;
-;;; Revision 1.4  1992/08/20  16:33:27  kl
-;;; Aufruf des clicc-test eingebaut.
-;;;
-;;; Revision 1.3  1992/08/14  10:37:09  uho
-;;; und wieder entfernt.
-;;;
-;;; Revision 1.2  1992/08/14  10:35:12  uho
-;;; leere Zeile eingefuegt.
-;;;
-;;; Revision 1.1  1992/08/11  10:49:50  hk
-;;; Initial revision
+;;; $Revision: 1.8 $
+;;; $Id: y-fac.lisp,v 1.8 1994/11/22 14:45:44 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "USER")

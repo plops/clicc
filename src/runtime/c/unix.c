@@ -1,51 +1,33 @@
 /*------------------------------------------------------------------------------
- * Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel
- *---------------------------------------------------------------------------
- * Projekt  : APPLY - A Practicable And Portable Lisp Implementation
- *            ------------------------------------------------------
- * Funktion : Laufzeitsystem
- *            - unix-current-directory
+ * CLiCC: The Common Lisp to C Compiler
+ * Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ * Christian-Albrechts-Universitaet zu Kiel, Germany
+ *------------------------------------------------------------------------------
+ * CLiCC has been developed as part of the APPLY research project,
+ * funded by the German Ministry of Research and Technology.
+ * 
+ * CLiCC is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * CLiCC is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License in file COPYING for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *------------------------------------------------------------------------------
+ * Function : - unix-current-directory
  *            - unix-lstat
  *            - unix-stat
  *            - unix-readlink
  *            - unix-get-unix-error-msg
  *
- * $Revision: 1.11 $
- * $Log: unix.c,v $
- * Revision 1.11  1994/05/26  10:59:33  uho
- * In unix_link_mode und unix_file_mode LOAD_SMALLFIXNUM in LOAD_FIXNUM
- * geaendert, da buf.st_mode kein Byte sein muss.
- *
- * Revision 1.10  1994/05/22  15:10:09  sma
- * LOAD_FIXNUM -> LOAD_SMALLFIXNUM um Compiler-Warnung abzuschaffen.
- *
- * Revision 1.9  1994/04/28  09:52:02  sma
- * LOAD_FIXNUM, LOAD_CHAR und LOAD_FLOAT um 3. Argument ergänzt.
- *
- * Revision 1.8  1994/01/22  18:33:39  sma
- * STACK(base, x) --> ARG(x) sowie kosmetische Korrekturen.
- *
- * Revision 1.7  1993/07/22  15:44:13  uho
- * Wie kam nur diese Klammer weg?
- *
- * Revision 1.6  1993/07/22  12:41:22  uho
- * Fuer GCC unter DOS, liefern 'unix_link_mod' und 'unix_read_link' fuer DOS
- * angemessene Ergebnisse.
- *
- * Revision 1.5  1993/07/06  11:37:17  sma
- * OFFSET-Makro eingeführt
- *
- * Revision 1.4  1993/06/16  14:43:22  hk
- * Copyright Notiz eingefuegt.
- *
- * Revision 1.3  1993/04/22  10:29:34  hk
- * fun_decl.h -> sys.h.
- *
- * Revision 1.2  1993/02/17  15:50:31  hk
- * CLICC -> APPLY, Revison Keyword.
- *
- * Revision 1.1  1993/01/19  14:39:14  hk
- * Initial revision
+ * $Revision: 1.12 $
+ * $Id: unix.c,v 1.12 1994/11/22 14:54:01 hk Exp $
  *--------------------------------------------------------------------------*/
 
 #include <c_decl.h>

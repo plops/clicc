@@ -1,57 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : System-Funktionen (16. Hash Tables)
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.13 $
-;;; $Log: hash.lisp,v $
-;;; Revision 1.13  1994/01/24  16:25:13  sma
-;;; combine-hash jetzt in LISP implementiert. (Kommentare verschönert)
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.12  1993/12/09  17:04:02  sma
-;;; default-hashtable-size ist jetzt 53. hash-string ist jetzt eine neue
-;;; Lisp-Funktion. Es wird nur noch sxhash-string aufgerufen und das auch
-;;; nur mit simple-strings.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Hash Tables
 ;;;
-;;; Revision 1.11  1993/07/07  08:40:29  hk
-;;; sxhash auch fuer Listen und Strings etc.
-;;;
-;;; Revision 1.10  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.9  1993/06/15  15:17:20  hk
-;;; Fehler in (setf gethash) behoben.
-;;;
-;;; Revision 1.8  1993/06/09  15:13:01  hk
-;;; ceiling bei der Berechnung der neuen Größe eingefügt.
-;;;
-;;; Revision 1.7  1993/06/09  14:02:00  hk
-;;; :rehash-threshold hat immer Wert vom Typ (float 0.0 1.0).
-;;;
-;;; Revision 1.6  1993/05/07  08:56:53  hk
-;;; hash-table exportiert.
-;;;
-;;; Revision 1.5  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.4  1993/02/23  12:34:17  hk
-;;; rehash-threshold: Grenzen korrigiert, Faktor angepasst.
-;;;
-;;; Revision 1.3  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.13 $ eingefuegt
-;;;
-;;; Revision 1.2  1992/10/09  15:04:28  hk
-;;; In einen halbwegs lauffaehigen Zustand gebracht.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.14 $
+;;; $Id: hash.lisp,v 1.14 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP")

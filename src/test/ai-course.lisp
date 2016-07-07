@@ -1,52 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Test einfacher Lisp-Funktionen
 ;;;
-;;; $Revision: 1.14 $
-;;; $Log: ai-course.lisp,v $
-;;; Revision 1.14  1993/10/19  08:08:15  jh
-;;; In match1 und match2 die unbenutzte Variable datum-head entfernt.
-;;;
-;;; Revision 1.13  1993/06/07  11:11:23  kl
-;;; Eine zweite Version eines Patternmatchers eingefuegt, die einen anderen
-;;; Programmierstil verwendet.
-;;;
-;;; Revision 1.12  1993/02/16  17:13:53  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.11  1993/01/06  16:55:46  kl
-;;; Funktion extract-key entfernt.
-;;;
-;;; Revision 1.10  1992/09/04  12:46:29  kl
-;;; Tippfehler in einer Testbeschreibung behoben.
-;;;
-;;; Revision 1.9  1992/09/04  12:26:05  kl
-;;; Package auf User geaendert und einige Tests eingefuegt.
-;;;
-;;; Revision 1.8  1992/08/26  14:23:25  kl
-;;; in-package eingefuehrt.
-;;;
-;;; Revision 1.7  1992/08/26  12:32:05  kl
-;;; Einige Tests hinzugefuegt.
-;;;
-;;; Revision 1.6  1992/08/20  16:40:19  kl
-;;; clicc-test nach testmain.lisp verlagert.
-;;;
-;;; Revision 1.5  1992/08/14  08:34:55  uho
-;;; In clicc-test ein progn eingefuegt.
-;;;
-;;; Revision 1.4  1992/08/13  16:42:28  kl
-;;; Erste Version des Macros clicc-test entworfen.
-;;;
-;;; Revision 1.3  1992/08/12  13:50:15  kl
-;;; RCS-log eingefuegt.
-;;;
-;;; Revision 1.2  1992/08/12  13:49:35  kl
-;;; Symbolischen Differenzierer erweitert.
-;;;
-;;; Revision 1.1  1992/08/12  13:45:27  kl
-;;; Initial revision
+;;; $Revision: 1.15 $
+;;; $Id: ai-course.lisp,v 1.15 1994/11/22 14:45:44 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "USER")

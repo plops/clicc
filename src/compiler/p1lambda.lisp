@@ -1,121 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Lambda-Expressions
 ;;;
-;;; $Revision: 1.33 $
-;;; $Log: p1lambda.lisp,v $
-;;; Revision 1.33  1994/02/01  11:28:32  hk
-;;; In p1-named-lambda wird *current-fun* an die gerade generierte fun
-;;; gebunden.
-;;;
-;;; Revision 1.32  1993/10/07  08:04:37  ft
-;;; ll-par-spec hinzugefuegt und Fehler darin behoben.
-;;;
-;;; Revision 1.31  1993/08/19  16:47:38  hk
-;;; Verwendung von save-lex-var-name.
-;;;
-;;; Revision 1.30  1993/07/14  15:00:31  hk
-;;; parse-lambda-list in p1-lambda-list integriert. Dadurch wird
-;;; verhindert, dass in Instanzen vom Typ params zunaechst Symbole
-;;; statt Instanzen vom Typ var eingetragen werden.
-;;;
-;;; Revision 1.29  1993/07/02  11:30:17  ft
-;;; Der Name des impliziten Blocks um den Rumpf einer Funktion
-;;; muss p1-named-lambda jetzt als Parameter uebergeben werden.
-;;;
-;;; Revision 1.28  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.27  1993/02/16  16:56:22  hk
-;;; Revision Keyword eingefuegt, Symbole des zu uebersetzenden Programms
-;;; durch clicc-lisp:: gekennzeichnet.
-;;;
-;;; Revision 1.26  1993/01/29  06:58:40  ft
-;;; consp statt listp zur Pruefung auf erweiterte Funktionsnamen benutzt.
-;;;
-;;; Revision 1.25  1993/01/22  15:39:46  ft
-;;; Fehler in p1-named-lambda behoben.
-;;;
-;;; Revision 1.24  1993/01/22  15:00:14  ft
-;;; Aenderungen fuer die Verarbeitung von erweiterten Funktionsnamen.
-;;;
-;;; Revision 1.23  1993/01/19  11:12:48  hk
-;;; In parse-lambda-list Fehler behoben.
-;;;
-;;; Revision 1.22  1993/01/18  10:31:41  hk
-;;; Fehler in parse-lambda-list korrigiert (null -> empty-queue-p),
-;;; Aufrufe von p1-lambda-list-error in p1-bind-param in clicc-error umbenannt.
-;;;
-;;; Revision 1.21  1993/01/08  16:18:23  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.20  1993/01/08  15:50:16  hk
-;;; clicc-error -> clcerror
-;;;
-;;; Revision 1.19  1992/12/01  11:48:50  hk
-;;; Bindungsfehler von dem Argument von mv-lambda behoben.
-;;;
-;;; Revision 1.18  1992/11/26  12:22:29  hk
-;;; ?write von dynamischen Variablen wird erhoeht, wenn diese beschrieben oder
-;;; gebunden werden, damit bestimmt werden kann, ob spaeter ein illegales
-;;; defconstant erfolgt.
-;;;
-;;; Revision 1.17  1992/11/02  10:35:57  hk
-;;; optional-init-default gestrichen, durch nil ersetzt.
-;;;
-;;; Revision 1.16  1992/10/13  16:21:51  hk
-;;; Kommentar von parse-named-lambda korrigiert.
-;;;
-;;; Revision 1.15  1992/09/25  07:45:29  kl
-;;; Schreibfehler korrigiert.
-;;;
-;;; Revision 1.14  1992/09/09  12:59:51  kl
-;;; In p1-bind-param ein push durch pushnew ersetzt.
-;;;
-;;; Revision 1.13  1992/08/15  13:29:00  kl
-;;; parse-named-lambda vereinfacht.
-;;;
-;;; Revision 1.12  1992/08/06  17:23:42  kl
-;;; Fehler behoben: In p1-bind-param Vorkommen von param durch symbol ersetzt.
-;;;
-;;; Revision 1.11  1992/08/06  15:55:35  kl
-;;; Fehler in p1-bind-param behoben. Zwei Zeilen geloescht.
-;;;
-;;; Revision 1.10  1992/08/06  13:09:58  hk
-;;; Schreibfehler, Code umgestellt.
-;;;
-;;; Revision 1.9  1992/08/06  11:58:41  hk
-;;; Aux-variablen muessen durch let* ausgedrueckt werden und nicht durch let.
-;;;
-;;; Revision 1.8  1992/08/06  11:39:42  hk
-;;; Aux-Variablen duerfen nicht in den impliziten Block von Funktionen
-;;; verschoben werden.
-;;;
-;;; Revision 1.7  1992/07/30  10:30:22  hk
-;;; .
-;;;
-;;; Revision 1.6  1992/07/29  17:19:41  hk
-;;; Aufgeraeumt.
-;;;
-;;; Revision 1.5  1992/07/22  17:40:23  hk
-;;; Zugriffsfkt. auf global-env geaendert.
-;;;
-;;; Revision 1.4  1992/06/05  13:06:09  hk
-;;; Rest Param. in parse-lambda-list werden zunaechst in einer queue gehalten.
-;;;
-;;; Revision 1.3  1992/06/04  12:56:04  hk
-;;; Opt- Rest- und Key-Variablen werden auf nil gesetzt, falls nicht angegeben.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
-;;;
+;;; $Revision: 1.34 $
+;;; $Id: p1lambda.lisp,v 1.34 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

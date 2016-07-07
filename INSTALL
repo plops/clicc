@@ -1,16 +1,14 @@
- ---------------------------------------------------------------------
- Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
- ---------------------------------------------------------------------
- Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-            ------------------------------------------------------
- Funktion : Installation notes for CLiCC
+---------------------------------------------------------------------
+ CLiCC: The Common Lisp to C Compiler
+ Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ Christian-Albrechts-Universitaet zu Kiel, Germany
+---------------------------------------------------------------------
+ $Revision: 1.16 $
+ $Id: INSTALL,v 1.16 1994/12/14 08:25:05 hk Exp $
+---------------------------------------------------------------------
 
- $Revision: 1.14 $
- $Id: INSTALL,v 1.14 1994/06/23 14:57:59 hk Exp $
- ---------------------------------------------------------------------
- 
  This  file describes  the  system requirements  and  the installation
- procedure for the CLiCC Common Lisp to C compiler.
+ procedure for CLiCC, the Common Lisp to C compiler.
  
  See the files README, README.* and COPYRIGHT for further information.
  Look at  src/compiler/README and  lib/README to get information about
@@ -35,7 +33,7 @@
  
    - Allegro Common Lisp 4.1 (Franz Inc.)
    - Sun (Lucid) Common Lisp 4.0 (Sun Microsystems Inc., Lucid Inc.)
-   - CMU Common Lisp 17c (Carnegie Mellon University)
+   - CMU Common Lisp 17c, 17e (Carnegie Mellon University)
    - CLISP "August 1993" (Bruno Haible & Michael Stoll)
    - AKCL 1.615 (Austin Kyoto Common Lisp) with September-16-92-PCL-f
 
@@ -48,7 +46,7 @@
  
  If you want to use  the makefiles contained in our distribution,  you 
  will  need the  GNU Make Utility  "gmake".  GNU  Make is available on 
- ftp.informatik.uni-kiel.de (134.245.15.113) as:
+ ftp.informatik.uni-kiel.de (134.245.15.114) as:
  
    /pub/systems/gnu/make-<version>.tar.gz
  

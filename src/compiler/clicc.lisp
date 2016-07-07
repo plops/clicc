@@ -1,71 +1,34 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Hauptprogramm des Compilers
-;;;
-;;; $Revision: 1.16 $
-;;; $Log: clicc.lisp,v $
-;;; Revision 1.16  1994/05/22  15:07:49  sma
-;;; Neuer Kommandoswitch -R zum Einstellen der Datenrepräsentation.
-;;;
-;;; Revision 1.15  1994/05/19  07:57:02  pm
-;;; Fehler behoben
-;;;
-;;; Revision 1.14  1994/05/17  08:21:28  pm
-;;; Abgleich der FFI-Exports mit clcload.lisp
-;;;
-;;; Revision 1.13  1994/04/22  14:09:54  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Ueberfluessiges exportiertes Symbol entfernt
-;;;
-;;; Revision 1.12  1994/04/18  12:05:56  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - Liste der exportierten Symbole ergaenzt
-;;;
-;;; Revision 1.11  1993/12/21  09:29:59  hk
-;;; Schreibfehler in Usage behoben.
-;;;
-;;; Revision 1.10  1993/12/06  16:42:15  hk
-;;; Flag geändert und ergänzt: -v verbose, -V version, -O opt cycles.
-;;; Aufgeräumt. Gemischte Flags -vVo <name> gehen nun. Initialisierung
-;;; globaler Variablen nach clcdef.
-;;;
-;;; Revision 1.9  1993/10/26  11:32:34  pm
-;;; Abgleich der FFI-Exports mit clcload.lisp
-;;;
-;;; Revision 1.8  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.7  1993/06/09  12:45:09  hk
-;;; An den Modulcompiler angepasst, Packages mit clcload konsistent
-;;; gemacht.
-;;;
-;;; Revision 1.6  1993/04/06  09:59:11  hk
-;;; Nickname L.
-;;;
-;;; Revision 1.5  1993/02/19  13:58:46  hk
-;;; :use () beim LISP Package.
-;;;
-;;; Revision 1.4  1993/02/16  15:27:00  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.3  1993/01/11  16:48:37  hk
-;;; argv -> c-argv
-;;;
-;;; Revision 1.2  1992/08/07  11:40:36  hk
-;;; Dateikopf verschoenert.
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
 ;;; 
-;;; Changes  : 29.10.91 Bedienung durch Kommandozeilenparameter 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Main function, when using CLiCC as stand alone application
+;;;
+;;; $Revision: 1.19 $
+;;; $Id: clicc.lisp,v 1.19 1994/11/25 14:52:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP" :nicknames '("CLICC-LISP" "L") :use ())
 (in-package "USER")                     ; Damit es dieses Package wirklich gibt
-(lisp:in-package "RT" :nicknames '("RUNTIME") :use ())
+(lisp:in-package "RT" :use ())
 (lisp:in-package "FFI" :use ())
 (lisp:export
  '(c-array c-char c-char-p c-double c-double-p c-enum c-float c-float-p c-fun
@@ -75,7 +38,7 @@
    c-unsigned-long-p c-unsigned-short c-unsigned-short-p c-vararg c-void
    copy-c-cstring def-c-type def-call-in def-call-out foreign-package-name
    free lisp-character lisp-float lisp-integer load-foreign make-c-string
-   make-lisp-string)
+   make-lisp-string sys-include user-include)
  "FFI")
 
 (lisp:in-package "CLICC" :use '("LISP"))

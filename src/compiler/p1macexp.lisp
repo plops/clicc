@@ -1,55 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Makro Expansions Funktionen fuer COMMON-LISP Makros
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.14 $
-;;; $Log: p1macexp.lisp,v $
-;;; Revision 1.14  1994/02/16  10:56:54  hk
-;;; COND wird geschickter expandiert, so daß aus die abschließende T
-;;; Klausel nicht in ein (if T ..) expandiert.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.13  1994/02/09  14:54:31  hk
-;;; Lisp Symbole der Quellsprache mit L: versehen.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Expansion of standard Common-Lisp macros 
 ;;;
-;;; Revision 1.12  1993/12/14  12:32:28  hk
-;;; 'setf --> 'L::setf
-;;;
-;;; Revision 1.11  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.10  1993/04/14  12:36:12  hk
-;;; runtime:: -> RT::.
-;;;
-;;; Revision 1.9  1993/03/25  15:34:13  hk
-;;; p1-assert eingefuegt.
-;;;
-;;; Revision 1.8  1993/02/16  16:54:58  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.7  1993/01/08  15:49:28  hk
-;;; clicc-error -> clcerror
-;;;
-;;; Revision 1.6  1992/12/07  13:50:41  hk
-;;; p1-dolist: THE und VALUES gestrichen.
-;;;
-;;; Revision 1.5  1992/12/03  16:33:58  hk
-;;; ecase und etypecase neu definiert.
-;;;
-;;; Revision 1.4  1992/08/05  13:20:04  hk
-;;; Syntaktische Aenderungen.
-;;;
-;;; Revision 1.3  1992/07/10  09:50:59  hk
-;;; In WITH-OPEN-STREAM zunaechst CHECK-TYPE auskommentiert.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.15 $
+;;; $Id: p1macexp.lisp,v 1.15 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

@@ -1,29 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Test eines regelbasierten Expertensystems mit Vorvaertsverkettung
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.6 $
-;;; $Log: expert.lisp,v $
-;;; Revision 1.6  1993/06/07  11:12:03  kl
-;;; Anpassung an die zwei Versionen des Patternmatchers.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.5  1993/02/16  17:15:08  hk
-;;; Revision Keyword eingefuegt.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Test eines regelbasierten Expertensystems mit Vorwaertsverkettung
 ;;;
-;;; Revision 1.4  1992/09/04  12:52:14  kl
-;;; Package auf User geaendert.
-;;;
-;;; Revision 1.3  1992/08/26  14:24:00  kl
-;;; in-package eingefuegt.
-;;;
-;;; Revision 1.2  1992/08/26  13:38:11  kl
-;;; Textausgaben entfernt oder auskommentiert.
-;;;
-;;; Revision 1.1  1992/08/26  13:02:40  kl
-;;; Initial revision
-;;;
-;;;
+;;; $Revision: 1.7 $
+;;; $Id: expert.lisp,v 1.7 1994/11/22 14:45:44 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "USER")

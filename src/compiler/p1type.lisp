@@ -1,110 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Type Specifiers
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.30 $
-;;; $Log: p1type.lisp,v $
-;;; Revision 1.30  1993/12/14  13:01:29  sma
-;;; Vorhandensein des neuen Typtests rt::plain-vector-p ausgenutzt für
-;;; Test auf (simple-array * (*)).
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.29  1993/12/09  14:22:17  sma
-;;; simple-vectorp und simple-stringp in simple-vector-p (dito string)
-;;; korrigiert, desweiteren wird jetzt auf simple-vector-p auch bei
-;;; (simple-array T (*)) statt (simple-array * (*)) optimiert (dito
-;;; string). Außerdem einige Leerzeilen am Ende gelöscht.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Type Specifiers
 ;;;
-;;; Revision 1.28  1993/11/09  11:52:05  hk
-;;; Fehler in p1-type-expand behoben: (eq 1 ...) --> (eql 1 ...)
-;;;
-;;; Revision 1.27  1993/09/07  09:50:04  ft
-;;; p1-def-built-in hat einen neuen Key-Parameter fuer die Angabe eines
-;;; Werts fuer die Annotation order erhalten.
-;;;
-;;; Revision 1.26  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.25  1993/05/06  16:43:44  hk
-;;; kleiner Fehler
-;;;
-;;; Revision 1.24  1993/05/06  16:39:46  hk
-;;; Message fuer DEF-BUILT-IN.
-;;;
-;;; Revision 1.23  1993/04/21  08:58:59  ft
-;;; Anpassung an die geaenderten Parameter von p1-def-built-in.
-;;;
-;;; Revision 1.22  1993/04/20  14:33:54  ft
-;;; Erweiterung um Funktionen fuer die neue Top-Level-Form 'def-built-in'.
-;;;
-;;; Revision 1.21  1993/04/14  16:53:49  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.20  1993/04/13  11:49:38  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.19  1993/04/13  11:45:42  hk
-;;; Vorkommen von check-integer durch seinen Rumpf ersetzt.
-;;;
-;;; Revision 1.18  1993/04/08  10:51:25  hk
-;;; L:: vor find-class vergessen.
-;;;
-;;; Revision 1.17  1993/04/06  15:02:51  hk
-;;; Schreibfehler behoben.
-;;;
-;;; Revision 1.16  1993/04/06  14:34:50  hk
-;;; :STRUCT Type wurde nicht benutzt, also gestrichen, :class Type expandiert
-;;; in (typep-class x (find-class 'c)), Symbole mit L:: gekennzeichnet,
-;;; Optimierung fuer array-internal, integer-internal schon in pass1.
-;;;
-;;; Revision 1.15  1993/04/06  14:00:57  ft
-;;; p1-type-expand erzeugt jetzt wieder reine Quellsprach-Ausdruecke.
-;;;
-;;; Revision 1.14  1993/04/03  10:04:45  hk
-;;; p1-typep als Quelltext transformierendes compiler-macro implementiert,
-;;; fuer Klassen wird faelschlich schon Zwischensprache verwendet.
-;;;
-;;; Revision 1.13  1993/03/23  07:38:01  ft
-;;; p1-typep liefert jetzt zwei Werte (siehe p1-call).
-;;;
-;;; Revision 1.12  1993/03/12  09:53:28  ft
-;;; Benutzung von class-defs statt rt::sym2class.
-;;;
-;;; Revision 1.11  1993/02/16  16:33:28  hk
-;;; ...-internal Typen intern im clicc-lisp Package, Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.10  1992/12/10  06:31:23  ft
-;;; Auswertung der Expansion von Klassentypen verzoegert.
-;;;
-;;; Revision 1.9  1992/11/25  17:49:15  hk
-;;; T-INTERNAL -> (p1-form 'T), ..
-;;;
-;;; Revision 1.8  1992/11/17  12:14:55  ft
-;;; Fehler in der Verarbeitung von Klassen durch p1-typep behoben.
-;;;
-;;; Revision 1.7  1992/11/11  12:55:45  ft
-;;; Umgang mit Klassen korrigiert.
-;;;
-;;; Revision 1.6  1992/10/15  09:46:53  ft
-;;; Anpassung an die Aenderung in global-env:types.
-;;;
-;;; Revision 1.5  1992/10/12  12:02:50  ft
-;;; Fehler im case von p1-type-expand behoben.
-;;;
-;;; Revision 1.4  1992/10/07  13:51:28  ft
-;;; Anpassung an die Aenderungen im Slot types des global-env.
-;;;
-;;; Revision 1.3  1992/08/05  11:59:02  hk
-;;; Syntaktische Aenderungen.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.31 $
+;;; $Id: p1type.lisp,v 1.31 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")

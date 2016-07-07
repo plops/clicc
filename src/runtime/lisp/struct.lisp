@@ -1,61 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : Laufzeitsystem (19. Structures)
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.14 $
-;;; $Log: struct.lisp,v $
-;;; Revision 1.14  1994/06/09  09:25:09  hk
-;;; rt:struct-ref anders kodiert
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.13  1994/06/02  14:18:57  hk
-;;; Neue Funktionen rt:struct-printer und (setf rt:struct-printer)
-;;; definiert.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Structures
 ;;;
-;;; Revision 1.12  1994/05/05  14:51:11  sma
-;;; Wenn in make-struct do in dolist umgeschrieben wird, wird die Funktion
-;;; restlisten-optimiert.
-;;;
-;;; Revision 1.11  1994/01/24  16:18:11  sma
-;;; rt:struct-type in LISP implementiert.
-;;;
-;;; Revision 1.10  1994/01/13  16:46:31  sma
-;;; setf-Methoden statt set-*. Sourcecode verschönert/einfacher
-;;; programmiert.
-;;;
-;;; Revision 1.9  1993/10/14  13:09:36  sma
-;;; rt:new-struct nach structure.c verschoben
-;;;
-;;; Revision 1.8  1993/06/25  12:38:23  wg
-;;; Symbol rt::included-struct aus dem Package RT exportiert.
-;;;
-;;; Revision 1.7  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.6  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.5  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.14 $ eingefuegt
-;;;
-;;; Revision 1.4  1993/01/11  14:38:35  hk
-;;; structure -> struct
-;;;
-;;; Revision 1.3  1992/07/06  09:22:42  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.2  1992/07/06  08:18:10  hk
-;;; Neue Sysntax fuer declaim fun-spec.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.15 $
+;;; $Id: struct.lisp,v 1.15 1994/11/22 14:55:56 hk Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "LISP")

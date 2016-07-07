@@ -1,46 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Systemunabhaengige Pathname Funktionen
 ;;;
-;;; $Revision: 1.10 $
-;;; $Log: pathname.lisp,v $
-;;; Revision 1.10  1994/06/02  13:15:53  hk
-;;; Print-Funktion f"ur pathname-Struktur definiert.
-;;;
-;;; Revision 1.9  1994/05/05  14:15:31  hk
-;;; Constructor f"ur pattern wieder mit BOA versehen.
-;;;
-;;; Revision 1.8  1993/07/06  10:40:02  hk
-;;; Queue Funktionen nach seq.lisp
-;;;
-;;; Revision 1.7  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.6  1993/06/05  19:26:34  hk
-;;; Benutzung der Funktion rt::file-name eingeschaltet.
-;;;
-;;; Revision 1.5  1993/05/07  08:59:26  hk
-;;; pathname exportiert.
-;;;
-;;; Revision 1.4  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.3  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.10 $ eingefuegt
-;;;
-;;; Revision 1.2  1993/01/20  11:09:03  uho
-;;; Aufrufe von %make-pathname mit keywords versehen.
-;;;
-;;; Revision 1.1  1993/01/19  13:18:14  hk
-;;; Initial revision
+;;; $Revision: 1.12 $
+;;; $Id: pathname.lisp,v 1.12 1994/11/22 14:55:56 hk Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -137,9 +120,11 @@
 (defun %print-pathname (pathname stream depth)
   (declare (ignore depth))
      (write-string "#P\"" stream)
-     (write-string (namestring pathname) stream)
+     ;;(write-string (namestring pathname) stream)
+     (write-string (unparse-unix-namestring pathname) stream)
      (write-char #\" stream))
 
+#|
 (defstruct (host
              (:copier nil)
              #|(:print-function %print-host)|#)
@@ -149,7 +134,9 @@
   (unparse-directory (required-argument) :type function)
   (unparse-file (required-argument) :type function)
   (unparse-enough (required-argument) :type function)
-  (customary-case (required-argument) :type (member :upper :lower)))
+  (customary-case (required-argument) :type (member :upper :lower))
+)
+|#
 
 
 ;;;; Pathname functions.
@@ -191,7 +178,8 @@
 	((simple-string-p namestr)
 	 (multiple-value-bind
 	     (new-host device directory file type version)
-	     (funcall (host-parse host) namestr start end)
+             ;;(funcall (host-parse host) namestr start end)
+	     (parse-unix-namestring namestr start end)
 	   (values (%make-pathname :host (or new-host host)
 				   :device device
                                    :directory directory
@@ -323,8 +311,8 @@
 	     (pathname-host (%pathname-host pathname))
 	     (diddle-case
 	      (and default-host pathname-host
-		   (not (eq (host-customary-case default-host)
-			    (host-customary-case pathname-host))))))
+		   (not (eq :lower #|(host-customary-case default-host)|#
+			    :lower #|(host-customary-case pathname-host)|#)))))
 	(%make-pathname
          :host (or pathname-host default-host)
          :device (or (%pathname-device pathname)
@@ -393,10 +381,10 @@
 			   (pathname-host *default-pathname-defaults*)))
 	 (host (if hostp host default-host))
 	 (diddle-args (and (eq case :common)
-			   (eq (host-customary-case host) :lower)))
+			   (eq :lower #|(host-customary-case host)|# :lower)))
 	 (diddle-defaults
-	  (not (eq (host-customary-case host)
-		   (host-customary-case default-host)))))
+	  (not (eq :lower #|(host-customary-case host)|#
+		   :lower #|(host-customary-case default-host)|#))))
     (macrolet ((pick (var varp field)
 		 `(cond ((eq ,var :wild)
 			 (make-pattern (list :multi-char-wild)))
@@ -442,8 +430,8 @@
   (with-pathname (pathname pathname)
     (maybe-diddle-case (%pathname-device pathname)
 		       (and (eq case :common)
-			    (eq (host-customary-case
-				 (%pathname-host pathname))
+			    (eq :lower #|(host-customary-case
+				 (%pathname-host pathname))|#
 				:lower)))))
 
 (defun pathname-directory (pathname &key (case :local))
@@ -452,8 +440,8 @@
   (with-pathname (pathname pathname)
     (maybe-diddle-case (%pathname-directory pathname)
 		       (and (eq case :common)
-			    (eq (host-customary-case
-				 (%pathname-host pathname))
+			    (eq :lower #|(host-customary-case
+				 (%pathname-host pathname))|#
 				:lower)))))
 
 (defun pathname-name (pathname &key (case :local))
@@ -462,8 +450,8 @@
   (with-pathname (pathname pathname)
     (maybe-diddle-case (%pathname-name pathname)
 		       (and (eq case :common)
-			    (eq (host-customary-case
-				 (%pathname-host pathname))
+			    (eq :lower #|(host-customary-case
+				 (%pathname-host pathname))|#
 				:lower)))))
 
 (defun pathname-type (pathname &key (case :local))
@@ -472,8 +460,8 @@
   (with-pathname (pathname pathname)
     (maybe-diddle-case (%pathname-type pathname)
 		       (and (eq case :common)
-			    (eq (host-customary-case
-				 (%pathname-host pathname))
+			    (eq :lower #|(host-customary-case
+				 (%pathname-host pathname))|#
 				:lower)))))
 
 (defun pathname-version (pathname)
@@ -486,7 +474,8 @@
   (with-pathname (pathname pathname)
     (let ((host (%pathname-host pathname)))
       (if host
-	  (funcall (host-unparse host) pathname)
+          ;;(funcall (host-unparse host) pathname)
+	  (unparse-unix-namestring pathname)
 	  (error
 	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))
@@ -496,7 +485,8 @@
   (with-pathname (pathname pathname)
     (let ((host (%pathname-host pathname)))
       (if host
-	  (funcall (host-unparse-host host) pathname)
+          ;;(funcall (host-unparse-host host) pathname)
+	  (unparse-unix-host pathname)
 	  (error
 	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))
@@ -506,7 +496,8 @@
   (with-pathname (pathname pathname)
     (let ((host (%pathname-host pathname)))
       (if host
-	  (funcall (host-unparse-directory host) pathname)
+          ;;(funcall (host-unparse-directory host) pathname)
+	  (unparse-unix-directory pathname)
 	  (error
 	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))
@@ -516,7 +507,8 @@
   (with-pathname (pathname pathname)
     (let ((host (%pathname-host pathname)))
       (if host
-	  (funcall (host-unparse-file host) pathname)
+	  ;;(funcall (host-unparse-file host) pathname)
+          (unparse-unix-file pathname)
 	  (error
 	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))
@@ -528,7 +520,8 @@
     (let ((host (%pathname-host pathname)))
       (if host
 	  (with-pathname (defaults defaults)
-	    (funcall (host-unparse-enough host) pathname defaults))
+            ;;(funcall (host-unparse-enough host) pathname defaults)
+	    (unparse-unix-enough pathname defaults))
 	  (error
 	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))

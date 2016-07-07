@@ -1,15 +1,14 @@
 #!/bin/sh
-#-----------------------------------------------------------------------------
-# Projekt: APPLY - A Practicable And Portable Lisp Implementation
-#          ------------------------------------------------------
-# Inhalt : Aufruf des Makefiles zum Updaten der Laufzeitsystem Bibliotheken.
-#
-# $Source: /home3/apply/public/clicc-0.6.4/bin/RCS/rtg-s,v $
-# $Author: uho $
-# $Revision: 1.1 $
-# $Date: 1994/02/21 13:43:11 $
 #------------------------------------------------------------------------------
-
+# CLiCC: The Common Lisp to C Compiler
+# Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+# Christian-Albrechts-Universitaet zu Kiel, Germany
+#------------------------------------------------------------------------------
+# Function : Update the shared lisp library files with debugging information
+#
+# $Revision: 1.2 $
+# $Id: rtg-s,v 1.2 1994/11/22 15:11:46 hk Exp $
+#------------------------------------------------------------------------------
 
 as=`which as | tail -1`
 if [ "$as" != "/usr/lang/as" ]; then

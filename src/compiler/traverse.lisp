@@ -1,79 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Traversieren von Zwischensprachkonstrukten
 ;;;
-;;; $Revision: 1.21 $
-;;; $Log: traverse.lisp,v $
-;;; Revision 1.21  1993/07/16  09:50:24  uho
-;;; Fuer Function als Specializer von #+(or CLISP CMU) auf #+PCL
-;;; umgestellt, dito fuer #-(or CLISP CMU) auf #-PCL
-;;;
-;;; Revision 1.20  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.19  1993/05/22  11:29:13  kl
-;;; Es wird nun auch die location-Komponente in setq-Ausdruecken traversiert.
-;;;
-;;; Revision 1.18  1993/05/14  12:34:15  kl
-;;; Analyse der Parameter-Initialisierungsausdruecke eingebaut.
-;;; Aufruf von (gensym analyse-mark-) in (gensym) geaendert.
-;;;
-;;; Revision 1.17  1993/05/13  13:38:48  hk
-;;; Anpassung an CMU und CLISP.
-;;;
-;;; Revision 1.16  1993/05/03  10:35:27  jh
-;;; ?fun-list in all-global-funs geaendert, damit die toplevel-forms ebenfalls
-;;; traversiert werden.
-;;;
-;;; Revision 1.15  1993/04/16  10:56:25  jh
-;;; Ueberfluessige Option entfernt.
-;;;
-;;; Revision 1.14  1993/04/15  13:34:08  jh
-;;; *analyse-mark* mit Symbol vorbesetzt und Unsinn entfernt.
-;;;
-;;; Revision 1.13  1993/04/08  14:50:58  uho
-;;; traverse-zs-Methode fuer functions eingefuehrt. Funktionen des Wirts-
-;;; systems treten NUR in Macroexpansionsfunktionen auf!
-;;;
-;;; Revision 1.12  1993/03/16  16:54:24  jh
-;;; Funktionen fuer die Handhabung der Analysemarken eingefuehrt.
-;;;
-;;; Revision 1.11  1993/02/24  14:14:16  jh
-;;; Lokale Funktionen werden jetzt erst in der entsprechenden labels-form
-;;; untersucht.
-;;;
-;;; Revision 1.10  1993/02/16  16:09:05  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.9  1993/02/11  13:27:07  jh
-;;; mv-lambda eingebaut.
-;;;
-;;; Revision 1.8  1993/02/10  12:44:03  jh
-;;; local-fun-list vom module wird jetzt benutzt.
-;;;
-;;; Revision 1.7  1993/01/26  11:08:32  jh
-;;; Kommentar korrigiert.
-;;;
-;;; Revision 1.6  1993/01/21  14:13:33  jh
-;;; Fehler bei tagged-forms beseitigt.
-;;;
-;;; Revision 1.5  1993/01/20  12:39:45  jh
-;;; before- und after-funs eingebaut.
-;;;
-;;; Revision 1.4  1993/01/19  15:48:01  jh
-;;; Fehler beseitigt.
-;;;
-;;; Revision 1.3  1993/01/19  13:04:37  jh
-;;; Erweiterung der Traversiermoeglichkeiten.
-;;;
-;;; Revision 1.2  1993/01/12  15:11:55  kl
-;;; Funktionsselektor eingebaut.
-;;;
-;;; Revision 1.1  1993/01/12  13:51:35  kl
-;;; Initial revision
+;;; $Revision: 1.23 $
+;;; $Id: traverse.lisp,v 1.23 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -211,6 +161,14 @@
       (traverse-zs (?init param)))
     (traverse-zs (?body a-fun))))
 
+;;------------------------------------------------------------------------------
+;; Force analysis with args type top_t when call-in
+;;------------------------------------------------------------------------------
+(defmethod traverse-function ((a-global-fun global-fun))
+  (when (?call-in a-global-fun)
+    (dolist (var (?var-list (?params a-global-fun)))
+      (update-type-f (?type var) top-t)))
+  (call-next-method))
 
 ;;------------------------------------------------------------------------------
 ;; Wenn *tr-app-form-p* erfuellt ist, wird die form der Applikation traversiert.

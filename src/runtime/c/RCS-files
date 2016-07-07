@@ -1,8 +1,8 @@
-$Revision: 1.9 $
+$Revision: 1.10 $
 GNUmakefile
 GNUmakefile386
 Makefile
-RCS-files
+arith.c
 array.c
 catch.c
 character.c
@@ -16,8 +16,11 @@ funcall.c
 hash.c
 keysort.c
 list.c
+logexpt.c
 main.c
-number.c
+ncompare.c
+nconvert.c
+npredic.c
 obrep1.c
 obrep2.c
 progv.c
@@ -25,5 +28,6 @@ string.c
 structure.c
 symbols.c
 system.c
+trigonom.c
 unix.c
 values.c

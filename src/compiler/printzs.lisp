@@ -1,98 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Methoden fuer Print-Object, spezialisiert fuer die Lisp nahe
 ;;;            Zwischensprache
 ;;;
-;;; $Revision: 1.26 $
-;;; $Log: printzs.lisp,v $
-;;; Revision 1.26  1994/03/03  13:52:36  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.25  1994/02/21  09:55:07  ft
-;;; Anpassung von PO-STANDARD an die Änderungen an Klassen und ge.
-;;; Funktionen.
-;;;
-;;; Revision 1.24  1994/01/05  10:13:02  kl
-;;; Funktionen types-on und types-off aus timain.lisp nach hier verlegt.
-;;;
-;;; Revision 1.23  1993/12/22  09:21:00  hk
-;;; Verwendung des xp Package gestrichen, um Probleme mit vordefinieren
-;;; Pretty-Printern zu vermeiden.
-;;;
-;;; Revision 1.22  1993/11/08  11:17:31  hk
-;;; Das package von class-direct-superclasses wird nur noch anhand des
-;;; Features PCL bzw. CLOS bestimmt.
-;;;
-;;; Revision 1.21  1993/08/31  09:33:44  uho
-;;; Aenderungen fuer die 22Aug93 Version von CLISP eingebaut.
-;;;
-;;; Revision 1.20  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.19  1993/05/28  11:47:20  ft
-;;; Anpassung an die Aenderungen in der Zwischensprachdefinition.
-;;;
-;;; Revision 1.18  1993/05/19  14:42:48  uho
-;;; Aenderungen fuer CLISP eingebaut.
-;;;
-;;; Revision 1.17  1993/02/16  16:14:19  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.16  1992/11/22  16:35:09  kl
-;;; Aufbau und Ausgabe fuer die verschiedenen Implementationen vereinheitlicht.
-;;; Namenskonflikte mit dem XP-Package beseitigt.
-;;;
-;;; Revision 1.15  1992/11/05  10:43:33  kl
-;;; Aufbau und Ausgabe verbessert. Pretty-printer fuer Lucid eingebunden.
-;;;
-;;; Revision 1.14  1992/10/01  17:47:19  kl
-;;; PO-Standard an den geaenderten Klassenbaum angepasst.
-;;;
-;;; Revision 1.13  1992/09/28  12:15:41  hk
-;;; Die tagbody-form in tagged-form wird nicht ausgegeben, um Rekursion
-;;; zu vermeiden.
-;;;
-;;; Revision 1.12  1992/09/25  17:45:38  kl
-;;; Umstellung auf die neue Repraesentation der einfachen Literale.
-;;;
-;;; Revision 1.11  1992/08/11  10:37:14  ft
-;;; Die Belegung fuer PO-ALL-SLOTS wird jetzt berechnet.
-;;;
-;;; Revision 1.10  1992/08/05  15:47:51  kl
-;;; `union' durch `append' ersetzt, Umbenennungen durchgefuehrt und Fehler 
-;;; beseitigt.
-;;;
-;;; Revision 1.9  1992/08/05  10:38:51  ft
-;;; Symbol Annotationen in Standard-Tabelle eingetragen, All-Slots Tabelle 
-;;; neu erstellt.
-;;;
-;;; Revision 1.8  1992/08/05  08:58:50  ft
-;;; print-object:zws-object kann jetzt pretty printen.
-;;;
-;;; Revision 1.7  1992/08/04  15:20:03  ft
-;;; Slot constant-value in sym auskommentiert bis zur Beachtung der Rekursion.
-;;;
-;;; Revision 1.6  1992/08/04  13:12:12  ft
-;;; PO_STANDARD erstellt, Vererbung der Eigenschaft "Slot wird gedruckt" 
-;;; eingebaut.
-;;;
-;;; Revision 1.5  1992/08/03  10:54:54  ft
-;;; erste lauff"ahige, tabellengesteuerte Version; mit einer Tabelle
-;;;
-;;; Revision 1.4  1992/07/31  09:09:24  ft
-;;; Frank's neuer (zweiter) Ansatz mit nur ein Meth. und vielen Listen
-;;;
-;;; Revision 1.3  1992/07/30  09:44:30  ft
-;;; Frank's erster Ansatz.
-;;;
-;;; Revision 1.2  1992/07/30  08:38:35  apply
-;;; Karstens erste Version.
-;;;
-;;; Revision 1.1  1992/07/29  08:53:27  apply
-;;; Initial revision
+;;; $Revision: 1.27 $
+;;; $Id: printzs.lisp,v 1.27 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC") 

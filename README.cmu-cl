@@ -1,0 +1,159 @@
+---------------------------------------------------------------------
+ CLiCC: The Common Lisp to C Compiler
+ Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+ Christian-Albrechts-Universitaet zu Kiel, Germany
+---------------------------------------------------------------------
+ $Revision: 1.1 $
+ $Id: README.cmu-cl,v 1.1 1994/12/06 14:48:22 hk Exp $
+---------------------------------------------------------------------
+
+Please read the files README, COPYRIGHT and INSTALL first.
+This file contains only CMU Common Lisp specific information.
+
+--------------------------------------------------------------------------------
+
+CLiCC is not usable with CMU Common Lisp 17f because of a bug in
+version 17f. We have got a patch to cure this bug but we did not try
+it out.
+
+From the cmucl-bugs@cs.cmu.edu mailing list:
+
+--------------------------------------------------------------------------------
+ Our bug report
+--------------------------------------------------------------------------------
+
+Date: Fri, 2 Dec 94 17:07:36 +0100
+From: hk
+To: cmucl-bugs@cs.cmu.edu
+Subject: Unusable slow defmethod processing
+
+
+Below I have included the contents of a file with 20 class definitions
+and 20 method definitions for a generic function foo; one method for
+each class.
+
+When I load this file into CMU Common Lisp 17f, the processing time of
+the defmethod forms seems to be doubled for each form and requires
+more than a minute beginning with the 15th form on a SPARCstation 2. 
+Because of this I never saw that all forms were processed.
+
+My version of CMU Common Lisp 17f is installed from
+liasun3.epfl.ch:/pub/lisp/cmucl/17f:17f-sun4c_411.tar.gz 
+without any modifications.
+
+The same problem occurs when I try to load our Common Lisp to C
+Compiler CLiCC into CMU Common Lisp 17f. 
+
+-- Heinz
+-- 
+Heinz Knutzen                    email: hk@informatik.uni-kiel.d400.de
+Institut fuer Informatik, Universitaet Kiel        Tel: +49-431-560426
+Preusserstr. 1-9, D-24105 Kiel, Germany            Fax: +49-431-566143
+ 
+
+--------------------------------------------------------------------------------
+ file test.lisp:
+--------------------------------------------------------------------------------
+
+(defclass c1 () ())
+(defclass c2 () ())
+(defclass c3 () ())
+(defclass c4 () ())
+(defclass c5 () ())
+(defclass c6 () ())
+(defclass c7 () ())
+(defclass c8 () ())
+(defclass c9 () ())
+(defclass c10 () ())
+(defclass c11 () ())
+(defclass c12 () ())
+(defclass c13 () ())
+(defclass c14 () ())
+(defclass c15 () ())
+(defclass c16 () ())
+(defclass c17 () ())
+(defclass c18 () ())
+(defclass c19 () ())
+(defclass c20 () ())
+
+(defmacro test (class)
+  `(progn (print ',class) (DEFMETHOD foo ((v ,class)))))
+
+(test c1)
+(test c2)
+(test c3)
+(test c4)
+(test c5)
+(test c6)
+(test c7)
+(test c8)
+(test c9)
+(test c10)
+(test c11)
+(test c12)
+(test c13)
+(test c14)
+(test c15)
+(test c16)
+(test c17)
+(test c18)
+(test c19)
+(test c20)
+
+
+--------------------------------------------------------------------------------
+ The proposed patch
+--------------------------------------------------------------------------------
+
+Date: 2 Dec 94 16:11:53-0500
+P1-Message-Id: de*d400-gw*com;<199412022111.QAA21232@almond.ch
+From: "Richard Harris" <rharris@chestnut.com>
+To: cmucl-bugs@cs.cmu.edu, hk@informatik.uni-kiel.de
+Subject: Re: Unusable slow defmethod processing
+
+Change the following two functions (defined in pcl/dfun.lisp):
+
+(in-package "PCL")
+
+(defun use-dispatch-dfun-p (gf &optional (caching-p (use-caching-dfun-p gf)))
+  (when (eq *boot-state* 'complete)
+    (unless caching-p
+      ;; This should return T when almost all dispatching is by
+      ;; eql specializers or built-in classes.  In other words,
+      ;; return NIL if we might ever need to do more than
+      ;; one (non built-in) typep.
+      ;; Otherwise, it is probably at least as fast to use
+      ;; a caching dfun first, possibly followed by secondary dispatching.
+      (let ((caching-cost (caching-dfun-cost gf)))
+	(< (dispatch-dfun-cost gf caching-cost) caching-cost)))))
+
+(defun dispatch-dfun-cost (gf &optional limit)
+  (generate-discrimination-net-internal 
+   gf (generic-function-methods gf) nil
+   #'(lambda (methods known-types)
+       (declare (ignore methods known-types))
+       0)
+   #'(lambda (position type true-value false-value)
+       (declare (ignore position))
+       (let* ((type-test-cost
+	       (if (eq 'class (car type))
+		   (let* ((metaclass (class-of (cadr type)))
+			  (mcpl (class-precedence-list metaclass)))
+		     (cond ((memq *the-class-built-in-class* mcpl)
+			    *built-in-typep-cost*)
+			   ((memq *the-class-structure-class* mcpl)
+			    *structure-typep-cost*)
+			   (t
+			    *non-built-in-typep-cost*)))
+		   0))
+	      (max-cost-so-far
+	       (+ (max true-value false-value) type-test-cost)))
+	 (when (and limit (<= limit max-cost-so-far))
+	   (return-from dispatch-dfun-cost max-cost-so-far))
+	 max-cost-so-far))
+   #'identity))
+
+
+Richard Harris
+
+

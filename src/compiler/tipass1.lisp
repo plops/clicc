@@ -1,235 +1,33 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Vorbereitungen zur Typinferenz. Dazu gehoeren:
 ;;;             o Typisierung der Literale,
 ;;;             o Feststellen, ob eine Funktion als funktionales 
 ;;;               Objekt verwendet wird,
 ;;;             o Setzen der `called-by'-Komponenten.
 ;;;
-;;; $Revision: 1.67 $
-;;; $Log: tipass1.lisp,v $
-;;; Revision 1.67  1994/03/03  13:54:36  jh
-;;; defined- und imported-named-consts werden jetzt unterschieden.
-;;;
-;;; Revision 1.66  1994/01/27  19:08:55  kl
-;;; Anpassung an den erweiterten Typverband.
-;;;
-;;; Revision 1.65  1993/12/09  10:34:44  hk
-;;; provide wieder an das Dateiende
-;;;
-;;; Revision 1.64  1993/11/21  22:08:54  kl
-;;; Referenzen auf den Typinferenzlevel entfernt.
-;;;
-;;; Revision 1.63  1993/11/07  14:21:00  kl
-;;; Setzen der Read- und Write-Listen aufgeräumt.
-;;;
-;;; Revision 1.62  1993/10/08  20:43:37  kl
-;;; Nicht verwendeten Code entfernt.
-;;;
-;;; Revision 1.61  1993/10/06  16:53:01  hk
-;;; In set-all-predecessor-and-result-type-envs wird ?pred-type-env nun
-;;; anhand des Werts in ?free-lex-vars und nicht mehr anhand der falschen
-;;; Analyseergebnisse von get/set-lex-vars berechnet.
-;;;
-;;; Revision 1.60  1993/09/12  16:08:39  kl
-;;; Bei den Typinferenz-Leveln 0,1 und 2 werden globale Variablen mit TOP
-;;; getypt. Dadurch werden diese Stufen sehr viel schneller.
-;;;
-;;; Revision 1.59  1993/09/12  11:53:00  kl
-;;; Typinferenz-Level 2 gestrichen und Spezialisierungen ueber T entfernt.
-;;;
-;;; Revision 1.58  1993/09/04  14:03:01  kl
-;;; Bei Level 1 und 2 laeuft nun tatsaechlich nur noch eine intraprozedurale
-;;; und damit wesentlich schnellere Analyse ab.
-;;;
-;;; Revision 1.57  1993/07/26  14:35:06  wg
-;;; Lokale Funktionen in Methoden fuer CMU global definiert.
-;;;
-;;; Revision 1.56  1993/07/22  09:51:41  jh
-;;; prepare-type-inference fuer *ti-level* 0 vereinfacht.
-;;;
-;;; Revision 1.55  1993/07/19  09:50:28  jh
-;;; Fehler bei named-const behoben.
-;;;
-;;; Revision 1.54  1993/07/11  13:33:32  kl
-;;; Ruecksetzen der Typannotationen implementiert.
-;;;
-;;; Revision 1.53  1993/06/24  14:02:54  kl
-;;; In der Komponente local-funs von Funktionen werden Elemente nun hoechstens
-;;; einmal abgelegt.
-;;;
-;;; Revision 1.52  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.51  1993/06/10  10:34:32  kl
-;;; Lokale Funktionen und freie lexikalische Variablen werden jetzt
-;;; eigenstaendig berechnet und nicht mehr aus der Annotation fuer die
-;;; Codegenerierung entnommen.
-;;;
-;;; Revision 1.50  1993/06/07  10:08:20  kl
-;;; set-parameter-types und target-fixnump eingebaut.
-;;;
-;;; Revision 1.49  1993/06/02  08:55:59  kl
-;;; Behandlung der dyn-var-list verbessert.
-;;;
-;;; Revision 1.48  1993/05/23  15:59:21  kl
-;;; Anpassung an den neuen Typverband.
-;;;
-;;; Revision 1.47  1993/05/22  11:27:15  kl
-;;; Typisierung bei ti-level=0 geaendert.
-;;;
-;;; Revision 1.46  1993/05/18  16:17:18  kl
-;;; Vorbereitung auf einen neuen ti-level getroffen.
-;;;
-;;; Revision 1.45  1993/05/09  16:55:25  kl
-;;; Behandlung der constant-values korrigiert.
-;;;
-;;; Revision 1.44  1993/04/30  09:19:30  kl
-;;; Aufruf von search-fun-calls entfernt.
-;;;
-;;; Revision 1.43  1993/04/20  15:05:36  kl
-;;; Der called-by-Slot wird nun in appfuns.lisp gesetzt.
-;;;
-;;; Revision 1.42  1993/04/19  12:29:42  kl
-;;; Noch Anpassungen an den verkleinerten Typverband.
-;;;
-;;; Revision 1.41  1993/04/15  08:25:01  kl
-;;; Anpassung an den verkleinerten Typverband vorgenommen.
-;;;
-;;; Revision 1.40  1993/04/02  10:15:25  kl
-;;; Joergs Analyse zu Funktionsaufrufen eingebunden.
-;;;
-;;; Revision 1.39  1993/03/25  09:39:36  kl
-;;; Ausgabemeldungen erweitert und Behandlung von Funktionen geaendert.
-;;;
-;;; Revision 1.38  1993/03/18  13:46:31  kl
-;;; Unterschiedliche Meldungen fuer unterschiedliche TI-Level eingefuehrt.
-;;;
-;;; Revision 1.37  1993/03/05  15:50:13  kl
-;;; Used-Annotation wird nicht mehr verwendet.
-;;;
-;;; Revision 1.36  1993/03/04  10:45:22  kl
-;;; Anpassung an die eingefuehrten Typinferenzlevel.
-;;;
-;;; Revision 1.35  1993/02/26  11:11:26  jh
-;;; traverse-keyword function-selector in fun-selector geaendert.
-;;;
-;;; Revision 1.34  1993/02/16  16:10:31  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.33  1993/02/15  14:44:35  kl
-;;; Durch die Verwendung des Slots read-list bleiben die Vorgaenger-
-;;; typumgebungen jetzt wesentlich kleiner.
-;;;
-;;; Revision 1.32  1993/02/02  09:51:54  kl
-;;; Die Vorgaengertypumgebungen werden jetzt in diesem Pass gesetzt.
-;;; In der Typvorbereitung werden nur noch benutzte Funktionen behandelt.
-;;;
-;;; Revision 1.31  1993/01/29  13:07:21  kl
-;;; Applikation von type-of entfernt.
-;;;
-;;; Revision 1.30  1993/01/27  13:04:12  kl
-;;; Typecase in zs-type-of so umgestellt, dass der Typtest auf bignum
-;;; unnoetig geworden ist.
-;;;
-;;; Revision 1.29  1993/01/26  18:37:22  kl
-;;; Die eigentliche Typinferenz findet nun in tipass2.lisp statt.
-;;; Hier werden jetzt nur noch Vorbereitungen fuer die Typinferenz getroffen.
-;;;
-;;; Revision 1.28  1993/01/25  13:12:48  kl
-;;; Globale Fixpunktiteration naeher an die Fixpunktiteration von Jens Knoop
-;;; angepasst. Fixpunktiteration fuer tagbody-Konstrukte fuer einen haeufigen
-;;; Spezialfall optimiert. Typumgebungen wachsen jetzt etwas langsamer.
-;;;
-;;; Revision 1.27  1993/01/21  14:23:43  kl
-;;; Die Variablen fuer Typfehler und -warnungen werden jetzt jeweils mit der 
-;;; leeren Liste initialisiert.
-;;;
-;;; Revision 1.26  1993/01/20  12:43:53  jh
-;;; An before- und after-funs aus traverse.lisp angepasst.
-;;;
-;;; Revision 1.25  1993/01/19  15:13:23  jh
-;;; Anpassung an die neue Version von traverse.lisp.
-;;;
-;;; Revision 1.24  1993/01/19  11:31:03  kl
-;;; get-type-assertions-from-predicate-position nach tiassert.lisp verlegt.
-;;;
-;;; Revision 1.23  1993/01/14  10:38:11  kl
-;;; Analyse der Repraesentation globaler Variablen verbessert.
-;;;
-;;; Revision 1.22  1993/01/12  12:47:54  kl
-;;; Globale Fixpunktiteration geaendert.
-;;;
-;;; Revision 1.21  1993/01/07  09:41:53  kl
-;;; Dokumentation zur Fixpunktiteration auf Tagbody-Konstrukten erweitert.
-;;;
-;;; Revision 1.20  1993/01/06  13:30:41  kl
-;;; Analyse der Continuations verbessert und kommentiert. Fixpunktiteration
-;;; auf tagbody-Konstrukten korrigiert.
-;;;
-;;; Revision 1.19  1992/12/31  12:37:05  kl
-;;; Neuen Typ t-t eingebaut.
-;;;
-;;; Revision 1.18  1992/12/28  16:55:24  kl
-;;; Bei den ungetypten importierten Funktionen wird die Anzahl der
-;;; Applikationen mitgezaehlt.
-;;;
-;;; Revision 1.17  1992/12/21  09:02:40  kl
-;;; Kleine Fehler behoben.
-;;;
-;;; Revision 1.16  1992/12/10  10:12:15  kl
-;;; Die Funktionsbeschreibungen an die Zwischensprachelemente gehaengt.
-;;;
-;;; Revision 1.15  1992/12/09  10:56:56  kl
-;;; Falsche Abfrage auf symbol in if-Konstrukten wird abgefangen.
-;;;
-;;; Revision 1.14  1992/12/08  14:11:07  kl
-;;; Argumenttypen werden bei Applikation definierter Funktionen verwendet.
-;;; Fehler mit falschem Rueckgabewert in analyse-types (setq-form) behoben.
-;;;
-;;; Revision 1.13  1992/12/02  13:27:19  kl
-;;; Fehler in der Typbindung in let*-Konstrukten behoben.
-;;;
-;;; Revision 1.12  1992/12/01  16:04:05  kl
-;;; Fixpunktiteration umgestellt und zahlreiche Verbesserungen eingebaut.
-;;;
-;;; Revision 1.11  1992/11/26  11:41:29  kl
-;;; Anpassung an neue Variablen und Typzugriffsfunktionen vorgenommen.
-;;;
-;;; Revision 1.10  1992/11/24  16:34:44  kl
-;;; Continuations beruecksichtigt und Analyse fuer tagbodys verbessert.
-;;;
-;;; Revision 1.9  1992/11/23  13:35:21  kl
-;;; Typen globaler Variablen werden nicht mehr an das zugehoerige Symbol
-;;; sondern an die Variable selber gebunden. Neues bind-parameter-types benutzt.
-;;;
-;;; Revision 1.8  1992/11/05  14:40:27  kl
-;;; Die initialen Typannotationen werden waehrend der Analyse gesetzt.
-;;;
-;;; Revision 1.7  1992/11/04  13:47:42  kl
-;;; Kommentare verbessert und internal-error verwendet.
-;;;
-;;; Revision 1.6  1992/11/02  12:14:26  kl
-;;; Dynamische Variablen haben jetzt eine eigene Typumgebung.
-;;;
-;;; Revision 1.5  1992/10/27  12:09:23  kl
-;;; Umstellung auf den neuen Typverband durchgefuehrt. Teile korrigiert.
-;;;
-;;; Revision 1.4  1992/10/15  19:03:19  kl
-;;; Umstellung auf neue Hilfsfunktionen. Einigee Analysemethoden korrigiert.
-;;;
-;;; Revision 1.3  1992/10/02  14:23:36  kl
-;;; Bei Applikationen werden eventuelle Seiteneffekte beruecksichtigt.
-;;;
-;;; Revision 1.2  1992/10/01  17:01:15  kl
-;;; Umstellung auf neue Repraesentation der einfachen Literale.
-;;;
-;;; Revision 1.1  1992/09/25  16:42:45  kl
-;;; Initial revision
-;;;
+;;; $Revision: 1.70 $
+;;; $Id: tipass1.lisp,v 1.70 1994/12/06 13:03:47 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -245,20 +43,11 @@
 ;;------------------------------------------------------------------------------
 (defun zs-type-of (anything) 
   (labels ((proper-list-p (a-list)
-             (null (rest (last a-list))))
-
-           (ti-bytep (an-integer)
-             (< (abs an-integer) 256))
-
-           (ti-wordp (an-integer)
-             (< (abs an-integer) 65536)))
+             (null (rest (last a-list)))))
   
-    (typecase anything
+    (etypecase anything
       (null-form        null-t)
       (null             null-t)
-      (symbol           (if (eq anything T)
-                            t-symbol-t
-                            other-symbol-t))
       (sym              (if (eq (?symbol anything) T)
                             t-symbol-t
                             other-symbol-t))
@@ -271,28 +60,15 @@
       (vector           non-string-vector-t)
       (array            non-vector-array-t)
       (fun              function-t)
-      (function         function-t)
       (literal-instance class-t)
-      (number           (typecase anything
-                          (integer (cond ((ti-bytep anything)      
-                                          byte-t)
-                                         ((ti-wordp anything)       
-                                          non-byte-word-t)
-                                         ((target-fixnump anything) 
-                                          non-word-fixnum-t)
-                                         (T bignum-t)))
-                          (float   float-t)
-                          (otherwise 
-                           (internal-error 'zs-type-of 
-                                           "~S has unknown number type." 
-                                           anything)
-                           number-t)))
+      ((signed-byte 8)  byte-t)
+      ((signed-byte 16) non-byte-word-t)
+      ((satisfies target-fixnump) non-word-fixnum-t)
+      (integer bignum-t)
+      (float float-t)
+      (number number-t)
       (package          package-t)
-      (stream           stream-t)
-      (otherwise        (internal-error 'zs-type-of
-                                        "~S has unknown type." anything)
-                        top-t))))
-
+      (stream           stream-t))))
 
 ;;------------------------------------------------------------------------------
 ;; Setze die Typkomponenten der Literale. Wenn die Typen der Nichtliterale 

@@ -1,83 +1,30 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
 ;;; Funktion : Das Lisp Modul mit Loads, Definitionen und Toplevel Forms,
 ;;;            die der Initialisierung dienen.
 ;;;
-;;; $Revision: 1.20 $
-;;; $Log: lisp.lisp,v $
-;;; Revision 1.20  1994/05/24  14:08:34  sma
-;;; most-positive-fixnum, most-negaitiv-fixnum werden jetzt in fspec.c je
-;;; nach Obrep zur Laufzeit berechnet.
-;;;
-;;; Revision 1.19  1994/01/27  16:22:07  kl
-;;; rt::fixnump eingeführt.
-;;;
-;;; Revision 1.18  1994/01/24  16:22:10  sma
-;;; Symbol T wird jetzt hier definiert.
-;;;
-;;; Revision 1.17  1993/12/09  17:35:28  sma
-;;; Typ-Definitionen von simple-array, simple-vector, simple-string
-;;; korrigiert. Ladereihenfolge der Lisp-Dateien des Laufzeitsystems
-;;; geändert.
-;;;
-;;; Revision 1.16  1993/11/25  17:19:59  hk
-;;; error.lisp wird nach print.lisp geladen, damit die special
-;;; Deklarationen für *print-level* etc. bekannt sind.
-;;;
-;;; Revision 1.15  1993/08/20  08:47:36  hk
-;;; list wird nach seq geladen, da check-seq-test nun ein Macro ist
-;;;
-;;; Revision 1.14  1993/07/26  14:47:00  hk
-;;; import-nil-and-t erst nach Initialierung von *package* ausfuehren.
-;;;
-;;; Revision 1.13  1993/07/26  13:55:56  hk
-;;; export-nil-and-t gestrichen.
-;;; import-nil-and-t wird frueh in der Initialisierung des Lisp Moduls
-;;; ausgefuehrt, damit keine Probleme bei einem spaeteren export
-;;; auftreten.
-;;;
-;;; Revision 1.12  1993/07/26  12:32:08  hk
-;;; *package* sofort nach dem Laden von packg.lisp mit dem Lisp Package
-;;; initialisieren, damit es fuer folgende Package Operationen,
-;;; insbesondere export, einen vernuenftigen Wert hat.
-;;;
-;;; Revision 1.11  1993/06/30  16:19:49  hk
-;;; hash nach struct laden
-;;;
-;;; Revision 1.10  1993/06/17  17:33:47  hk
-;;; Reihenfolge der LOAD Befehle umgestellt.
-;;;
-;;; Revision 1.9  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.8  1993/06/16  14:58:48  hk
-;;; allsyms wird geladen.
-;;;
-;;; Revision 1.7  1993/06/05  23:05:47  hk
-;;; Symbol '* exportiert.
-;;;
-;;; Revision 1.6  1993/05/13  14:02:30  hk
-;;; Expander vom Typ vector korrigiert.
-;;;
-;;; Revision 1.5  1993/05/11  10:56:39  hk
-;;; DEFSETF fuer first, .., fourth, rest gestrichen.
-;;;
-;;; Revision 1.4  1993/05/08  18:22:10  hk
-;;; def-built-in eingefuegt,
-;;; (defsetf SYMBOL-PLIST rt::SET-SYMBOL-PLIST) gestrichen.
-;;;
-;;; Revision 1.3  1993/05/04  13:14:41  pm
-;;; (load foreign.lisp) eingefuegt
-;;;
-;;; Revision 1.2  1993/04/22  10:34:50  hk
-;;; In export-nil-and-t *package* an Lisp Package gebunden.
-;;;
-;;; Revision 1.1  1993/04/22  08:57:32  hk
-;;; Initial revision
-;;;
+;;; $Revision: 1.21 $
+;;; $Id: lisp.lisp,v 1.21 1994/11/22 14:55:56 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "LISP" :use ())

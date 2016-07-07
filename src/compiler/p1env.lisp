@@ -1,191 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
 ;;;-----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Environments
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.55 $
-;;; $Log: p1env.lisp,v $
-;;; Revision 1.55  1994/06/10  20:40:14  hk
-;;; name2fun: liefert nil, wenn Funktion nicht gefunden.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.54  1994/05/26  10:10:06  hk
-;;; dynamische Variablen in Ausdr"ucken, die zur Compile-Zeit evaluiert
-;;; werden, werden nicht in global-env eingetragen, da dies f"ur Symbole
-;;; auch nicht geschieht. Vorher konnte ein sym f"alschlich in den
-;;; Zwischencode gelangen.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Environments
 ;;;
-;;; Revision 1.53  1994/04/18  15:40:39  pm
-;;; Foreign Function Interface voellig ueberarbeitet.
-;;; - UNEXPANDED-FOREIGN-FUN als moeglicher Operator ins Globale
-;;;   Environment eingetragen.
-;;;
-;;; Revision 1.52  1994/03/12  18:34:02  jh
-;;; Macro get-global-setf-fun eingefuegt.
-;;;
-;;; Revision 1.51  1994/02/08  13:28:14  hk
-;;; Neue Funktion name2fun: Das Argument ist ein 'extended function
-;;; designator' also eine Symbol oder eine Liste der Gestalt (setf
-;;; <symbol>).
-;;;
-;;; Revision 1.50  1993/12/07  15:04:12  ft
-;;; find im Rumpf von get-symbol-bind durch dolist ersetzt.
-;;;
-;;; Revision 1.49  1993/11/03  11:42:39  pm
-;;; Inkonsistenzen in den Symbolnamen behoben.
-;;;
-;;; Revision 1.48  1993/09/17  13:52:36  ft
-;;; Explizite Angabe des Tests bei allen Aufrufen von assoc die nur eq
-;;; benoetigen.
-;;;
-;;; Revision 1.47  1993/08/19  16:47:06  hk
-;;; Neue Macros save-lex-var-name und lex-var-name-p.
-;;;
-;;; Revision 1.46  1993/06/17  20:45:16  hk
-;;; Slot call-in-funs: Typ von () nach list.
-;;;
-;;; Revision 1.45  1993/06/17  08:00:09  hk
-;;; Copright Notiz eingefuegt
-;;;
-;;; Revision 1.44  1993/05/31  17:04:56  pm
-;;; Global-Environment um slot fuer call-in-Funktionen erweitert
-;;;
-;;; Revision 1.43  1993/05/10  07:03:29  hk
-;;; Klammerfehler in op-as-fun-error behoben, durch (clicc clicc) gefunden.
-;;;
-;;; Revision 1.42  1993/04/20  14:30:00  ft
-;;; Neue Verwaltung des Types-Slot des Global-Environment.
-;;;
-;;; Revision 1.41  1993/04/14  10:35:46  hk
-;;; Neues Macro set-imported-setf-fun.
-;;;
-;;; Revision 1.40  1993/04/07  10:16:29  hk
-;;; Neues Macro set-imported-fun (= set-sys-fun)
-;;;
-;;; Revision 1.39  1993/04/06  14:52:04  ft
-;;; Kommentar fuer die Darstellung von Typ-Eintraegen hinzugefuegt.
-;;;
-;;; Revision 1.38  1993/04/03  09:41:41  hk
-;;; Kommentar in global-env zu :COMPILER-MACRO.
-;;;
-;;; Revision 1.37  1993/04/03  09:40:09  hk
-;;; inline-decls in local und global env gestrichen,
-;;; get-global-fun an :COMPILER-MACRO angepasst.
-;;;
-;;; Revision 1.36  1993/04/01  11:01:26  hk
-;;; :COMPILER-MACRO in redef-op-error beruecksichtigt.
-;;;
-;;; Revision 1.35  1993/03/30  12:01:22  hk
-;;; Neues Macro set-compiler-macro.
-;;;
-;;; Revision 1.34  1993/03/26  14:59:34  hk
-;;; Neue Funktion op-as-fun-error, redef-op-error umgeschrieben.
-;;;
-;;; Revision 1.33  1993/02/23  08:40:44  ft
-;;; set-built-in-class-entry korrigiert.
-;;;
-;;; Revision 1.32  1993/02/16  17:00:50  hk
-;;; Revision Keyword eingefuegt.
-;;;
-;;; Revision 1.31  1993/02/03  13:33:38  hk
-;;; In get-var-bind ~a durch ~s ersetzt.
-;;;
-;;; Revision 1.30  1993/02/01  11:32:10  pm
-;;; Neue Environment-Slots und Zugriffsfunktionen fuer die Verarbeitung
-;;; von Foreign Types.
-;;;
-;;; Revision 1.29  1993/01/22  14:57:45  ft
-;;; Neue Environment-Slots und Zugriffsfunktionen fuer die Verarbeitung
-;;; von erweiterten Funktionsnamen.
-;;;
-;;; Revision 1.28  1993/01/08  15:33:58  hk
-;;; Strings in redef-op-error ueberarbeitet.
-;;;
-;;; Revision 1.27  1992/12/10  14:28:05  ft
-;;; Writer-Anwendung durch entspr. SETF-Methoden-Aufruf ersetzt.
-;;;
-;;; Revision 1.26  1992/12/03  17:07:39  hk
-;;; Neu: set-top-level.
-;;;
-;;; Revision 1.25  1992/11/26  14:32:41  ft
-;;; Log Message: siehe Revision 1.24.
-;;;
-;;; Revision 1.24  1992/11/26  13:16:36  ft
-;;; get-type-def und get-class-entry korrigiert.
-;;;
-;;; Revision 1.23  1992/11/25  16:20:18  ft
-;;; Aenderung in der Repraesentation von Typen im Global-Environment.
-;;;
-;;; Revision 1.22  1992/11/03  16:10:55  pm
-;;; kleine Schoenheitkorrekturen
-;;;
-;;; Revision 1.21  1992/11/02  14:39:12  pm
-;;; set-unexpanded-foreign-fun
-;;;
-;;; Revision 1.20  1992/10/20  09:21:50  ft
-;;; copy-(global-)env vereinfacht.
-;;;
-;;; Revision 1.19  1992/10/19  13:10:05  ft
-;;; Klammerungsfehler in redef-op-error beseitigt.
-;;;
-;;; Revision 1.18  1992/10/19  12:45:20  ft
-;;; Zugriffsfunktionen auf global-env:?funs erweitert.
-;;; Funktion redef-op-error eingefuehrt.
-;;;
-;;; Revision 1.17  1992/10/16  13:25:56  pm
-;;; Kommentar in global-env eingefuegt
-;;;
-;;; Revision 1.16  1992/10/15  08:23:31  ft
-;;; Fehler in set-global-class-entry beseitigt.
-;;;
-;;; Revision 1.15  1992/10/14  12:11:11  ft
-;;; Aenderung der Unterbringung von Klassen im types-Slots von global-env.
-;;;
-;;; Revision 1.14  1992/10/09  10:49:59  ft
-;;; saved-sym-consts von let in defvar geaendert.
-;;;
-;;; Revision 1.13  1992/10/08  08:50:03  ft
-;;; Aenderungen am structures Slot rueckgaengig gemacht.
-;;;
-;;; Revision 1.12  1992/10/07  10:38:58  ft
-;;; Typen, Slots und Strukturen im Slot types des global-env zusammengefasst.
-;;;
-;;; Revision 1.11  1992/10/02  14:19:19  hk
-;;; *warn-unbound-vars* und special-symbol-name-p in get-var-bind.
-;;;
-;;; Revision 1.10  1992/09/22  10:30:00  uho
-;;; Layout fuer save-sym-status, reset-sym-status geandert,
-;;; damit sie durch ETAGS erkannt werden.
-;;;
-;;; Revision 1.9  1992/09/15  13:39:08  hk
-;;; Kommentare ergaenzt, Slots in global-env umsortiert.
-;;;
-;;; Revision 1.8  1992/08/07  10:00:40  hk
-;;; Neue Funktion bind-local-macro.
-;;;
-;;; Revision 1.7  1992/07/27  16:34:54  hk
-;;; defstructs durch defclass1 ersetzt, Umbenennungen, copy-global-env neu.
-;;;
-;;; Revision 1.6  1992/07/09  15:51:29  hk
-;;; Zunaechst vor jeder Uebersetzung *init-system* auf t.
-;;;
-;;; Revision 1.5  1992/07/07  11:16:49  hk
-;;; Globale Variable *symbol-list* gestrichen, da nicht benutzt.
-;;;
-;;; Revision 1.4  1992/07/07  10:56:39  hk
-;;; Schreibfehler.
-;;;
-;;; Revision 1.3  1992/07/07  09:43:42  hk
-;;; global-env-symbols enthaelt keine A-Liste mehr, sondern nur noch Objekte
-;;; vom Typ sym. Die Zuordnung von Symbol zu Sym erfolgt durch ?symbol in sym.
-;;;
-;;; Revision 1.2  1992/06/04  07:11:20  hk
-;;; Nach Umstellung auf die Lisp nahe Zwischensprache, Syntax-Fehler
-;;; sind schon beseitigt
-;;;
-;;; Revision 1.1  1992/03/24  16:54:56  hk
-;;; Initial revision
+;;; $Revision: 1.58 $
+;;; $Id: p1env.lisp,v 1.58 1994/11/22 14:49:16 hk Exp $
 ;;;-----------------------------------------------------------------------------
 
 (in-package "CLICC")
@@ -230,7 +68,6 @@
   ;; (:FORWARD . defined-named-const)
   ;; (:GENERIC-FUN . generic-fun)
   ;; (:FOREIGN-FUN . foreign-fun)
-  ;; (:UNEXPANDED-FOREIGN-FUN . foreign-fun)
   ;; oder
   ;; (:COMPILER-MACRO . (expander . X))
   ;;-----------------------------
@@ -388,9 +225,6 @@
 (defmacro set-foreign-fun (name fun)
   `(set-global-op ,name :FOREIGN-FUN ,fun))
 
-(defmacro set-unexpanded-foreign-fun (name fun)
-  `(set-global-op ,name :UNEXPANDED-FOREIGN-FUN ,fun))
-
 (defmacro set-compiler-macro (name fun)
   `(let ((entry (assoc ,name (?operators *GLOBAL-ENVIRONMENT*))))
     (if entry
@@ -469,9 +303,9 @@
   `(push ,sym (?syms *GLOBAL-ENVIRONMENT*)))
 
 ;;------------------------------------------------------------------------------
-(defmacro get-symbol-bind (symbol)
-  `(dolist (sym (?syms *GLOBAL-ENVIRONMENT*))
-     (when (eq ,symbol (?symbol sym)) (return sym))))
+(defun get-symbol-bind (symbol)
+  (dolist (sym (?syms *GLOBAL-ENVIRONMENT*))
+    (when (eq symbol (?symbol sym)) (return sym))))
 
 ;;------------------------------------------------------------------------------
 ;; Dynamic Variables

@@ -1,44 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Inhalt   : Laufzeitfunktionen zur Bearbeitung von UNIX Pathnames
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.9 $
-;;; $Log: filesys.lisp,v $
-;;; Revision 1.9  1993/12/09  16:59:54  sma
-;;; Parameter der Aufrufe von error korrigiert. rt::shrink-vector durch
-;;; shrink-simple-string ersetzt.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.8  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Funktion : Laufzeitfunktionen zur Bearbeitung von UNIX Pathnames
 ;;;
-;;; Revision 1.7  1993/06/05  19:26:57  hk
-;;; Funktion file-name ins Package RT.
-;;;
-;;; Revision 1.6  1993/05/13  13:24:53  hk
-;;; rt:: vor unix-current-directory.
-;;;
-;;; Revision 1.5  1993/05/03  14:35:47  hk
-;;; declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.4  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.3  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.9 $ eingefuegt
-;;;
-;;; Revision 1.2  1993/01/19  16:46:25  uho
-;;; Beim Aufruf von %make-pathname keywords eingefuegt.
-;;;
-;;; Revision 1.1  1993/01/19  13:17:07  hk
-;;; Initial revision
+;;; $Revision: 1.11 $
+;;; $Id: filesys.lisp,v 1.11 1994/11/22 14:55:56 hk Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -63,14 +48,16 @@
 
 
 (defparameter *ignore-wildcards* nil)
-(defparameter *unix-host* (make-host :parse #'parse-unix-namestring
+(defparameter *unix-host* "UNIX"
+  #|(make-host :parse #'parse-unix-namestring
                                      :unparse #'unparse-unix-namestring
                                      :unparse-host #'unparse-unix-host
                                      :unparse-directory #'unparse-unix-directory
                                      :unparse-file #'unparse-unix-file
                                      :unparse-enough #'unparse-unix-enough
-                                     :customary-case :lower)
-  #|(make-unix-host)|#)
+                                     :customary-case :lower)|#
+  )
+
 (defconstant s-ifmt 61440)
 (defconstant s-ifdir 16384)
 (defconstant s-ifreg 32768)

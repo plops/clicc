@@ -1,14 +1,14 @@
 #!/bin/sh
-#-----------------------------------------------------------------------------
-# Projekt: APPLY - A Practicable And Portable Lisp Implementation
-#          ------------------------------------------------------
-# Inhalt : Aufruf des Makefiles zum Updaten der Laufzeitsystem Bibliotheken.
+#------------------------------------------------------------------------------
+# CLiCC: The Common Lisp to C Compiler
+# Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+# Christian-Albrechts-Universitaet zu Kiel, Germany
+#------------------------------------------------------------------------------
+# Function : Update the lisp library files
 #
-# $Source: /home3/apply/public/clicc-0.6.4/bin/RCS/rt,v $
-# $Author: ft $
-# $Revision: 1.2 $
-# $Date: 1993/08/04 13:19:15 $
+# $Revision: 1.5 $
+# $Id: rt,v 1.5 1994/11/22 15:11:46 hk Exp $
 #------------------------------------------------------------------------------
 
-gmake -C $CLICCROOT/src/runtime/c "OPTIMIZE=-O" "CC=gcc"
-gmake -C $CLICCROOT/src/runtime/lisp2c "OPTIMIZE=-O" "CC=gcc"
+gmake -C $CLICCROOT/src/runtime/c OPTIMIZE=-O2 CC=gcc
+gmake -C $CLICCROOT/src/runtime/lisp2c OPTIMIZE=-O2 CC=gcc

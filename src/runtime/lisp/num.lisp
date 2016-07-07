@@ -1,54 +1,29 @@
 ;;;-----------------------------------------------------------------------------
-;;; Copyright (C) 1993 Christian-Albrechts-Universitaet zu Kiel, Germany
-;;;----------------------------------------------------------------------------
-;;; Projekt  : APPLY - A Practicable And Portable Lisp Implementation
-;;;            ------------------------------------------------------
-;;; Funktion : System-Funktionen (12. Numbers)                                
+;;; CLiCC: The Common Lisp to C Compiler
+;;; Copyright (C) 1994 Wolfgang Goerigk, Ulrich Hoffmann, Heinz Knutzen 
+;;; Christian-Albrechts-Universitaet zu Kiel, Germany
+;;;-----------------------------------------------------------------------------
+;;; CLiCC has been developed as part of the APPLY research project,
+;;; funded by the German Ministry of Research and Technology.
+;;; 
+;;; CLiCC is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2 of the License, or
+;;; (at your option) any later version.
 ;;;
-;;; $Revision: 1.12 $
-;;; $Log: num.lisp,v $
-;;; Revision 1.12  1994/01/21  14:47:20  ft
-;;; Erweiterung um die Funktionen scale-float, float-radix, float-sign,
-;;; float-precision und integer-decode-float.
+;;; CLiCC is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License in file COPYING for more details.
 ;;;
-;;; Revision 1.11  1994/01/05  12:41:20  sma
-;;; Namensänderung: rt::*-internal -> rt::*
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; if not, write to the Free Software
+;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+;;;-----------------------------------------------------------------------------
+;;; Function : Numbers
 ;;;
-;;; Revision 1.10  1993/09/02  15:56:37  uho
-;;; LOGTEST und LOGBITP definiert. Einige andere logische Funktionen
-;;; verschoenert.
-;;;
-;;; Revision 1.9  1993/06/16  15:20:38  hk
-;;;  Copyright Notiz eingefuegt.
-;;;
-;;; Revision 1.8  1993/04/22  10:48:21  hk
-;;; (in-package "RUNTIME") -> (in-package "LISP"),
-;;; Definitionen exportiert, defvar, defconstant, defmacro aus
-;;; clicc/lib/lisp.lisp einkopiert. rt::set-xxx in (setf xxx) umgeschrieben.
-;;; Definitionen und Anwendungen von/aus Package Runtime mit rt: gekennzeichnet.
-;;; declaim fun-spec und declaim top-level-form gestrichen.
-;;;
-;;; Revision 1.7  1993/04/06  17:07:09  hk
-;;; shift-right, shift-left -> %shift-right, %shift-left.
-;;;
-;;; Revision 1.6  1993/03/02  15:27:48  hk
-;;; isqrt definiert.
-;;;
-;;; Revision 1.5  1993/02/16  14:34:20  hk
-;;; clicc::declaim -> declaim, clicc::fun-spec (etc.) -> lisp::fun-spec (etc.)
-;;; $Revision: 1.12 $ eingefuegt
-;;;
-;;; Revision 1.4  1993/01/13  15:07:13  ft
-;;; Erweiterung um (ash ...)
-;;;
-;;; Revision 1.3  1993/01/06  11:18:18  ft
-;;; Erweiterung um logische Operationen auf Zahlen.
-;;;
-;;; Revision 1.2  1992/07/06  09:14:15  hk
-;;; Neue Syntax fuer declaim fun-spec.
-;;;
-;;; Revision 1.1  1992/03/24  17:12:55  hk
-;;; Initial revision
+;;; $Revision: 1.14 $
+;;; $Id: num.lisp,v 1.14 1994/11/22 14:55:56 hk Exp $
 ;;;----------------------------------------------------------------------------
 
 (in-package "LISP")
@@ -64,7 +39,7 @@
 (defparameter I-D-F-FAKTOR (* FLOAT-RADIX FLOAT-SIGNIFICAND-LENGTH))
 
 ;;-----------------------------------------------------------------------------
-;; 12.3. Comparisons on Numbers                                               
+;; Comparisons on Numbers                                               
 ;;-----------------------------------------------------------------------------
 
 ;;-----------------------------------------------------------------------------
@@ -136,7 +111,7 @@
       (error "Isqrt: ~S argument must be a nonnegative integer" n)))
 
 ;;-----------------------------------------------------------------------------
-;; 12.5.2. Trigonometric and Related Functions                                
+;; Trigonometric and Related Functions                                
 ;;-----------------------------------------------------------------------------
 
 ;;-----------------------------------------------------------------------------
@@ -146,7 +121,7 @@
   (if (minusp number) (- number) number))
 
 ;;-----------------------------------------------------------------------------
-;; 12.6. Type Conversions and Component Extractions on Numbers                
+;; Type Conversions and Component Extractions on Numbers                
 ;;-----------------------------------------------------------------------------
 
 ;;-----------------------------------------------------------------------------
@@ -164,25 +139,25 @@
 ;; FLOOR number &OPTIONAL divisor
 ;;-----------------------------------------------------------------------------
 (defun floor (number &optional (divisor 1))
-  (rt::floor number divisor))
+  (rt::convert-to-int number divisor 0))
 
 ;;-----------------------------------------------------------------------------
 ;; CEILING number &OPTIONAL divisor
 ;;-----------------------------------------------------------------------------
 (defun ceiling (number &optional (divisor 1))
-  (rt::ceiling number divisor))
+  (rt::convert-to-int number divisor 1))
 
 ;;-----------------------------------------------------------------------------
 ;; TRUNCATE number &OPTIONAL divisor
 ;;-----------------------------------------------------------------------------
 (defun truncate (number &optional (divisor 1))
-  (rt::truncate number divisor))
+  (rt::convert-to-int number divisor 2))
 
 ;;-----------------------------------------------------------------------------
 ;; ROUND number &OPTIONAL divisor
 ;;-----------------------------------------------------------------------------
 (defun round (number &optional (divisor 1))
-  (rt::round number divisor))
+  (rt::convert-to-int number divisor 3))
 
 ;;-----------------------------------------------------------------------------
 ;; MOD number divisor
@@ -260,7 +235,7 @@
      (floor float-sign))))
 
 ;;------------------------------------------------------------------------------
-;; 12.7. Logical Operations on Numbers
+;; Logical Operations on Numbers
 ;;------------------------------------------------------------------------------
 
 ;;------------------------------------------------------------------------------

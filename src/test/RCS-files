@@ -1,0 +1,17 @@
+$Revision: 1.8 $
+README
+ai-course.lisp
+arrays.lisp
+bindings.lisp
+boyer.lisp
+clos-test.lisp
+eval.lisp
+evaltest.lisp
+expert.lisp
+lambda.lisp
+search.lisp
+side-effect.lisp
+testmain.lisp
+time.def
+time.lisp
+y-fac.lisp

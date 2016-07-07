@@ -1,4 +1,69 @@
-$Revision: 1.4 $
+$Revision: 1.5 $
+
+
+Release Notes for Prelease CLiCC 0.6.5
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------------------------------------------------
+                Please read these carefully and enhance.
+     We plan to release 0.6.5 after thoroughly testing this prerelease
+                          in January 1996
+--------------------------------------------------------------------------------
+
+Since the APPLY project ended in Summer'94 we keep on developin CLiCC
+in our spare time without funding. So things evolve slower than they
+used to. Improvements we made for release 0.6.5:
+
+- CLiCC is now released under the GPL.
+
+- The way host specific functions are called is improved so that
+  programs, which do not use pathname functions will not contain all
+  functions defined in filesys.sys. This leads to smaller resulting
+  programs most of the time.
+
+- The Foreign function interface does not generate print functions for
+  foreign data any longer. It's up to the user to provide specific
+  output functions for her foreign types.
+
+- New switch *IGNORE-THE* controls treatment of 'the' special forms.
+
+- Several bugs in the type analyzer, in the optimizers and in the
+  object system were fixed.
+
+- Side effect and closure analysis are enhanced and simplified.
+ 
+- Performance of read is improved by using more special data
+  structures in its implementation.
+
+- Using different object representations (OBREP) when compiling from
+  CL0 to C and from C to machine code now results in a verbose error 
+  message rather than undetected malicous behaviour.
+
+- Foreign function interface now works with both object
+  representations and seems to be stable.
+
+- In case an ANSI C compiler is used to compile the resulting C
+  programs, the range of fixnums will now be detected by using the 
+  informations in limits.h.
+ 
+- MAKE-ARRAY is greatly simplified to increase performance. 
+  In case of type errors this might result in less readable error
+  messages.
+
+- Pathnames are now used all over the place.
+
+- CLiCC compiled programs now run fine on DEC-Alphas, where integer
+  sizes conflicted with our former assumptions (INT_GE_PTR). In
+  addition the size for doubles might be less then the size for long.
+
+- Some error message are (hopefully) much clearer now.
+
+- Garbage collection message is printed only if preprocessor symbol
+  DEBUG is defined. Thus it will be shown when programs are compiled
+  with 'clg' but not if they are compiled with 'cl'.
+
+- Migration aid for run time evals is now available. See file
+  clicc/src/test/eval.lisp for details.
+
 
 Release Notes for CLiCC 0.6.4
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
